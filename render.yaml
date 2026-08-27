@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: returnhaul-api
+    runtime: node
+    rootDir: artifacts/api-server
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: NODE_ENV
+        value: production

@@ -1,0 +1,481 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: ReturnHaul freight matching API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: dashboard
+  - name: trips
+  - name: freight
+  - name: matches
+  - name: bookings
+  - name: messages
+  - name: documents
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Return dashboard overview
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /trips:
+    get:
+      operationId: listTrips
+      tags: [trips]
+      summary: List return trips
+      parameters:
+        - $ref: "#/components/parameters/Corridor"
+        - $ref: "#/components/parameters/Date"
+        - $ref: "#/components/parameters/VehicleType"
+      responses:
+        "200":
+          description: Return trips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trip"
+    post:
+      operationId: createTrip
+      tags: [trips]
+      summary: Post a return trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TripInput"
+      responses:
+        "201":
+          description: Created trip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trip"
+  /trips/{id}:
+    patch:
+      operationId: updateTrip
+      tags: [trips]
+      summary: Edit a return trip
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TripUpdate"
+      responses:
+        "200":
+          description: Updated trip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trip"
+  /freight:
+    get:
+      operationId: listFreight
+      tags: [freight]
+      summary: List freight requests
+      parameters:
+        - $ref: "#/components/parameters/Corridor"
+        - $ref: "#/components/parameters/Date"
+      responses:
+        "200":
+          description: Freight requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Freight"
+    post:
+      operationId: createFreight
+      tags: [freight]
+      summary: Post a freight request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreightInput"
+      responses:
+        "201":
+          description: Created freight request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Freight"
+  /freight/{id}:
+    patch:
+      operationId: updateFreight
+      tags: [freight]
+      summary: Edit a freight request
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreightUpdate"
+      responses:
+        "200":
+          description: Updated freight request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Freight"
+  /matches:
+    get:
+      operationId: listMatches
+      tags: [matches]
+      summary: Find corridor and capacity compatible matches
+      parameters:
+        - $ref: "#/components/parameters/Mode"
+        - $ref: "#/components/parameters/Corridor"
+      responses:
+        "200":
+          description: Matching results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Match"
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      summary: List bookings and escrow status
+      responses:
+        "200":
+          description: Bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Book a match and hold escrow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingInput"
+      responses:
+        "201":
+          description: Created booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+  /bookings/{id}/status:
+    patch:
+      operationId: updateBookingStatus
+      tags: [bookings]
+      summary: Advance trip status and release escrow on delivery
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusInput"
+      responses:
+        "200":
+          description: Updated booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+  /messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: List negotiation messages
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: createMessage
+      tags: [messages]
+      summary: Send a negotiation message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /documents:
+    get:
+      operationId: listDocuments
+      tags: [documents]
+      summary: List uploaded logistics documents
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+    post:
+      operationId: createDocument
+      tags: [documents]
+      summary: Register a document upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentInput"
+      responses:
+        "201":
+          description: Created document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    Corridor:
+      name: corridor
+      in: query
+      schema: { type: string }
+    Date:
+      name: date
+      in: query
+      schema: { type: string }
+    VehicleType:
+      name: vehicleType
+      in: query
+      schema:
+        type: string
+        enum: [Flatbed, Enclosed, Refrigerated, "Box Truck"]
+    Mode:
+      name: mode
+      in: query
+      schema:
+        type: string
+        enum: [shipper, carrier]
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status: { type: string }
+      required: [status]
+    Trip:
+      type: object
+      required: [id, carrier, origin, destination, corridor, departureDate, vehicleType, capacityTons, capacityM3, price, priceType, status]
+      properties:
+        id: { type: string }
+        carrier: { type: string }
+        carrierRating: { type: number }
+        origin: { type: string }
+        destination: { type: string }
+        corridor: { type: string }
+        departureDate: { type: string }
+        vehicleType: { type: string }
+        capacityTons: { type: number }
+        capacityM3: { type: number }
+        price: { type: number }
+        priceType: { type: string, enum: [Fixed, "Per Ton"] }
+        status: { type: string, enum: [Available, Booked, "En Route to Pickup", Loaded, "At Border", Delivered] }
+    TripInput:
+      type: object
+      required: [origin, destination, departureDate, vehicleType, capacityTons, capacityM3, price, priceType]
+      properties:
+        origin: { type: string }
+        destination: { type: string }
+        departureDate: { type: string }
+        vehicleType: { type: string }
+        capacityTons: { type: number }
+        capacityM3: { type: number }
+        price: { type: number }
+        priceType: { type: string }
+    TripUpdate:
+      type: object
+      properties:
+        origin: { type: string }
+        destination: { type: string }
+        departureDate: { type: string }
+        vehicleType: { type: string }
+        capacityTons: { type: number }
+        capacityM3: { type: number }
+        price: { type: number }
+        priceType: { type: string }
+    Freight:
+      type: object
+      required: [id, shipper, pickup, dropoff, corridor, description, weightTons, dimensions, pickupDate, price, status]
+      properties:
+        id: { type: string }
+        shipper: { type: string }
+        pickup: { type: string }
+        dropoff: { type: string }
+        corridor: { type: string }
+        description: { type: string }
+        weightTons: { type: number }
+        dimensions: { type: string }
+        pickupDate: { type: string }
+        price: { type: number }
+        status: { type: string, enum: [Pending, Matched, "In-Transit", Delivered] }
+    FreightInput:
+      type: object
+      required: [pickup, dropoff, description, weightTons, dimensions, pickupDate, price]
+      properties:
+        pickup: { type: string }
+        dropoff: { type: string }
+        description: { type: string }
+        weightTons: { type: number }
+        dimensions: { type: string }
+        pickupDate: { type: string }
+        price: { type: number }
+    FreightUpdate:
+      type: object
+      properties:
+        pickup: { type: string }
+        dropoff: { type: string }
+        description: { type: string }
+        weightTons: { type: number }
+        dimensions: { type: string }
+        pickupDate: { type: string }
+        price: { type: number }
+    Match:
+      type: object
+      required: [id, type, title, corridor, date, capacity, price, compatibility]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [trip, freight] }
+        title: { type: string }
+        corridor: { type: string }
+        date: { type: string }
+        capacity: { type: string }
+        price: { type: number }
+        compatibility: { type: number }
+        counterpart: { type: string }
+    Booking:
+      type: object
+      required: [id, tripId, freightId, corridor, amount, escrowStatus, status, bookedAt]
+      properties:
+        id: { type: string }
+        tripId: { type: string }
+        freightId: { type: string }
+        corridor: { type: string }
+        amount: { type: number }
+        escrowStatus: { type: string, enum: [Held, Released] }
+        status: { type: string }
+        bookedAt: { type: string }
+    BookingInput:
+      type: object
+      required: [tripId, freightId, amount, corridor]
+      properties:
+        tripId: { type: string }
+        freightId: { type: string }
+        amount: { type: number }
+        corridor: { type: string }
+    StatusInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+    Message:
+      type: object
+      required: [id, sender, body, sentAt, read]
+      properties:
+        id: { type: string }
+        sender: { type: string }
+        body: { type: string }
+        sentAt: { type: string }
+        read: { type: boolean }
+    MessageInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+    Document:
+      type: object
+      required: [id, name, type, uploadedBy, uploadedAt, size, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string }
+        uploadedBy: { type: string }
+        uploadedAt: { type: string }
+        size: { type: string }
+        status: { type: string, enum: [Pending, Verified, Rejected] }
+    DocumentInput:
+      type: object
+      required: [name, type, size]
+      properties:
+        name: { type: string }
+        type: { type: string }
+        size: { type: string }
+    Dashboard:
+      type: object
+      required: [activeTrips, availableLoads, inTransit, delivered, totalEscrow, matchRate, recentActivity]
+      properties:
+        activeTrips: { type: number }
+        availableLoads: { type: number }
+        inTransit: { type: number }
+        delivered: { type: number }
+        totalEscrow: { type: number }
+        matchRate: { type: number }
+        recentActivity:
+          type: array
+          items:
+            type: object
+            required: [id, label, detail, time, tone]
+            properties:
+              id: { type: string }
+              label: { type: string }
+              detail: { type: string }
+              time: { type: string }
+              tone: { type: string }
