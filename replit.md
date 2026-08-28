@@ -1,6 +1,6 @@
-# ReturnHaul
+# TruckShare UG
 
-Cross-border freight matching that turns carrier backhaul capacity into reliable, bookable loads for shippers.
+Cross-border and regional freight matching that turns carrier backhaul capacity into reliable, bookable loads for shippers across Uganda.
 
 ## Run & Operate
 
@@ -11,6 +11,7 @@ Cross-border freight matching that turns carrier backhaul capacity into reliable
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
 - `FRONTEND_URL` — allowed browser origin for the API
+- `JWT_SECRET` — signing secret for API sessions
 - `VITE_API_URL` — API base URL for Netlify builds
 
 ## Stack
@@ -40,8 +41,12 @@ Cross-border freight matching that turns carrier backhaul capacity into reliable
 
 - Carrier and shipper portals for posting trips and loads
 - Corridor, capacity, and date matching
-- Booking with simulated held/released escrow
-- Status tracking, negotiation messages, and logistics document hub
+- Phone +256 OTP and simulated Google onboarding
+- Driver verification with NIN, license, and vehicle logbook review
+- Booking with MTN MoMo / Airtel Money simulation and 12% / 88% split
+- Status tracking, receiver OTP proof of delivery, and payout unlock
+- Negotiation messages, call links, and logistics document hub
+- Uganda seed corridors: Kampala–Mbale, Kampala–Mbarara, Kampala–Gulu, Malaba–Kampala
 
 ## User preferences
 
