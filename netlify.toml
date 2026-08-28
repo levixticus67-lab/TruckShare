@@ -5,6 +5,8 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  PORT = "5173"
+  BASE_PATH = "/"
 
 [[redirects]]
   from = "/*"

@@ -8,8 +8,6 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: PORT
-        sync: false
       - key: FRONTEND_URL
         sync: false
       - key: JWT_SECRET
