@@ -1,5 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createHmac, randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { db, databaseConfigured, runtimeStateTable } from "@workspace/db";
 import {
   CreateBookingBody,
   CreateDocumentBody,
@@ -151,6 +153,57 @@ const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const stateKeys = ["trips", "freight", "bookings", "messages", "documents", "users", "verifications"] as const;
+type StateKey = (typeof stateKeys)[number];
+let stateReady: Promise<void> | undefined;
+
+function stateValue(key: StateKey) {
+  return JSON.stringify({ trips, freight, bookings, messages, documents, users, verifications }[key]);
+}
+
+function applyState(key: string, value: string) {
+  const parsed: unknown = JSON.parse(value);
+  if (!Array.isArray(parsed)) return;
+  if (key === "trips") trips.splice(0, trips.length, ...parsed as Trip[]);
+  if (key === "freight") freight.splice(0, freight.length, ...parsed as Freight[]);
+  if (key === "bookings") bookings.splice(0, bookings.length, ...parsed as Booking[]);
+  if (key === "messages") messages.splice(0, messages.length, ...parsed);
+  if (key === "documents") documents.splice(0, documents.length, ...parsed);
+  if (key === "users") users.splice(0, users.length, ...parsed as User[]);
+  if (key === "verifications") verifications.splice(0, verifications.length, ...parsed as Verification[]);
+}
+
+async function ensureDatabaseState() {
+  if (!databaseConfigured) return;
+  if (!stateReady) {
+    stateReady = (async () => {
+      const rows = await db.select().from(runtimeStateTable);
+      if (rows.length === 0) {
+        await db.insert(runtimeStateTable).values(stateKeys.map((key) => ({ key, value: stateValue(key) })));
+        return;
+      }
+      for (const row of rows) applyState(row.key, row.value);
+    })();
+  }
+  try {
+    await stateReady;
+  } catch (error) {
+    stateReady = undefined;
+    throw error;
+  }
+}
+
+async function persistDatabaseState() {
+  if (!databaseConfigured) return;
+  await Promise.all(stateKeys.map((key) =>
+    db.insert(runtimeStateTable)
+      .values({ key, value: stateValue(key) })
+      .onConflictDoUpdate({
+        target: runtimeStateTable.key,
+        set: { value: stateValue(key), updatedAt: new Date() },
+      }),
+  ));
+}
 
 function issueToken(user: User) {
   const payload = Buffer.from(JSON.stringify({ sub: user.id, role: user.role, exp: Date.now() + 86400000 })).toString("base64url");
@@ -159,6 +212,15 @@ function issueToken(user: User) {
 }
 
 const router: IRouter = Router();
+
+router.use(async (_req, _res, next) => {
+  try {
+    await ensureDatabaseState();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/dashboard", (_req, res) => {
   const totalEscrow = bookings.filter((booking) => booking.escrowStatus === "Held").reduce((sum, booking) => sum + booking.amount, 0);
@@ -188,7 +250,7 @@ router.post("/auth/request-otp", (req, res) => {
   res.json({ challengeId, phone, message: "Mock OTP sent. Use 2468 in development.", devOtp: process.env.NODE_ENV === "production" ? undefined : "2468" });
 });
 
-router.post("/auth/verify-otp", (req, res) => {
+router.post("/auth/verify-otp", async (req, res) => {
   const challenge = otpChallenges.get(text(req.body?.challengeId));
   if (!challenge || text(req.body?.otp) !== challenge.otp) {
     res.status(400).json({ error: "That OTP is not valid or has expired." });
@@ -198,14 +260,16 @@ router.post("/auth/verify-otp", (req, res) => {
   users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
+  await persistDatabaseState();
   res.json({ token, user });
 });
 
-router.post("/auth/google", (_req, res) => {
+router.post("/auth/google", async (_req, res) => {
   const user: User = { id: id("user"), name: "Google workspace user", email: "demo@truckshare.ug", role: "Shipper", verified: false };
   users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
+  await persistDatabaseState();
   res.json({ token, user, simulated: true });
 });
 
@@ -225,7 +289,7 @@ router.get("/trips", (req, res) => {
   res.json(ListTripsResponse.parse(filtered));
 });
 
-router.post("/trips", (req, res) => {
+router.post("/trips", async (req, res) => {
   const data = CreateTripBody.parse(req.body);
   const trip: Trip = {
     ...data,
@@ -239,16 +303,18 @@ router.post("/trips", (req, res) => {
     status: "Available",
   };
   trips.unshift(trip);
+  await persistDatabaseState();
   res.status(201).json(trip);
 });
 
-router.patch("/trips/:id", (req, res) => {
+router.patch("/trips/:id", async (req, res) => {
   const params = UpdateTripParams.parse(req.params);
   const data = UpdateTripBody.parse(req.body);
   const trip = trips.find((item) => item.id === params.id);
   if (!trip) { res.status(404).json({ error: "Trip not found" }); return; }
   Object.assign(trip, data);
   trip.corridor = `${trip.origin.split(",")[0]} → ${trip.destination.split(",")[0]}`;
+  await persistDatabaseState();
   res.json(UpdateTripResponse.parse(trip));
 });
 
@@ -260,7 +326,7 @@ router.get("/freight", (req, res) => {
   )));
 });
 
-router.post("/freight", (req, res) => {
+router.post("/freight", async (req, res) => {
   const data = CreateFreightBody.parse(req.body);
   const load: Freight = {
     ...data,
@@ -272,16 +338,18 @@ router.post("/freight", (req, res) => {
     status: "Pending",
   };
   freight.unshift(load);
+  await persistDatabaseState();
   res.status(201).json(load);
 });
 
-router.patch("/freight/:id", (req, res) => {
+router.patch("/freight/:id", async (req, res) => {
   const params = UpdateFreightParams.parse(req.params);
   const data = UpdateFreightBody.parse(req.body);
   const load = freight.find((item) => item.id === params.id);
   if (!load) { res.status(404).json({ error: "Freight request not found" }); return; }
   Object.assign(load, data);
   load.corridor = `${load.pickup.split(",")[0]} → ${load.dropoff.split(",")[0]}`;
+  await persistDatabaseState();
   res.json(UpdateFreightResponse.parse(load));
 });
 
@@ -295,7 +363,7 @@ router.get("/matches", (req, res) => {
 });
 
 router.get("/bookings", (_req, res) => res.json(bookings));
-router.post("/bookings", (req, res) => {
+router.post("/bookings", async (req, res) => {
   const data = CreateBookingBody.parse(req.body);
   const amount = number(data.amount);
   const booking: Booking = {
@@ -312,10 +380,11 @@ router.post("/bookings", (req, res) => {
     podOtp: "4312",
   };
   bookings.unshift(booking);
+  await persistDatabaseState();
   res.status(201).json(booking);
 });
 
-router.patch("/bookings/:id/status", (req, res) => {
+router.patch("/bookings/:id/status", async (req, res) => {
   const params = UpdateBookingStatusParams.parse(req.params);
   const data = UpdateBookingStatusBody.parse(req.body);
   const booking = bookings.find((item) => item.id === params.id);
@@ -325,17 +394,19 @@ router.patch("/bookings/:id/status", (req, res) => {
     booking.escrowStatus = "Released";
     booking.podStatus = "Delivered";
   }
+  await persistDatabaseState();
   res.json(booking);
 });
 
-router.post("/bookings/:id/request-pod", (req, res) => {
+router.post("/bookings/:id/request-pod", async (req, res) => {
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
   booking.podStatus = "OTP sent";
+  await persistDatabaseState();
   res.json({ bookingId: booking.id, message: "Mock receiver OTP sent.", devOtp: process.env.NODE_ENV === "production" ? undefined : booking.podOtp });
 });
 
-router.post("/bookings/:id/complete-delivery", (req, res) => {
+router.post("/bookings/:id/complete-delivery", async (req, res) => {
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
   if (text(req.body?.otp) !== booking.podOtp) {
@@ -346,6 +417,7 @@ router.post("/bookings/:id/complete-delivery", (req, res) => {
   booking.escrowStatus = "Released";
   booking.podStatus = "Delivered";
   booking.deliveryPhoto = text(req.body?.photoName) || undefined;
+  await persistDatabaseState();
   res.json({ booking, payoutUnlocked: true });
 });
 
@@ -355,7 +427,7 @@ router.get("/payments/quote", (req, res) => {
   res.json({ amount, commissionAmount: Math.round(amount * 0.12), carrierPayout: Math.round(amount * 0.88), commissionRate: 12, carrierRate: 88 });
 });
 
-router.post("/payments/simulate", (req, res) => {
+router.post("/payments/simulate", async (req, res) => {
   const booking = bookings.find((item) => item.id === text(req.body?.bookingId));
   const network = text(req.body?.network);
   const phone = text(req.body?.phone);
@@ -366,27 +438,30 @@ router.post("/payments/simulate", (req, res) => {
   }
   booking.paymentNetwork = network as Booking["paymentNetwork"];
   booking.paymentStatus = "Paid";
+  await persistDatabaseState();
   res.json({ booking, message: `${network} payment simulated and escrow funded.` });
 });
 
 router.get("/messages", (_req, res) => res.json(ListMessagesResponse.parse(messages)));
-router.post("/messages", (req, res) => {
+router.post("/messages", async (req, res) => {
   const data = CreateMessageBody.parse(req.body);
   const message = { ...data, id: id("msg"), sender: "You", sentAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), read: true };
   messages.push(message);
+  await persistDatabaseState();
   res.status(201).json(message);
 });
 
 router.get("/documents", (_req, res) => res.json(ListDocumentsResponse.parse(documents)));
-router.post("/documents", (req, res) => {
+router.post("/documents", async (req, res) => {
   const data = CreateDocumentBody.parse(req.body);
   const document = { ...data, id: id("doc"), uploadedBy: "You", uploadedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), status: "Pending" as const };
   documents.unshift(document);
+  await persistDatabaseState();
   res.status(201).json(document);
 });
 
 router.get("/verification", (_req, res) => res.json(verifications));
-router.post("/verification", (req, res) => {
+router.post("/verification", async (req, res) => {
   const data = {
     name: text(req.body?.name) || "New driver",
     phone: text(req.body?.phone),
@@ -401,10 +476,11 @@ router.post("/verification", (req, res) => {
   }
   const verification: Verification = { ...data, id: id("verification"), userId: id("user"), status: "Pending", submittedAt: nowDate() };
   verifications.unshift(verification);
+  await persistDatabaseState();
   res.status(201).json(verification);
 });
 
-router.patch("/verification/:id/review", (req, res) => {
+router.patch("/verification/:id/review", async (req, res) => {
   const verification = verifications.find((item) => item.id === text(req.params.id));
   const status = text(req.body?.status) as Verification["status"];
   if (!verification) { res.status(404).json({ error: "Verification not found" }); return; }
@@ -412,6 +488,7 @@ router.patch("/verification/:id/review", (req, res) => {
   verification.status = status;
   const user = users.find((item) => item.id === verification.userId);
   if (user) user.verified = status === "Verified";
+  await persistDatabaseState();
   res.json(verification);
 });
 

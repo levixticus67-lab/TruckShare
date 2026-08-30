@@ -24,6 +24,7 @@ import { z } from "zod/v4";
 export const tripsTable = pgTable("returnhaul_trips", {
   id: text("id").primaryKey(),
   carrier: text("carrier").notNull(),
+  carrierRating: numeric("carrier_rating").notNull().default("5"),
   origin: text("origin").notNull(),
   destination: text("destination").notNull(),
   corridor: text("corridor").notNull(),
@@ -68,6 +69,8 @@ export const usersTable = pgTable("returnhaul_users", {
 export const verificationsTable = pgTable("returnhaul_verifications", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  phone: text("phone").notNull().default(""),
   nin: text("nin").notNull(),
   licenseNumber: text("license_number").notNull(),
   logbookNumber: text("logbook_number").notNull(),
@@ -88,7 +91,10 @@ export const bookingsTable = pgTable("returnhaul_bookings", {
   status: text("status").notNull().default("En Route to Pickup"),
   escrowStatus: text("escrow_status").notNull().default("Held"),
   paymentStatus: text("payment_status").notNull().default("Unpaid"),
+  paymentNetwork: text("payment_network"),
   podStatus: text("pod_status").notNull().default("Not requested"),
+  podOtp: text("pod_otp").notNull().default("4312"),
+  deliveryPhoto: text("delivery_photo"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -109,8 +115,26 @@ export const messagesTable = pgTable("returnhaul_messages", {
   bookingId: text("booking_id"),
   sender: text("sender").notNull(),
   body: text("body").notNull(),
+  sentAt: text("sent_at").notNull(),
   read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const documentsTable = pgTable("returnhaul_documents", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  uploadedBy: text("uploaded_by").notNull(),
+  uploadedAt: text("uploaded_at").notNull(),
+  size: text("size").notNull(),
+  status: text("status").notNull().default("Pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const runtimeStateTable = pgTable("returnhaul_runtime_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertTripSchema = createInsertSchema(tripsTable).omit({ createdAt: true });
@@ -120,6 +144,8 @@ export const insertVerificationSchema = createInsertSchema(verificationsTable).o
 export const insertBookingSchema = createInsertSchema(bookingsTable).omit({ createdAt: true });
 export const insertPaymentSchema = createInsertSchema(paymentsTable).omit({ createdAt: true });
 export const insertMessageSchema = createInsertSchema(messagesTable).omit({ createdAt: true });
+export const insertDocumentSchema = createInsertSchema(documentsTable).omit({ createdAt: true });
+export const insertRuntimeStateSchema = createInsertSchema(runtimeStateTable).omit({ updatedAt: true });
 export type InsertTrip = z.infer<typeof insertTripSchema>;
 export type Trip = typeof tripsTable.$inferSelect;
 export type InsertFreight = z.infer<typeof insertFreightSchema>;
@@ -134,3 +160,7 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof paymentsTable.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messagesTable.$inferSelect;
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type Document = typeof documentsTable.$inferSelect;
+export type InsertRuntimeState = z.infer<typeof insertRuntimeStateSchema>;
+export type RuntimeState = typeof runtimeStateTable.$inferSelect;
