@@ -2,6 +2,7 @@ services:
   - type: web
     name: returnhaul-api
     runtime: node
+    plan: free
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
     startCommand: pnpm --filter @workspace/api-server run start
     envVars:
