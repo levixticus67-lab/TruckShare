@@ -260,9 +260,14 @@
     @apply border-border;
   }
 
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
     min-width: 320px;
+    overflow-x: hidden;
   }
 }
 
@@ -281,6 +286,95 @@
     opacity: .035;
     z-index: 50;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+  }
+}
+
+/* Small-screen layout guardrails. Desktop layout remains unchanged. */
+@media (max-width: 767px) {
+  header.sticky {
+    min-height: 72px;
+    height: auto;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  header.sticky > div:first-child,
+  header.sticky > div:first-child > div:last-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  header.sticky h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.125rem;
+    line-height: 1.2;
+  }
+
+  header.sticky > div:last-child {
+    flex-shrink: 0;
+    gap: 0.375rem;
+  }
+
+  header.sticky > div:last-child > span {
+    display: none !important;
+  }
+
+  header.sticky > div:last-child > button:not([aria-label]) {
+    width: 4.5rem;
+    min-height: 44px;
+    padding: 0.5rem;
+    overflow: hidden;
+    font-size: 0;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  header.sticky > div:last-child > button:not([aria-label])::after {
+    content: "Sign in";
+    font-size: 0.75rem;
+  }
+
+  header.sticky button[aria-label="Notifications"] + div {
+    position: fixed !important;
+    top: 4.75rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  main {
+    min-width: 0;
+  }
+
+  main .mx-auto {
+    min-width: 0;
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
+  }
+
+  form.flex {
+    flex-wrap: wrap;
+  }
+
+  form.flex input {
+    min-width: 0;
+    flex: 1 1 0%;
+  }
+}
+
+@media (max-width: 380px) {
+  header.sticky > div:last-child > button:not([aria-label]) {
+    width: 3.75rem;
+  }
+
+  header.sticky h1 {
+    font-size: 1rem;
   }
 }
 
