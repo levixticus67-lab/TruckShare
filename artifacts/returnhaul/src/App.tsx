@@ -87,12 +87,16 @@ function Logo() {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [role, setRole] = useState<WorkspaceRole>("Carrier");
   const [authOpen, setAuthOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const current = nav.find(([href]) => href === location) || nav[0];
+  const changeRole = (nextRole: WorkspaceRole) => {
+    setRole(nextRole);
+    navigate(nextRole === "Carrier" ? "/trips" : nextRole === "Shipper" ? "/freight" : "/admin");
+  };
   const visibleNav = nav.filter(([href]) => role === "Carrier"
     ? !["/admin", "/payments"].includes(href)
     : role === "Shipper"
@@ -101,7 +105,7 @@ function Shell({ children }: { children: ReactNode }) {
   return <RoleContext.Provider value={role}><div className="noise min-h-[100dvh] bg-background">
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[258px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground shadow-2xl transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="mb-7 flex items-center justify-between px-2"><Logo /><button className="rounded-lg p-2 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={18} /></button></div>
-      <div className="mb-6 px-2"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/40">Operating as</p><div className="mt-2 flex rounded-lg border border-sidebar-border bg-sidebar-accent/50 p-1">{(["Carrier", "Shipper", "Admin"] as const).map((item) => <button type="button" key={item} onClick={() => setRole(item)} className={`flex-1 rounded-md px-1.5 py-1.5 text-[11px] font-semibold ${role === item ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/55"}`}>{item}</button>)}</div></div>
+      <div className="mb-6 px-2"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/40">Operating as</p><div className="mt-2 flex rounded-lg border border-sidebar-border bg-sidebar-accent/50 p-1">{(["Carrier", "Shipper", "Admin"] as const).map((item) => <button type="button" key={item} onClick={() => changeRole(item)} className={`flex-1 rounded-md px-1.5 py-1.5 text-[11px] font-semibold ${role === item ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/55"}`}>{item}</button>)}</div></div>
       <nav className="space-y-1"><p className="mb-2 px-3 font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/35">Operations</p>{visibleNav.map(([href, label, Icon]) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium ${location === href ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}><Icon size={17} /><span>{label}</span>{href === "/messages" && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" />}</Link>)}</nav>
       <div className="mt-auto space-y-3"><div className="rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2 text-[11px] font-semibold"><span className="live-dot h-2 w-2 rounded-full bg-[#65c7a1]" /> Uganda border network live</div><p className="mt-2 text-[11px] leading-relaxed text-sidebar-foreground/45">4 corridors syncing · next refresh in 42s</p></div><div className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9a35c] text-xs font-bold text-primary">NS</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">Nadia S.</p><p className="truncate text-[10px] text-sidebar-foreground/45">{role} workspace</p></div></div></div>
     </aside>
