@@ -247,7 +247,7 @@ router.post("/auth/request-otp", (req, res) => {
   }
   const challengeId = id("challenge");
   otpChallenges.set(challengeId, { phone, otp: "2468" });
-  res.json({ challengeId, phone, message: "Mock OTP sent. Use 2468 in development.", devOtp: process.env.NODE_ENV === "production" ? undefined : "2468" });
+  res.json({ challengeId, phone, message: "Demo OTP sent. Use the code shown to continue.", devOtp: "2468" });
 });
 
 router.post("/auth/verify-otp", async (req, res) => {

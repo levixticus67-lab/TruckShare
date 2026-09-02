@@ -11,11 +11,15 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
 
 const API_ROOT = (() => {
-  const value = String(import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+  const value = String(import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
+  if (!value) return "";
   return value.endsWith("/api") ? value : `${value}/api`;
 })();
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  if (!API_ROOT) {
+    throw new Error("The API is not configured. Add VITE_API_URL in Vercel and redeploy.");
+  }
   const response = await fetch(`${API_ROOT}${path}`, {
     ...options,
     headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
@@ -67,6 +71,7 @@ function Shell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [role, setRole] = useState<"Carrier" | "Shipper">("Carrier");
   const [authOpen, setAuthOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const current = nav.find(([href]) => href === location) || nav[0];
   return <div className="noise min-h-[100dvh] bg-background">
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[258px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground shadow-2xl transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
@@ -76,7 +81,7 @@ function Shell({ children }: { children: ReactNode }) {
       <div className="mt-auto space-y-3"><div className="rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2 text-[11px] font-semibold"><span className="live-dot h-2 w-2 rounded-full bg-[#65c7a1]" /> Uganda border network live</div><p className="mt-2 text-[11px] leading-relaxed text-sidebar-foreground/45">4 corridors syncing · next refresh in 42s</p></div><div className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9a35c] text-xs font-bold text-primary">NS</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">Nadia S.</p><p className="truncate text-[10px] text-sidebar-foreground/45">{role} workspace</p></div></div></div>
     </aside>
     {mobileOpen && <button className="fixed inset-0 z-30 bg-primary/35 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}
-    <main className="min-h-[100dvh] lg:pl-[258px]"><header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button className="rounded-lg border border-border bg-card p-2 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={18} /></button><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">TruckShare UG / {current[1]}</p><h1 className="mt-0.5 font-display text-xl font-semibold tracking-[-.03em]">{current[1]}</h1></div></div><div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground sm:flex"><span className="live-dot h-1.5 w-1.5 rounded-full bg-[#329477]" /> API synced</span><button className="relative rounded-lg border border-border bg-card p-2.5 text-muted-foreground" aria-label="Notifications"><Bell size={17} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent" /></button><button onClick={() => setAuthOpen(true)} className={`${secondaryButton} hidden sm:inline-flex`}>Sign in / Register</button><div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-bold">NS</div></div></header><div className="mx-auto max-w-[1500px] px-5 py-6 sm:px-8 sm:py-8">{children}</div></main>{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
+    <main className="min-h-[100dvh] lg:pl-[258px]"><header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button className="rounded-lg border border-border bg-card p-2 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={18} /></button><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">TruckShare UG / {current[1]}</p><h1 className="mt-0.5 font-display text-xl font-semibold tracking-[-.03em]">{current[1]}</h1></div></div><div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground sm:flex"><span className="live-dot h-1.5 w-1.5 rounded-full bg-[#329477]" /> API synced</span><div className="relative"><button type="button" onClick={() => setNotificationsOpen((open) => !open)} className="relative rounded-lg border border-border bg-card p-2.5 text-muted-foreground" aria-label="Notifications" aria-expanded={notificationsOpen}><Bell size={17} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent" /></button>{notificationsOpen && <div className="absolute right-0 top-12 z-30 w-72 rounded-xl border border-border bg-card p-4 text-left shadow-xl"><div className="flex items-center justify-between"><p className="font-display text-base font-semibold">Notifications</p><span className="font-mono-ui text-[9px] uppercase tracking-wide text-muted-foreground">3 updates</span></div><div className="mt-3 space-y-3 text-xs"><div className="border-b border-border pb-3"><p className="font-semibold">New match found</p><p className="mt-1 text-muted-foreground">Kampala → Mbale is 92% compatible.</p></div><div className="border-b border-border pb-3"><p className="font-semibold">Payment held</p><p className="mt-1 text-muted-foreground">Eastline Hardware escrow is secured.</p></div><div><p className="font-semibold">Verification queue updated</p><p className="mt-1 text-muted-foreground">Thabo Transport is awaiting review.</p></div></div></div>}</div><button onClick={() => setAuthOpen(true)} className={`${secondaryButton} hidden sm:inline-flex`}>Sign in / Register</button><div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-bold">NS</div></div></header><div className="mx-auto max-w-[1500px] px-5 py-6 sm:px-8 sm:py-8">{children}</div></main>{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
 }
 
 function Header({ eyebrow, title, detail, action }: { eyebrow: string; title: string; detail?: string; action?: ReactNode }) {
@@ -105,10 +110,50 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [message, setMessage] = useState("");
-  const submitPhone = async (event: FormEvent) => { event.preventDefault(); try { const result = await api<{ challengeId: string; message: string }>("/auth/request-otp", { method: "POST", body: JSON.stringify({ phone }) }); setChallengeId(result.challengeId); setMessage(result.message); setStep("otp"); } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Could not send OTP."); } };
-  const verify = async (event: FormEvent) => { event.preventDefault(); try { const result = await api<{ token: string }>("/auth/verify-otp", { method: "POST", body: JSON.stringify({ challengeId, otp }) }); localStorage.setItem("truckshare_token", result.token); onClose(); } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Invalid OTP."); } };
-  const google = async () => { const result = await api<{ token: string }>("/auth/google", { method: "POST", body: "{}" }); localStorage.setItem("truckshare_token", result.token); onClose(); };
-  return <Modal title="Join TruckShare UG" eyebrow="Secure access" onClose={onClose}><div className="mb-5 flex rounded-lg border border-border bg-muted/50 p-1"><button onClick={() => { setMethod("phone"); setStep("phone"); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "phone" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Phone +256</button><button onClick={() => setMethod("google")} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "google" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Google</button></div>{message && <div className="mb-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}{step === "otp" && <span> Use <strong>2468</strong> in dev.</span>}</div>}{method === "google" ? <div className="py-4 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-border font-display text-lg font-bold">G</div><p className="mt-4 text-sm font-semibold">Continue with Google</p><p className="mt-1 text-xs text-muted-foreground">OAuth onboarding is simulated in development.</p><button onClick={google} className={`${button} mt-5 w-full`}>Continue with Google <ArrowRight size={14} /></button></div> : step === "phone" ? <form onSubmit={submitPhone} className="space-y-4"><Field label="Ugandan phone number" value={phone} onChange={setPhone} placeholder="+256 700 000 000" /><button className={`${button} w-full`}>Send mock SMS OTP <ArrowRight size={14} /></button><p className="text-center font-mono-ui text-[10px] text-muted-foreground">Primary onboarding for drivers · dev mode</p></form> : <form onSubmit={verify} className="space-y-4"><Field label="4-digit OTP" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" /><button className={`${button} w-full`}>Verify phone <ShieldCheck size={14} /></button></form>}</Modal>;
+  const [busy, setBusy] = useState(false);
+  const submitPhone = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ challengeId: string; message: string; devOtp?: string }>("/auth/request-otp", { method: "POST", body: JSON.stringify({ phone }) });
+      setChallengeId(result.challengeId);
+      setMessage(result.devOtp ? `${result.message} Demo code: ${result.devOtp}` : result.message);
+      setStep("otp");
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Could not send OTP.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const verify = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string }>("/auth/verify-otp", { method: "POST", body: JSON.stringify({ challengeId, otp }) });
+      localStorage.setItem("truckshare_token", result.token);
+      onClose();
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Invalid OTP.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const google = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string }>("/auth/google", { method: "POST", body: "{}" });
+      localStorage.setItem("truckshare_token", result.token);
+      onClose();
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Google sign-in could not be completed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <Modal title="Join TruckShare UG" eyebrow="Secure access" onClose={onClose}><div className="mb-5 flex rounded-lg border border-border bg-muted/50 p-1"><button type="button" onClick={() => { setMethod("phone"); setStep("phone"); setMessage(""); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "phone" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Phone +256</button><button type="button" onClick={() => { setMethod("google"); setMessage(""); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "google" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Google</button></div>{message && <div className="mb-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}</div>}{method === "google" ? <div className="py-4 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-border font-display text-lg font-bold">G</div><p className="mt-4 text-sm font-semibold">Continue with Google</p><p className="mt-1 text-xs text-muted-foreground">OAuth onboarding is simulated for this preview.</p><button type="button" disabled={busy} onClick={google} className={`${button} mt-5 w-full`}>{busy ? "Connecting..." : "Continue with Google"} <ArrowRight size={14} /></button></div> : step === "phone" ? <form onSubmit={submitPhone} className="space-y-4"><Field label="Ugandan phone number" value={phone} onChange={setPhone} placeholder="+256 700 000 000" /><button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Sending..." : "Send mock SMS OTP"} <ArrowRight size={14} /></button><p className="text-center font-mono-ui text-[10px] text-muted-foreground">Primary onboarding for drivers · preview mode</p></form> : <form onSubmit={verify} className="space-y-4"><Field label="4-digit OTP" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" /><button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : "Verify phone"} <ShieldCheck size={14} /></button></form>}</Modal>;
 }
 
 function TripsPage() {
@@ -153,8 +198,25 @@ function TrackingPage() {
 function MessagesPage() {
   const query = useApi<{ id: string; sender: string; body: string; sentAt: string; read: boolean }[]>("/messages", []);
   const [body, setBody] = useState("");
-  const send = async (event: FormEvent) => { event.preventDefault(); if (!body.trim()) return; await api("/messages", { method: "POST", body: JSON.stringify({ body }) }); setBody(""); query.reload(); };
-  return <div className="space-y-6"><Header eyebrow="Coordination" title="Messages" detail="Keep drivers, shippers, and dispatch teams aligned without leaving the booking." action={<a href="tel:+256700000000" className={secondaryButton}><Phone size={14} /> Call counterpart</a>} /><Card className="mx-auto max-w-3xl"><div className="mb-5 flex items-center gap-3 border-b border-border pb-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-bold">KF</div><div><h3 className="text-sm font-bold">Kivu Foods</h3><p className="text-[11px] text-muted-foreground">Kampala → Mbale · Online</p></div><span className="ml-auto flex items-center gap-1.5 text-[10px] font-bold text-[#28765a]"><span className="h-1.5 w-1.5 rounded-full bg-[#28765a]" /> Active</span></div><div className="min-h-[280px] space-y-3">{query.data.map((message) => <div key={message.id} className={`flex ${message.sender === "You" ? "justify-end" : "justify-start"}`}><div className={`max-w-[80%] rounded-2xl px-4 py-3 text-xs ${message.sender === "You" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted"}`}><p>{message.body}</p><p className={`mt-2 font-mono-ui text-[9px] ${message.sender === "You" ? "text-primary-foreground/55" : "text-muted-foreground"}`}>{message.sender} · {message.sentAt}</p></div></div>)}</div><form onSubmit={send} className="mt-4 flex gap-2 border-t border-border pt-4"><input className={input} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." /><button className={button} aria-label="Send message"><Send size={14} /></button></form></Card></div>;
+  const [feedback, setFeedback] = useState("");
+  const [sending, setSending] = useState(false);
+  const send = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!body.trim() || sending) return;
+    setSending(true);
+    setFeedback("");
+    try {
+      await api("/messages", { method: "POST", body: JSON.stringify({ body }) });
+      setBody("");
+      setFeedback("Message sent.");
+      query.reload();
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "Message could not be sent.");
+    } finally {
+      setSending(false);
+    }
+  };
+  return <div className="space-y-6"><Header eyebrow="Coordination" title="Messages" detail="Keep drivers, shippers, and dispatch teams aligned without leaving the booking." action={<a href="tel:+256700000000" className={secondaryButton}><Phone size={14} /> Call counterpart</a>} /><Card className="mx-auto max-w-3xl"><div className="mb-5 flex items-center gap-3 border-b border-border pb-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-bold">KF</div><div><h3 className="text-sm font-bold">Kivu Foods</h3><p className="text-[11px] text-muted-foreground">Kampala → Mbale · Online</p></div><span className="ml-auto flex items-center gap-1.5 text-[10px] font-bold text-[#28765a]"><span className="h-1.5 w-1.5 rounded-full bg-[#28765a]" /> Active</span></div><div className="min-h-[280px] space-y-3">{query.data.map((message) => <div key={message.id} className={`flex ${message.sender === "You" ? "justify-end" : "justify-start"}`}><div className={`max-w-[80%] rounded-2xl px-4 py-3 text-xs ${message.sender === "You" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted"}`}><p>{message.body}</p><p className={`mt-2 font-mono-ui text-[9px] ${message.sender === "You" ? "text-primary-foreground/55" : "text-muted-foreground"}`}>{message.sender} · {message.sentAt}</p></div></div>)}</div>{feedback && <p className="mt-3 text-xs text-muted-foreground">{feedback}</p>}<form onSubmit={send} className="mt-4 flex gap-2 border-t border-border pt-4"><input className={input} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." /><button type="submit" disabled={sending || !body.trim()} className={button} aria-label="Send message">{sending ? "Sending..." : <Send size={14} />}</button></form></Card></div>;
 }
 
 function DocumentsPage() {
