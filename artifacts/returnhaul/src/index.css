@@ -322,18 +322,13 @@
   }
 
   header.sticky > div:last-child > button:not([aria-label]) {
-    width: 4.5rem;
+    width: auto;
+    min-width: 6.5rem;
     min-height: 44px;
     padding: 0.5rem;
     overflow: hidden;
-    font-size: 0;
     line-height: 1.1;
     white-space: nowrap;
-  }
-
-  header.sticky > div:last-child > button:not([aria-label])::after {
-    content: "Sign in";
-    font-size: 0.75rem;
   }
 
   header.sticky button[aria-label="Notifications"] + div {
@@ -370,7 +365,7 @@
 
 @media (max-width: 380px) {
   header.sticky > div:last-child > button:not([aria-label]) {
-    width: 3.75rem;
+    min-width: 6.5rem;
   }
 
   header.sticky h1 {
