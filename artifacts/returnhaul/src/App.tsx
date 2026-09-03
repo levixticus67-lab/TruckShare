@@ -74,6 +74,18 @@ const button = "inline-flex items-center justify-center gap-2 rounded-lg bg-prim
 const secondaryButton = "inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-xs font-bold transition hover:bg-muted disabled:opacity-50";
 const input = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
 const labelClass = "mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground";
+const mobileLabels: Record<string, string> = {
+  "Command center": "Home",
+  "Return trips": "Trips",
+  "Load board": "Loads",
+  "Smart matching": "Match",
+  "Bookings & payout": "Bookings",
+  "Live tracker": "Track",
+  "Document hub": "Docs",
+  "Driver verification": "Verify",
+  "Admin control": "Admin",
+  "Mobile money": "Pay",
+};
 
 const nav = [
   ["/", "Command center", LayoutDashboard], ["/trips", "Return trips", RouteIcon], ["/freight", "Load board", PackageCheck],
@@ -111,6 +123,7 @@ function Shell({ children }: { children: ReactNode }) {
     : role === "Shipper"
       ? !["/admin", "/verification"].includes(href)
       : ["/", "/admin", "/verification", "/documents", "/messages"].includes(href));
+  const mobileNavItems = visibleNav.filter(([href]) => href !== "/").slice(0, 4);
   return <RoleContext.Provider value={role}><div className="noise min-h-[100dvh] bg-background">
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[258px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground shadow-2xl transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="mb-7 flex items-center justify-between px-2"><Logo /><div className="flex items-center gap-1"><ThemeToggle /><button className="rounded-lg p-2 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={18} /></button></div></div>
@@ -118,6 +131,11 @@ function Shell({ children }: { children: ReactNode }) {
       <nav className="space-y-1"><p className="mb-2 px-3 font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/35">Operations</p>{visibleNav.map(([href, label, Icon]) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium ${location === href ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}><Icon size={17} /><span>{label}</span>{href === "/messages" && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" />}</Link>)}</nav>
       <div className="mt-auto space-y-3"><div className="rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2 text-[11px] font-semibold"><span className="live-dot h-2 w-2 rounded-full bg-[#65c7a1]" /> Uganda border network live</div><p className="mt-2 text-[11px] leading-relaxed text-sidebar-foreground/45">4 corridors syncing · next refresh in 42s</p></div><div className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9a35c] text-xs font-bold text-primary">NS</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">Nadia S.</p><p className="truncate text-[10px] text-sidebar-foreground/45">{role} workspace</p></div></div></div>
     </aside>
+     <nav className={`mobile-bottom-nav fixed inset-x-3 bottom-3 z-40 flex h-[70px] items-center gap-1 rounded-[22px] border border-border/80 px-2 shadow-xl lg:hidden ${mobileOpen ? "pointer-events-none opacity-0" : ""}`} aria-label="Mobile navigation">
+       <Link href="/" onClick={() => setMobileOpen(false)} aria-label="TruckShare home" className={`mobile-nav-brand ${location === "/" ? "is-active" : ""}`}><Truck size={19} /></Link>
+       {mobileNavItems.map(([href, label, Icon]) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} aria-current={location === href ? "page" : undefined} className={`mobile-nav-item ${location === href ? "is-active" : ""}`}><Icon size={18} /><span>{mobileLabels[label] || label}</span>{location === href && <i aria-hidden="true" />}</Link>)}
+       <button type="button" onClick={() => setMobileOpen(true)} className={`mobile-nav-item ${!mobileNavItems.some(([href]) => href === location) && location !== "/" ? "is-active" : ""}`} aria-label="Open more navigation"><Menu size={18} /><span>More</span>{!mobileNavItems.some(([href]) => href === location) && location !== "/" && <i aria-hidden="true" />}</button>
+     </nav>
     {mobileOpen && <button className="fixed inset-0 z-30 bg-primary/35 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}
      <main className="min-h-[100dvh] lg:pl-[258px]"><header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button className="rounded-lg border border-border bg-card p-2 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={18} /></button><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">TruckShare UG</p><h1 className="mt-0.5 font-display text-xl font-semibold tracking-[-.03em]">{current[1]}</h1></div></div><div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground sm:flex"><span className="live-dot h-1.5 w-1.5 rounded-full bg-[#329477]" /> API synced</span><div className="relative"><button type="button" onClick={() => setNotificationsOpen((open) => !open)} className="relative rounded-lg border border-border bg-card p-2.5 text-muted-foreground" aria-label="Notifications" aria-expanded={notificationsOpen}><Bell size={17} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent" /></button>{notificationsOpen && <div className="absolute right-0 top-12 z-30 w-72 rounded-xl border border-border bg-card p-4 text-left shadow-xl"><div className="flex items-center justify-between"><p className="font-display text-base font-semibold">Notifications</p><span className="font-mono-ui text-[9px] uppercase tracking-wide text-muted-foreground">3 updates</span></div><div className="mt-3 space-y-3 text-xs"><div className="border-b border-border pb-3"><p className="font-semibold">New match found</p><p className="mt-1 text-muted-foreground">Kampala → Mbale is 92% compatible.</p></div><div className="border-b border-border pb-3"><p className="font-semibold">Payment held</p><p className="mt-1 text-muted-foreground">Eastline Hardware escrow is secured.</p></div><div><p className="font-semibold">Verification queue updated</p><p className="mt-1 text-muted-foreground">Thabo Transport is awaiting review.</p></div></div></div>}</div><button onClick={() => setAuthOpen(true)} className={`${secondaryButton} inline-flex whitespace-nowrap`}>Sign in / Register</button><div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-bold">NS</div></div></header><div className="mx-auto max-w-[1500px] px-5 py-6 sm:px-8 sm:py-8">{children}</div></main>{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div></RoleContext.Provider>;
 }
