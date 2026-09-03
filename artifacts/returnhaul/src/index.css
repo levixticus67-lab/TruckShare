@@ -644,11 +644,13 @@ header.sticky button[aria-label="Notifications"] + div {
   }
 
   .mobile-notifications {
-    position: absolute;
-    top: calc(100% + 0.5rem);
-    right: 0;
+    position: fixed;
+    top: 4.75rem;
+    right: 0.5rem;
+    left: 0.5rem;
     z-index: 30;
-    width: min(18rem, calc(100vw - 1.5rem));
+    width: auto;
+    max-width: none;
     max-height: min(28rem, calc(100dvh - 6rem));
     overflow-y: auto;
     border: 1px solid hsl(var(--popover-border) / 0.9);
