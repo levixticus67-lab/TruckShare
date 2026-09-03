@@ -107,6 +107,16 @@ function ThemeToggle() {
   return <button type="button" onClick={() => setDark((current) => !current)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent/60 text-sidebar-foreground/75 transition hover:text-sidebar-foreground" aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>;
 }
 
+function MobileHeader({ title, notificationsOpen, onNotifications, onAuth }: { title: string; notificationsOpen: boolean; onNotifications: () => void; onAuth: () => void }) {
+  return <header className="mobile-topbar">
+    <div className="mobile-topbar-brand"><span className="mobile-topbar-mark"><Truck size={18} /></span><div className="min-w-0"><p>TruckShare UG</p><h1>{title}</h1></div></div>
+    <div className="mobile-topbar-actions">
+      <div className="relative"><button type="button" onClick={onNotifications} className="mobile-topbar-icon" aria-label="Notifications" aria-expanded={notificationsOpen}><Bell size={17} /><span /></button>{notificationsOpen && <div className="mobile-notifications"><div className="flex items-center justify-between"><p className="font-display text-base font-semibold">Notifications</p><span className="font-mono-ui text-[9px] uppercase tracking-wide text-muted-foreground">3 updates</span></div><div className="mt-3 space-y-3 text-xs"><div className="border-b border-border pb-3"><p className="font-semibold">New match found</p><p className="mt-1 text-muted-foreground">Kampala → Mbale is 92% compatible.</p></div><div className="border-b border-border pb-3"><p className="font-semibold">Payment held</p><p className="mt-1 text-muted-foreground">Eastline Hardware escrow is secured.</p></div><div><p className="font-semibold">Verification queue updated</p><p className="mt-1 text-muted-foreground">Thabo Transport is awaiting review.</p></div></div></div>}</div>
+      <button type="button" onClick={onAuth} className="mobile-account-button" aria-label="Sign in or register"><UserRound size={16} /><span className="max-[380px]:hidden">Sign in / Register</span><span className="min-[381px]:hidden">Account</span></button>
+    </div>
+  </header>;
+}
+
 function Shell({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -131,6 +141,7 @@ function Shell({ children }: { children: ReactNode }) {
       <nav className="space-y-1"><p className="mb-2 px-3 font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/35">Operations</p>{visibleNav.map(([href, label, Icon]) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium ${location === href ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}><Icon size={17} /><span>{label}</span>{href === "/messages" && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" />}</Link>)}</nav>
       <div className="mt-auto space-y-3"><div className="rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2 text-[11px] font-semibold"><span className="live-dot h-2 w-2 rounded-full bg-[#65c7a1]" /> Uganda border network live</div><p className="mt-2 text-[11px] leading-relaxed text-sidebar-foreground/45">4 corridors syncing · next refresh in 42s</p></div><div className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9a35c] text-xs font-bold text-primary">NS</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">Nadia S.</p><p className="truncate text-[10px] text-sidebar-foreground/45">{role} workspace</p></div></div></div>
     </aside>
+     <MobileHeader title={current[1]} notificationsOpen={notificationsOpen} onNotifications={() => setNotificationsOpen((open) => !open)} onAuth={() => setAuthOpen(true)} />
      <nav className={`mobile-bottom-nav fixed inset-x-3 bottom-3 z-40 flex h-[70px] items-center gap-1 rounded-[22px] border border-border/80 px-2 shadow-xl lg:hidden ${mobileOpen ? "pointer-events-none opacity-0" : ""}`} aria-label="Mobile navigation">
        <Link href="/" onClick={() => setMobileOpen(false)} aria-label="TruckShare home" className={`mobile-nav-brand ${location === "/" ? "is-active" : ""}`}><Truck size={19} /></Link>
        {mobileNavItems.map(([href, label, Icon]) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} aria-current={location === href ? "page" : undefined} className={`mobile-nav-item ${location === href ? "is-active" : ""}`}><Icon size={18} /><span>{mobileLabels[label] || label}</span>{location === href && <i aria-hidden="true" />}</Link>)}
