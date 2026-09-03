@@ -513,6 +513,26 @@ header.sticky button[aria-label="Notifications"] + div {
 }
 
 @media (max-width: 1023px) {
+  aside {
+    inset: auto 0.75rem 0.75rem !important;
+    width: auto !important;
+    max-height: min(72dvh, 560px);
+    overflow-y: auto;
+    border: 1px solid hsl(var(--sidebar-border) / 0.9);
+    border-radius: 1.5rem;
+    transform: translateY(120%) !important;
+    transition: transform 240ms ease, box-shadow 240ms ease;
+  }
+
+  aside.translate-x-0 {
+    transform: translateY(0) !important;
+    box-shadow: 0 24px 60px hsl(var(--foreground) / 0.35);
+  }
+
+  aside.-translate-x-full {
+    transform: translateY(120%) !important;
+  }
+
   .mobile-topbar {
     position: sticky;
     top: 0;
