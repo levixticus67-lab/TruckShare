@@ -239,6 +239,71 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Booking"
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      summary: List payment settlement records
+      responses:
+        "200":
+          description: Payment records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+  /payments/quote:
+    get:
+      operationId: getPaymentQuote
+      tags: [payments]
+      summary: Quote a cross-border settlement
+      parameters:
+        - name: amount
+          in: query
+          required: true
+          schema: { type: number, exclusiveMinimum: 0 }
+        - name: fromCurrency
+          in: query
+          schema: { $ref: "#/components/schemas/CurrencyCode" }
+        - name: toCurrency
+          in: query
+          schema: { $ref: "#/components/schemas/CurrencyCode" }
+        - name: payerCountry
+          in: query
+          schema: { $ref: "#/components/schemas/CountryCode" }
+        - name: payeeCountry
+          in: query
+          schema: { $ref: "#/components/schemas/CountryCode" }
+      responses:
+        "200":
+          description: Indicative settlement quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentQuote"
+  /payments/simulate:
+    post:
+      operationId: simulatePayment
+      tags: [payments]
+      summary: Simulate a payment and hold its settlement amount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "200":
+          description: Simulated payment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [booking, payment]
+                properties:
+                  booking: { $ref: "#/components/schemas/Booking" }
+                  payment: { $ref: "#/components/schemas/Payment" }
   /messages:
     get:
       operationId: listMessages
@@ -450,6 +515,8 @@ components:
         escrowStatus: { type: string, enum: [Held, Released] }
         status: { type: string }
         bookedAt: { type: string }
+        paymentNetwork: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
+        paymentStatus: { type: string, enum: [Unpaid, Paid] }
     BookingInput:
       type: object
       required: [tripId, freightId, amount, corridor]
@@ -461,6 +528,56 @@ components:
         originCountry: { $ref: "#/components/schemas/CountryCode" }
         destinationCountry: { $ref: "#/components/schemas/CountryCode" }
         currency: { $ref: "#/components/schemas/CurrencyCode" }
+    PaymentInput:
+      type: object
+      required: [bookingId, network, phone]
+      properties:
+        bookingId: { type: string }
+        network: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
+        phone: { type: string }
+        payerCountry: { $ref: "#/components/schemas/CountryCode" }
+        amount: { type: number, exclusiveMinimum: 0 }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    Payment:
+      type: object
+      required: [id, bookingId, network, phone, payerCountry, payeeCountry, amount, currency, settlementAmount, settlementCurrency, exchangeRate, commissionAmount, carrierPayout, fee, reference, status, createdAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        network: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
+        phone: { type: string }
+        payerCountry: { $ref: "#/components/schemas/CountryCode" }
+        payeeCountry: { $ref: "#/components/schemas/CountryCode" }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        settlementAmount: { type: number }
+        settlementCurrency: { $ref: "#/components/schemas/CurrencyCode" }
+        exchangeRate: { type: number }
+        commissionAmount: { type: number }
+        carrierPayout: { type: number }
+        fee: { type: number }
+        reference: { type: string }
+        status: { type: string, enum: [Initiated, Held, Released, Failed] }
+        createdAt: { type: string }
+    PaymentQuote:
+      type: object
+      required: [quoteId, payerCountry, payeeCountry, amount, currency, settlementAmount, settlementCurrency, exchangeRate, fee, commissionAmount, carrierPayout, commissionRate, carrierRate, expiresInSeconds, indicative]
+      properties:
+        quoteId: { type: string }
+        payerCountry: { $ref: "#/components/schemas/CountryCode" }
+        payeeCountry: { $ref: "#/components/schemas/CountryCode" }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        settlementAmount: { type: number }
+        settlementCurrency: { $ref: "#/components/schemas/CurrencyCode" }
+        exchangeRate: { type: number }
+        fee: { type: number }
+        commissionAmount: { type: number }
+        carrierPayout: { type: number }
+        commissionRate: { type: number }
+        carrierRate: { type: number }
+        expiresInSeconds: { type: integer }
+        indicative: { type: boolean }
     StatusInput:
       type: object
       required: [status]

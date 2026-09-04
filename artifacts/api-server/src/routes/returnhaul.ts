@@ -78,7 +78,7 @@ type Booking = {
   currency: CurrencyCode;
   commissionAmount: number;
   carrierPayout: number;
-  paymentNetwork?: "MTN MoMo" | "Airtel Money";
+  paymentNetwork?: PaymentNetwork;
   paymentStatus: "Unpaid" | "Paid";
   escrowStatus: "Held" | "Released";
   status: string;
@@ -86,6 +86,28 @@ type Booking = {
   podStatus: "Not requested" | "OTP sent" | "Delivered";
   podOtp: string;
   deliveryPhoto?: string;
+};
+
+type PaymentNetwork = "MTN MoMo" | "Airtel Money" | "Bank Transfer";
+type PaymentStatus = "Initiated" | "Held" | "Released" | "Failed";
+type Payment = {
+  id: string;
+  bookingId: string;
+  network: PaymentNetwork;
+  phone: string;
+  payerCountry: CountryCode;
+  payeeCountry: CountryCode;
+  amount: number;
+  currency: CurrencyCode;
+  settlementAmount: number;
+  settlementCurrency: CurrencyCode;
+  exchangeRate: number;
+  commissionAmount: number;
+  carrierPayout: number;
+  fee: number;
+  reference: string;
+  status: PaymentStatus;
+  createdAt: string;
 };
 
 type Verification = {
@@ -131,6 +153,17 @@ const eacCorridors = [
   { origin: "Kampala", originCountry: "UG", destination: "Juba", destinationCountry: "SS", border: "Elegu / Nimule" },
 ] satisfies Array<{ origin: string; originCountry: CountryCode; destination: string; destinationCountry: CountryCode; border: string }>;
 
+const indicativeFxToUgx: Record<CurrencyCode, number> = {
+  UGX: 1,
+  KES: 29.5,
+  TZS: 0.29,
+  RWF: 2.8,
+  BIF: 1.35,
+  CDF: 0.0013,
+  SSP: 0.022,
+  SOS: 0.058,
+};
+
 function countryCode(value: unknown, fallback: CountryCode = "UG"): CountryCode {
   const code = text(value).toUpperCase();
   return eacCountries.some((country) => country.code === code) ? code as CountryCode : fallback;
@@ -139,6 +172,14 @@ function countryCode(value: unknown, fallback: CountryCode = "UG"): CountryCode 
 function currencyCode(value: unknown, fallback: CurrencyCode = "UGX"): CurrencyCode {
   const code = text(value).toUpperCase();
   return eacCountries.some((country) => country.currency === code) ? code as CurrencyCode : fallback;
+}
+
+function exchangeRate(from: CurrencyCode, to: CurrencyCode) {
+  return indicativeFxToUgx[from] / indicativeFxToUgx[to];
+}
+
+function convertedAmount(amount: number, from: CurrencyCode, to: CurrencyCode) {
+  return Math.round(amount * exchangeRate(from, to));
 }
 
 const routes = [
@@ -164,6 +205,10 @@ const freight: Freight[] = [
 
 const bookings: Booking[] = [
   { id: "booking-1", tripId: "trip-3", freightId: "load-3", corridor: "Malaba → Kampala", originCountry: "UG", destinationCountry: "UG", amount: 1320000, currency: "UGX", commissionAmount: 158400, carrierPayout: 1161600, paymentNetwork: "MTN MoMo", paymentStatus: "Paid", escrowStatus: "Held", status: "At Border", bookedAt: "2026-08-22", podStatus: "Not requested", podOtp: "4312" },
+];
+
+const payments: Payment[] = [
+  { id: "payment-1", bookingId: "booking-1", network: "MTN MoMo", phone: "+256 700 000 000", payerCountry: "UG", payeeCountry: "UG", amount: 1320000, currency: "UGX", settlementAmount: 1320000, settlementCurrency: "UGX", exchangeRate: 1, commissionAmount: 158400, carrierPayout: 1161600, fee: 0, reference: "TS-DEMO-BOOKING-1", status: "Held", createdAt: "2026-08-22" },
 ];
 
 const messages = [
@@ -193,7 +238,7 @@ const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
-const stateKeys = ["trips", "freight", "bookings", "messages", "documents", "users", "verifications"] as const;
+const stateKeys = ["trips", "freight", "bookings", "payments", "messages", "documents", "users", "verifications"] as const;
 type StateKey = (typeof stateKeys)[number];
 let stateReady: Promise<void> | undefined;
 
@@ -222,6 +267,13 @@ function applyState(key: string, value: string) {
     destinationCountry: countryCode(item.destinationCountry),
     currency: currencyCode(item.currency),
   })) as Booking[]);
+  if (key === "payments") payments.splice(0, payments.length, ...(parsed as Partial<Payment>[]).map((item) => ({
+    ...item,
+    payerCountry: countryCode(item.payerCountry),
+    payeeCountry: countryCode(item.payeeCountry),
+    currency: currencyCode(item.currency),
+    settlementCurrency: currencyCode(item.settlementCurrency),
+  })) as Payment[]);
   if (key === "messages") messages.splice(0, messages.length, ...parsed);
   if (key === "documents") documents.splice(0, documents.length, ...parsed);
   if (key === "users") users.splice(0, users.length, ...parsed as User[]);
@@ -491,25 +543,82 @@ router.post("/bookings/:id/complete-delivery", async (req, res) => {
   res.json({ booking, payoutUnlocked: true });
 });
 
+router.get("/payments", (_req, res) => {
+  res.json(payments);
+});
+
 router.get("/payments/quote", (req, res) => {
   const amount = number(req.query.amount);
   if (!Number.isFinite(amount) || amount <= 0) { res.status(400).json({ error: "A positive amount is required." }); return; }
-  res.json({ amount, commissionAmount: Math.round(amount * 0.12), carrierPayout: Math.round(amount * 0.88), commissionRate: 12, carrierRate: 88 });
+  const fromCurrency = currencyCode(req.query.fromCurrency || req.query.currency);
+  const toCurrency = currencyCode(req.query.toCurrency);
+  const rate = exchangeRate(fromCurrency, toCurrency);
+  const settlementAmount = convertedAmount(amount, fromCurrency, toCurrency);
+  const fee = Math.round(settlementAmount * 0.015);
+  const commissionAmount = Math.round(settlementAmount * 0.12);
+  res.json({
+    quoteId: id("quote"),
+    payerCountry: countryCode(req.query.payerCountry),
+    payeeCountry: countryCode(req.query.payeeCountry),
+    amount,
+    currency: fromCurrency,
+    settlementAmount,
+    settlementCurrency: toCurrency,
+    exchangeRate: rate,
+    fee,
+    commissionAmount,
+    carrierPayout: settlementAmount - fee - commissionAmount,
+    commissionRate: 12,
+    carrierRate: 88,
+    expiresInSeconds: 300,
+    indicative: true,
+  });
 });
 
 router.post("/payments/simulate", async (req, res) => {
   const booking = bookings.find((item) => item.id === text(req.body?.bookingId));
-  const network = text(req.body?.network);
+  const network = text(req.body?.network) as PaymentNetwork;
   const phone = text(req.body?.phone);
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
-  if (!["MTN MoMo", "Airtel Money"].includes(network) || !/^\+256\s?\d{3}\s?\d{3}\s?\d{3}$/.test(phone)) {
-    res.status(400).json({ error: "Choose a mobile money network and valid +256 number." });
+  if (!["MTN MoMo", "Airtel Money", "Bank Transfer"].includes(network) || !/^\+\d{8,15}$/.test(phone.replace(/\s+/g, ""))) {
+    res.status(400).json({ error: "Choose a supported payment network and valid international phone number." });
     return;
   }
+  if (booking.paymentStatus === "Paid") {
+    res.status(409).json({ error: "This booking has already been funded." });
+    return;
+  }
+  const payerCountry = countryCode(req.body?.payerCountry);
+  const payerCurrency = currencyCode(req.body?.currency || booking.currency);
+  const settlementCurrency = booking.currency;
+  const amount = number(req.body?.amount) > 0 ? number(req.body?.amount) : booking.amount;
+  const settlementAmount = convertedAmount(amount, payerCurrency, settlementCurrency);
+  const fee = Math.round(settlementAmount * 0.015);
+  const commissionAmount = Math.round(settlementAmount * 0.12);
+  const payment: Payment = {
+    id: id("payment"),
+    bookingId: booking.id,
+    network,
+    phone,
+    payerCountry,
+    payeeCountry: booking.destinationCountry,
+    amount,
+    currency: payerCurrency,
+    settlementAmount,
+    settlementCurrency,
+    exchangeRate: exchangeRate(payerCurrency, settlementCurrency),
+    commissionAmount,
+    carrierPayout: settlementAmount - fee - commissionAmount,
+    fee,
+    reference: `TS-${booking.id}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    status: "Held",
+    createdAt: nowDate(),
+  };
+  payments.unshift(payment);
   booking.paymentNetwork = network as Booking["paymentNetwork"];
   booking.paymentStatus = "Paid";
   await persistDatabaseState();
-  res.json({ booking, message: `${network} payment simulated and escrow funded.` });
+  res.json({ booking, payment, message: `${network} payment simulated and escrow funded.` });
 });
 
 router.get("/messages", (_req, res) => res.json(ListMessagesResponse.parse(messages)));

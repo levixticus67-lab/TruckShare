@@ -29,6 +29,13 @@
       "when": 1788510000000,
       "tag": "0003_eac_geography_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788510000001,
+      "tag": "0004_payment_settlement_ledger",
+      "breakpoints": true
     }
   ]
 }
