@@ -292,7 +292,7 @@ type StateKey = (typeof stateKeys)[number];
 let stateReady: Promise<void> | undefined;
 
 function stateValue(key: StateKey) {
-  return JSON.stringify({ trips, freight, bookings, messages, documents, users, verifications }[key]);
+  return JSON.stringify({ trips, freight, bookings, payments, borderMilestones, messages, documents, users, verifications }[key]);
 }
 
 function applyState(key: string, value: string) {
