@@ -42,7 +42,7 @@ Cross-border and regional freight matching that turns carrier backhaul capacity 
 - Carrier and shipper portals for posting trips and loads
 - Corridor, capacity, and date matching
 - Explicit EAC country, currency, and starter corridor reference data
-- Phone +256 OTP and simulated Google onboarding
+- EAC phone-country onboarding and simulated Google onboarding
 - Driver verification with NIN, license, and vehicle logbook review
 - Cross-border settlement quote model with EAC currencies, fees, and payment ledger
 - Booking with MTN MoMo / Airtel Money simulation and 12% / 88% split

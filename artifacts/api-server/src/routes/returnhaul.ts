@@ -141,6 +141,7 @@ type User = {
   name: string;
   phone?: string;
   email?: string;
+  country: CountryCode;
   role: "Carrier" | "Shipper" | "Admin";
   verified: boolean;
 };
@@ -158,6 +159,17 @@ const eacCountries = [
   { code: "TZ", name: "Tanzania", currency: "TZS" },
   { code: "UG", name: "Uganda", currency: "UGX" },
 ] satisfies Array<{ code: CountryCode; name: string; currency: CurrencyCode }>;
+
+const dialingCodes: Record<CountryCode, string> = {
+  BI: "+257",
+  CD: "+243",
+  KE: "+254",
+  RW: "+250",
+  SO: "+252",
+  SS: "+211",
+  TZ: "+255",
+  UG: "+256",
+};
 
 const eacCorridors = [
   { origin: "Kampala", originCountry: "UG", destination: "Nairobi", destinationCountry: "KE", border: "Malaba / Busia" },
@@ -185,6 +197,11 @@ function countryCode(value: unknown, fallback: CountryCode = "UG"): CountryCode 
 function currencyCode(value: unknown, fallback: CurrencyCode = "UGX"): CurrencyCode {
   const code = text(value).toUpperCase();
   return eacCountries.some((country) => country.currency === code) ? code as CurrencyCode : fallback;
+}
+
+function phoneCountry(value: string) {
+  const normalized = value.replace(/\s+/g, "");
+  return (Object.entries(dialingCodes).find(([, prefix]) => normalized.startsWith(prefix))?.[0] || undefined) as CountryCode | undefined;
 }
 
 function exchangeRate(from: CurrencyCode, to: CurrencyCode) {
@@ -255,9 +272,9 @@ const documents = [
 ];
 
 const users: User[] = [
-  { id: "user-1", name: "Moses K.", phone: "+256 700 111 222", role: "Carrier", verified: true },
-  { id: "user-2", name: "Kampala Grain Co.", email: "dispatch@kampalagrain.ug", role: "Shipper", verified: true },
-  { id: "user-3", name: "Thabo Transport", phone: "+256 781 333 444", role: "Carrier", verified: false },
+  { id: "user-1", name: "Moses K.", phone: "+256 700 111 222", country: "UG", role: "Carrier", verified: true },
+  { id: "user-2", name: "Kampala Grain Co.", email: "dispatch@kampalagrain.ug", country: "UG", role: "Shipper", verified: true },
+  { id: "user-3", name: "Thabo Transport", phone: "+256 781 333 444", country: "UG", role: "Carrier", verified: false },
 ];
 
 const verifications: Verification[] = [
@@ -265,7 +282,7 @@ const verifications: Verification[] = [
 ];
 
 const sessions = new Map<string, User>();
-const otpChallenges = new Map<string, { phone: string; otp: string }>();
+const otpChallenges = new Map<string, { phone: string; country: CountryCode; otp: string }>();
 const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
@@ -314,7 +331,10 @@ function applyState(key: string, value: string) {
   })) as BorderMilestone[]);
   if (key === "messages") messages.splice(0, messages.length, ...parsed);
   if (key === "documents") documents.splice(0, documents.length, ...parsed);
-  if (key === "users") users.splice(0, users.length, ...parsed as User[]);
+  if (key === "users") users.splice(0, users.length, ...(parsed as Partial<User>[]).map((item) => ({
+    ...item,
+    country: countryCode(item.country),
+  })) as User[]);
   if (key === "verifications") verifications.splice(0, verifications.length, ...parsed as Verification[]);
 }
 
@@ -389,13 +409,14 @@ router.get("/reference/eac", (_req, res) => {
 });
 
 router.post("/auth/request-otp", (req, res) => {
-  const phone = text(req.body?.phone).replace(/\s+/g, " ");
-  if (!/^\+256\s?\d{3}\s?\d{3}\s?\d{3}$/.test(phone)) {
-    res.status(400).json({ error: "Use a valid Ugandan number such as +256 700 000 000." });
+  const phone = text(req.body?.phone).replace(/\s+/g, "");
+  const country = phoneCountry(phone);
+  if (!country || !/^\+\d{8,15}$/.test(phone)) {
+    res.status(400).json({ error: "Use a valid EAC number with a supported country code." });
     return;
   }
   const challengeId = id("challenge");
-  otpChallenges.set(challengeId, { phone, otp: "2468" });
+  otpChallenges.set(challengeId, { phone, country, otp: "2468" });
   res.json({ challengeId, phone, message: "Demo OTP sent. Use the code shown to continue.", devOtp: "2468" });
 });
 
@@ -405,7 +426,7 @@ router.post("/auth/verify-otp", async (req, res) => {
     res.status(400).json({ error: "That OTP is not valid or has expired." });
     return;
   }
-  const user: User = { id: id("user"), name: "New TruckShare driver", phone: challenge.phone, role: "Carrier", verified: false };
+  const user: User = { id: id("user"), name: "New TruckShare driver", phone: challenge.phone, country: challenge.country, role: "Carrier", verified: false };
   users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
@@ -414,7 +435,7 @@ router.post("/auth/verify-otp", async (req, res) => {
 });
 
 router.post("/auth/google", async (_req, res) => {
-  const user: User = { id: id("user"), name: "Google workspace user", email: "demo@truckshare.ug", role: "Shipper", verified: false };
+  const user: User = { id: id("user"), name: "Google workspace user", email: "demo@truckshare.ug", country: "UG", role: "Shipper", verified: false };
   users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
@@ -685,7 +706,12 @@ router.post("/payments/simulate", async (req, res) => {
     res.status(409).json({ error: "This booking has already been funded." });
     return;
   }
-  const payerCountry = countryCode(req.body?.payerCountry);
+  const detectedPhoneCountry = phoneCountry(phone);
+  const payerCountry = countryCode(req.body?.payerCountry || detectedPhoneCountry);
+  if (detectedPhoneCountry !== payerCountry) {
+    res.status(400).json({ error: "The payer country must match the phone number country code." });
+    return;
+  }
   const payerCurrency = currencyCode(req.body?.currency || booking.currency);
   const settlementCurrency = booking.currency;
   const amount = number(req.body?.amount) > 0 ? number(req.body?.amount) : booking.amount;

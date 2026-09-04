@@ -1,0 +1,1 @@
+ALTER TABLE "returnhaul_users" ADD COLUMN "country" text DEFAULT 'UG' NOT NULL;

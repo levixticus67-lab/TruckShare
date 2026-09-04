@@ -67,6 +67,7 @@ export const usersTable = pgTable("returnhaul_users", {
   name: text("name").notNull(),
   phone: text("phone"),
   email: text("email"),
+  country: text("country").notNull().default("UG"),
   role: text("role").notNull().default("Carrier"),
   verified: boolean("verified").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

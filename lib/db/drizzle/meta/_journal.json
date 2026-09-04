@@ -43,6 +43,13 @@
       "when": 1788510000002,
       "tag": "0005_border_milestones",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788510000003,
+      "tag": "0006_eac_user_phone_country",
+      "breakpoints": true
     }
   ]
 }
