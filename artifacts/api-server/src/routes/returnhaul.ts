@@ -110,6 +110,19 @@ type Payment = {
   createdAt: string;
 };
 
+type BorderMilestoneStatus = "Planned" | "Documents Pending" | "Submitted" | "Cleared" | "Held" | "Crossed";
+type BorderMilestone = {
+  id: string;
+  bookingId: string;
+  sequence: number;
+  checkpoint: string;
+  country: CountryCode;
+  border: string;
+  requiredDocuments: string[];
+  status: BorderMilestoneStatus;
+  completedAt?: string;
+};
+
 type Verification = {
   id: string;
   userId: string;
@@ -211,6 +224,12 @@ const payments: Payment[] = [
   { id: "payment-1", bookingId: "booking-1", network: "MTN MoMo", phone: "+256 700 000 000", payerCountry: "UG", payeeCountry: "UG", amount: 1320000, currency: "UGX", settlementAmount: 1320000, settlementCurrency: "UGX", exchangeRate: 1, commissionAmount: 158400, carrierPayout: 1161600, fee: 0, reference: "TS-DEMO-BOOKING-1", status: "Held", createdAt: "2026-08-22" },
 ];
 
+const borderMilestones: BorderMilestone[] = [
+  { id: "milestone-1", bookingId: "booking-1", sequence: 1, checkpoint: "Malaba border arrival", country: "UG", border: "Malaba", requiredDocuments: ["Consignment note", "Customs form"], status: "Documents Pending" },
+  { id: "milestone-2", bookingId: "booking-1", sequence: 2, checkpoint: "Customs review", country: "UG", border: "Malaba", requiredDocuments: ["Customs form"], status: "Planned" },
+  { id: "milestone-3", bookingId: "booking-1", sequence: 3, checkpoint: "Border clearance", country: "UG", border: "Malaba", requiredDocuments: [], status: "Planned" },
+];
+
 const messages = [
   { id: "msg-1", sender: "Kivu Foods", body: "Hi Moses, can you confirm the pickup window at our Kampala warehouse?", sentAt: "09:42", read: true },
   { id: "msg-2", sender: "You", body: "Confirmed. I’ll be there between 08:00 and 09:00 on Friday.", sentAt: "09:47", read: true },
@@ -238,7 +257,7 @@ const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
-const stateKeys = ["trips", "freight", "bookings", "payments", "messages", "documents", "users", "verifications"] as const;
+const stateKeys = ["trips", "freight", "bookings", "payments", "borderMilestones", "messages", "documents", "users", "verifications"] as const;
 type StateKey = (typeof stateKeys)[number];
 let stateReady: Promise<void> | undefined;
 
@@ -274,6 +293,12 @@ function applyState(key: string, value: string) {
     currency: currencyCode(item.currency),
     settlementCurrency: currencyCode(item.settlementCurrency),
   })) as Payment[]);
+  if (key === "borderMilestones") borderMilestones.splice(0, borderMilestones.length, ...(parsed as Partial<BorderMilestone>[]).map((item) => ({
+    ...item,
+    country: countryCode(item.country),
+    requiredDocuments: Array.isArray(item.requiredDocuments) ? item.requiredDocuments.filter((document): document is string => typeof document === "string") : [],
+    status: item.status || "Planned",
+  })) as BorderMilestone[]);
   if (key === "messages") messages.splice(0, messages.length, ...parsed);
   if (key === "documents") documents.splice(0, documents.length, ...parsed);
   if (key === "users") users.splice(0, users.length, ...parsed as User[]);
@@ -504,6 +529,50 @@ router.post("/bookings", async (req, res) => {
   bookings.unshift(booking);
   await persistDatabaseState();
   res.status(201).json(booking);
+});
+
+router.get("/bookings/:id/border-milestones", (req, res) => {
+  const booking = bookings.find((item) => item.id === text(req.params.id));
+  if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  res.json(borderMilestones.filter((milestone) => milestone.bookingId === booking.id).sort((a, b) => a.sequence - b.sequence));
+});
+
+router.post("/bookings/:id/border-milestones", async (req, res) => {
+  const booking = bookings.find((item) => item.id === text(req.params.id));
+  if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  const status = text(req.body?.status) as BorderMilestoneStatus || "Planned";
+  const validStatuses: BorderMilestoneStatus[] = ["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"];
+  if (!validStatuses.includes(status)) { res.status(400).json({ error: "Invalid border milestone status." }); return; }
+  const existing = borderMilestones.filter((milestone) => milestone.bookingId === booking.id);
+  const milestone: BorderMilestone = {
+    id: id("milestone"),
+    bookingId: booking.id,
+    sequence: existing.length + 1,
+    checkpoint: text(req.body?.checkpoint) || "Border checkpoint",
+    country: countryCode(req.body?.country, booking.destinationCountry),
+    border: text(req.body?.border) || "Unspecified border",
+    requiredDocuments: Array.isArray(req.body?.requiredDocuments) ? req.body.requiredDocuments.filter((document: unknown): document is string => typeof document === "string" && document.trim().length > 0) : [],
+    status,
+    completedAt: ["Cleared", "Crossed"].includes(status) ? nowDate() : undefined,
+  };
+  borderMilestones.push(milestone);
+  await persistDatabaseState();
+  res.status(201).json(milestone);
+});
+
+router.patch("/bookings/:id/border-milestones/:milestoneId", async (req, res) => {
+  const booking = bookings.find((item) => item.id === text(req.params.id));
+  const milestone = borderMilestones.find((item) => item.id === text(req.params.milestoneId) && item.bookingId === text(req.params.id));
+  if (!booking || !milestone) { res.status(404).json({ error: "Border milestone not found." }); return; }
+  const status = text(req.body?.status) as BorderMilestoneStatus;
+  const validStatuses: BorderMilestoneStatus[] = ["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"];
+  if (!validStatuses.includes(status)) { res.status(400).json({ error: "Invalid border milestone status." }); return; }
+  milestone.status = status;
+  milestone.completedAt = ["Cleared", "Crossed"].includes(status) ? nowDate() : undefined;
+  if (status === "Held") booking.status = "At Border";
+  if (status === "Crossed") booking.status = "In Transit";
+  await persistDatabaseState();
+  res.json(milestone);
 });
 
 router.patch("/bookings/:id/status", async (req, res) => {

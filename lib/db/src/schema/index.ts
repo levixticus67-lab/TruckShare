@@ -17,7 +17,7 @@
 //   export type InsertPost = z.infer<typeof insertPostSchema>;
 //   export type Post = typeof postsTable.$inferSelect;
 
-import { boolean, date, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, date, integer, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -127,6 +127,19 @@ export const paymentsTable = pgTable("returnhaul_payments", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const borderMilestonesTable = pgTable("returnhaul_border_milestones", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  sequence: integer("sequence").notNull(),
+  checkpoint: text("checkpoint").notNull(),
+  country: text("country").notNull().default("UG"),
+  border: text("border").notNull(),
+  requiredDocuments: text("required_documents").notNull().default("[]"),
+  status: text("status").notNull().default("Planned"),
+  completedAt: text("completed_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const messagesTable = pgTable("returnhaul_messages", {
   id: text("id").primaryKey(),
   bookingId: text("booking_id"),
@@ -160,6 +173,7 @@ export const insertUserSchema = createInsertSchema(usersTable).omit({ createdAt:
 export const insertVerificationSchema = createInsertSchema(verificationsTable).omit({ createdAt: true, reviewedAt: true });
 export const insertBookingSchema = createInsertSchema(bookingsTable).omit({ createdAt: true });
 export const insertPaymentSchema = createInsertSchema(paymentsTable).omit({ createdAt: true });
+export const insertBorderMilestoneSchema = createInsertSchema(borderMilestonesTable).omit({ createdAt: true });
 export const insertMessageSchema = createInsertSchema(messagesTable).omit({ createdAt: true });
 export const insertDocumentSchema = createInsertSchema(documentsTable).omit({ createdAt: true });
 export const insertRuntimeStateSchema = createInsertSchema(runtimeStateTable).omit({ updatedAt: true });
@@ -175,6 +189,8 @@ export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookingsTable.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof paymentsTable.$inferSelect;
+export type InsertBorderMilestone = z.infer<typeof insertBorderMilestoneSchema>;
+export type BorderMilestone = typeof borderMilestonesTable.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messagesTable.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;

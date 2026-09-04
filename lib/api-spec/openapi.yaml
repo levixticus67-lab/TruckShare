@@ -239,6 +239,68 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Booking"
+  /bookings/{id}/border-milestones:
+    get:
+      operationId: listBorderMilestones
+      tags: [border]
+      summary: List customs and border milestones for a booking
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Border milestones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BorderMilestone"
+    post:
+      operationId: createBorderMilestone
+      tags: [border]
+      summary: Add a customs or border milestone
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BorderMilestoneInput"
+      responses:
+        "201":
+          description: Created border milestone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BorderMilestone"
+  /bookings/{id}/border-milestones/{milestoneId}:
+    patch:
+      operationId: updateBorderMilestone
+      tags: [border]
+      summary: Update a customs or border milestone
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: milestoneId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/BorderMilestoneStatus" }
+      responses:
+        "200":
+          description: Updated border milestone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BorderMilestone"
   /payments:
     get:
       operationId: listPayments
@@ -578,6 +640,34 @@ components:
         carrierRate: { type: number }
         expiresInSeconds: { type: integer }
         indicative: { type: boolean }
+    BorderMilestoneStatus:
+      type: string
+      enum: [Planned, "Documents Pending", Submitted, Cleared, Held, Crossed]
+    BorderMilestone:
+      type: object
+      required: [id, bookingId, sequence, checkpoint, country, border, requiredDocuments, status]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        sequence: { type: integer }
+        checkpoint: { type: string }
+        country: { $ref: "#/components/schemas/CountryCode" }
+        border: { type: string }
+        requiredDocuments:
+          type: array
+          items: { type: string }
+        status: { $ref: "#/components/schemas/BorderMilestoneStatus" }
+        completedAt: { type: string }
+    BorderMilestoneInput:
+      type: object
+      properties:
+        checkpoint: { type: string }
+        country: { $ref: "#/components/schemas/CountryCode" }
+        border: { type: string }
+        requiredDocuments:
+          type: array
+          items: { type: string }
+        status: { $ref: "#/components/schemas/BorderMilestoneStatus" }
     StatusInput:
       type: object
       required: [status]

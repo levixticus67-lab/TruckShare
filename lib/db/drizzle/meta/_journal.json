@@ -36,6 +36,13 @@
       "when": 1788510000001,
       "tag": "0004_payment_settlement_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788510000002,
+      "tag": "0005_border_milestones",
+      "breakpoints": true
     }
   ]
 }
