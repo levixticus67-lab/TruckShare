@@ -13,13 +13,16 @@ export interface Trip {
   carrier: string;
   carrierRating?: number;
   origin: string;
+  originCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   destination: string;
+  destinationCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   corridor: string;
   departureDate: string;
   vehicleType: string;
   capacityTons: number;
   capacityM3: number;
   price: number;
+  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   priceType: TripPriceType;
   status: TripStatus;
 }

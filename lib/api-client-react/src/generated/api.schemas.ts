@@ -34,36 +34,45 @@ export interface Trip {
   carrier: string;
   carrierRating?: number;
   origin: string;
+  originCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   destination: string;
+  destinationCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   corridor: string;
   departureDate: string;
   vehicleType: string;
   capacityTons: number;
   capacityM3: number;
   price: number;
+  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   priceType: TripPriceType;
   status: TripStatus;
 }
 
 export interface TripInput {
   origin: string;
+  originCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   destination: string;
+  destinationCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   departureDate: string;
   vehicleType: string;
   capacityTons: number;
   capacityM3: number;
   price: number;
+  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   priceType: string;
 }
 
 export interface TripUpdate {
   origin?: string;
+  originCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   destination?: string;
+  destinationCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   departureDate?: string;
   vehicleType?: string;
   capacityTons?: number;
   capacityM3?: number;
   price?: number;
+  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   priceType?: string;
 }
 
@@ -81,34 +90,43 @@ export interface Freight {
   id: string;
   shipper: string;
   pickup: string;
+  pickupCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   dropoff: string;
+  dropoffCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   corridor: string;
   description: string;
   weightTons: number;
   dimensions: string;
   pickupDate: string;
   price: number;
+  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   status: FreightStatus;
 }
 
 export interface FreightInput {
   pickup: string;
+  pickupCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   dropoff: string;
+  dropoffCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   description: string;
   weightTons: number;
   dimensions: string;
   pickupDate: string;
   price: number;
+  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
 }
 
 export interface FreightUpdate {
   pickup?: string;
+  pickupCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   dropoff?: string;
+  dropoffCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   description?: string;
   weightTons?: number;
   dimensions?: string;
   pickupDate?: string;
   price?: number;
+  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
 }
 
 export type MatchType = typeof MatchType[keyof typeof MatchType];
@@ -144,7 +162,10 @@ export interface Booking {
   tripId: string;
   freightId: string;
   corridor: string;
+  originCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  destinationCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   amount: number;
+  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   escrowStatus: BookingEscrowStatus;
   status: string;
   bookedAt: string;
@@ -155,6 +176,9 @@ export interface BookingInput {
   freightId: string;
   amount: number;
   corridor: string;
+  originCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  destinationCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
 }
 
 export interface StatusInput {

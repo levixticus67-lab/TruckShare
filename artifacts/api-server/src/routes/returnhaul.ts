@@ -33,7 +33,9 @@ type Trip = {
   carrier: string;
   carrierRating: number;
   origin: string;
+  originCountry: CountryCode;
   destination: string;
+  destinationCountry: CountryCode;
   corridor: string;
   departureDate: string;
   departureTime: string;
@@ -41,6 +43,7 @@ type Trip = {
   capacityTons: number;
   capacityM3: number;
   price: number;
+  currency: CurrencyCode;
   priceType: "Fixed" | "Per Ton";
   status: string;
 };
@@ -49,7 +52,9 @@ type Freight = {
   id: string;
   shipper: string;
   pickup: string;
+  pickupCountry: CountryCode;
   dropoff: string;
+  dropoffCountry: CountryCode;
   corridor: string;
   description: string;
   cargoType: string;
@@ -58,6 +63,7 @@ type Freight = {
   dimensions: string;
   pickupDate: string;
   price: number;
+  currency: CurrencyCode;
   status: "Pending" | "Matched" | "In-Transit" | "Delivered";
 };
 
@@ -66,7 +72,10 @@ type Booking = {
   tripId: string;
   freightId: string;
   corridor: string;
+  originCountry: CountryCode;
+  destinationCountry: CountryCode;
   amount: number;
+  currency: CurrencyCode;
   commissionAmount: number;
   carrierPayout: number;
   paymentNetwork?: "MTN MoMo" | "Airtel Money";
@@ -101,29 +110,60 @@ type User = {
   verified: boolean;
 };
 
+type CountryCode = "BI" | "CD" | "KE" | "RW" | "SO" | "SS" | "TZ" | "UG";
+type CurrencyCode = "BIF" | "CDF" | "KES" | "RWF" | "SOS" | "SSP" | "TZS" | "UGX";
+
+const eacCountries = [
+  { code: "BI", name: "Burundi", currency: "BIF" },
+  { code: "CD", name: "Democratic Republic of the Congo", currency: "CDF" },
+  { code: "KE", name: "Kenya", currency: "KES" },
+  { code: "RW", name: "Rwanda", currency: "RWF" },
+  { code: "SO", name: "Somalia", currency: "SOS" },
+  { code: "SS", name: "South Sudan", currency: "SSP" },
+  { code: "TZ", name: "Tanzania", currency: "TZS" },
+  { code: "UG", name: "Uganda", currency: "UGX" },
+] satisfies Array<{ code: CountryCode; name: string; currency: CurrencyCode }>;
+
+const eacCorridors = [
+  { origin: "Kampala", originCountry: "UG", destination: "Nairobi", destinationCountry: "KE", border: "Malaba / Busia" },
+  { origin: "Kampala", originCountry: "UG", destination: "Kigali", destinationCountry: "RW", border: "Katuna / Gatuna" },
+  { origin: "Kampala", originCountry: "UG", destination: "Dar es Salaam", destinationCountry: "TZ", border: "Mutukula" },
+  { origin: "Kampala", originCountry: "UG", destination: "Juba", destinationCountry: "SS", border: "Elegu / Nimule" },
+] satisfies Array<{ origin: string; originCountry: CountryCode; destination: string; destinationCountry: CountryCode; border: string }>;
+
+function countryCode(value: unknown, fallback: CountryCode = "UG"): CountryCode {
+  const code = text(value).toUpperCase();
+  return eacCountries.some((country) => country.code === code) ? code as CountryCode : fallback;
+}
+
+function currencyCode(value: unknown, fallback: CurrencyCode = "UGX"): CurrencyCode {
+  const code = text(value).toUpperCase();
+  return eacCountries.some((country) => country.currency === code) ? code as CurrencyCode : fallback;
+}
+
 const routes = [
-  { origin: "Kampala", destination: "Mbale" },
-  { origin: "Kampala", destination: "Mbarara" },
-  { origin: "Kampala", destination: "Gulu" },
-  { origin: "Malaba", destination: "Kampala" },
+  { origin: "Kampala", originCountry: "UG", destination: "Mbale", destinationCountry: "UG" },
+  { origin: "Kampala", originCountry: "UG", destination: "Mbarara", destinationCountry: "UG" },
+  { origin: "Kampala", originCountry: "UG", destination: "Gulu", destinationCountry: "UG" },
+  { origin: "Malaba", originCountry: "UG", destination: "Kampala", destinationCountry: "UG" },
 ];
 
 const trips: Trip[] = [
-  { id: "trip-1", carrier: "Moses K.", carrierRating: 4.9, origin: "Kampala", destination: "Mbale", corridor: "Kampala → Mbale", departureDate: "2026-08-28", departureTime: "07:30", vehicleType: "Fuso", capacityTons: 8, capacityM3: 42, price: 680000, priceType: "Fixed", status: "Available" },
-  { id: "trip-2", carrier: "Amina Logistics", carrierRating: 4.8, origin: "Kampala", destination: "Mbarara", corridor: "Kampala → Mbarara", departureDate: "2026-08-30", departureTime: "06:00", vehicleType: "Canter", capacityTons: 6, capacityM3: 30, price: 520000, priceType: "Per Ton", status: "Available" },
-  { id: "trip-3", carrier: "Thabo Transport", carrierRating: 4.7, origin: "Malaba", destination: "Kampala", corridor: "Malaba → Kampala", departureDate: "2026-09-02", departureTime: "09:15", vehicleType: "Trailer", capacityTons: 18, capacityM3: 70, price: 1560000, priceType: "Fixed", status: "Booked" },
-  { id: "trip-4", carrier: "Gulu North Haulage", carrierRating: 4.6, origin: "Kampala", destination: "Gulu", corridor: "Kampala → Gulu", departureDate: "2026-09-04", departureTime: "05:45", vehicleType: "Flatbed", capacityTons: 14, capacityM3: 62, price: 980000, priceType: "Fixed", status: "Available" },
+  { id: "trip-1", carrier: "Moses K.", carrierRating: 4.9, origin: "Kampala", originCountry: "UG", destination: "Mbale", destinationCountry: "UG", corridor: "Kampala → Mbale", departureDate: "2026-08-28", departureTime: "07:30", vehicleType: "Fuso", capacityTons: 8, capacityM3: 42, price: 680000, currency: "UGX", priceType: "Fixed", status: "Available" },
+  { id: "trip-2", carrier: "Amina Logistics", carrierRating: 4.8, origin: "Kampala", originCountry: "UG", destination: "Mbarara", destinationCountry: "UG", corridor: "Kampala → Mbarara", departureDate: "2026-08-30", departureTime: "06:00", vehicleType: "Canter", capacityTons: 6, capacityM3: 30, price: 520000, currency: "UGX", priceType: "Per Ton", status: "Available" },
+  { id: "trip-3", carrier: "Thabo Transport", carrierRating: 4.7, origin: "Malaba", originCountry: "UG", destination: "Kampala", destinationCountry: "UG", corridor: "Malaba → Kampala", departureDate: "2026-09-02", departureTime: "09:15", vehicleType: "Trailer", capacityTons: 18, capacityM3: 70, price: 1560000, currency: "UGX", priceType: "Fixed", status: "Booked" },
+  { id: "trip-4", carrier: "Gulu North Haulage", carrierRating: 4.6, origin: "Kampala", originCountry: "UG", destination: "Gulu", destinationCountry: "UG", corridor: "Kampala → Gulu", departureDate: "2026-09-04", departureTime: "05:45", vehicleType: "Flatbed", capacityTons: 14, capacityM3: 62, price: 980000, currency: "UGX", priceType: "Fixed", status: "Available" },
 ];
 
 const freight: Freight[] = [
-  { id: "load-1", shipper: "Kampala Grain Co.", pickup: "Kampala", dropoff: "Mbale", corridor: "Kampala → Mbale", description: "Bagged grain and packaged food", cargoType: "Food & agriculture", weightTons: 4.5, volumeM3: 18, dimensions: "12 pallets", pickupDate: "2026-08-28", price: 540000, status: "Pending" },
-  { id: "load-2", shipper: "Mara Pharma", pickup: "Kampala", dropoff: "Mbarara", corridor: "Kampala → Mbarara", description: "Temperature-sensitive pharmaceuticals", cargoType: "Pharmaceuticals", weightTons: 3, volumeM3: 12, dimensions: "8 crates", pickupDate: "2026-08-30", price: 420000, status: "Matched" },
-  { id: "load-3", shipper: "Eastline Hardware", pickup: "Malaba", dropoff: "Kampala", corridor: "Malaba → Kampala", description: "Hardware and steel components", cargoType: "Construction", weightTons: 14, volumeM3: 48, dimensions: "Oversize", pickupDate: "2026-09-02", price: 1320000, status: "In-Transit" },
-  { id: "load-4", shipper: "Northern Fresh", pickup: "Kampala", dropoff: "Gulu", corridor: "Kampala → Gulu", description: "Fresh produce and cold-chain cartons", cargoType: "Food & agriculture", weightTons: 9, volumeM3: 40, dimensions: "20 pallets", pickupDate: "2026-09-04", price: 860000, status: "Pending" },
+  { id: "load-1", shipper: "Kampala Grain Co.", pickup: "Kampala", pickupCountry: "UG", dropoff: "Mbale", dropoffCountry: "UG", corridor: "Kampala → Mbale", description: "Bagged grain and packaged food", cargoType: "Food & agriculture", weightTons: 4.5, volumeM3: 18, dimensions: "12 pallets", pickupDate: "2026-08-28", price: 540000, currency: "UGX", status: "Pending" },
+  { id: "load-2", shipper: "Mara Pharma", pickup: "Kampala", pickupCountry: "UG", dropoff: "Mbarara", dropoffCountry: "UG", corridor: "Kampala → Mbarara", description: "Temperature-sensitive pharmaceuticals", cargoType: "Pharmaceuticals", weightTons: 3, volumeM3: 12, dimensions: "8 crates", pickupDate: "2026-08-30", price: 420000, currency: "UGX", status: "Matched" },
+  { id: "load-3", shipper: "Eastline Hardware", pickup: "Malaba", pickupCountry: "UG", dropoff: "Kampala", dropoffCountry: "UG", corridor: "Malaba → Kampala", description: "Hardware and steel components", cargoType: "Construction", weightTons: 14, volumeM3: 48, dimensions: "Oversize", pickupDate: "2026-09-02", price: 1320000, currency: "UGX", status: "In-Transit" },
+  { id: "load-4", shipper: "Northern Fresh", pickup: "Kampala", pickupCountry: "UG", dropoff: "Gulu", dropoffCountry: "UG", corridor: "Kampala → Gulu", description: "Fresh produce and cold-chain cartons", cargoType: "Food & agriculture", weightTons: 9, volumeM3: 40, dimensions: "20 pallets", pickupDate: "2026-09-04", price: 860000, currency: "UGX", status: "Pending" },
 ];
 
 const bookings: Booking[] = [
-  { id: "booking-1", tripId: "trip-3", freightId: "load-3", corridor: "Malaba → Kampala", amount: 1320000, commissionAmount: 158400, carrierPayout: 1161600, paymentNetwork: "MTN MoMo", paymentStatus: "Paid", escrowStatus: "Held", status: "At Border", bookedAt: "2026-08-22", podStatus: "Not requested", podOtp: "4312" },
+  { id: "booking-1", tripId: "trip-3", freightId: "load-3", corridor: "Malaba → Kampala", originCountry: "UG", destinationCountry: "UG", amount: 1320000, currency: "UGX", commissionAmount: 158400, carrierPayout: 1161600, paymentNetwork: "MTN MoMo", paymentStatus: "Paid", escrowStatus: "Held", status: "At Border", bookedAt: "2026-08-22", podStatus: "Not requested", podOtp: "4312" },
 ];
 
 const messages = [
@@ -164,9 +204,24 @@ function stateValue(key: StateKey) {
 function applyState(key: string, value: string) {
   const parsed: unknown = JSON.parse(value);
   if (!Array.isArray(parsed)) return;
-  if (key === "trips") trips.splice(0, trips.length, ...parsed as Trip[]);
-  if (key === "freight") freight.splice(0, freight.length, ...parsed as Freight[]);
-  if (key === "bookings") bookings.splice(0, bookings.length, ...parsed as Booking[]);
+  if (key === "trips") trips.splice(0, trips.length, ...(parsed as Partial<Trip>[]).map((item) => ({
+    ...item,
+    originCountry: countryCode(item.originCountry),
+    destinationCountry: countryCode(item.destinationCountry),
+    currency: currencyCode(item.currency),
+  })) as Trip[]);
+  if (key === "freight") freight.splice(0, freight.length, ...(parsed as Partial<Freight>[]).map((item) => ({
+    ...item,
+    pickupCountry: countryCode(item.pickupCountry),
+    dropoffCountry: countryCode(item.dropoffCountry),
+    currency: currencyCode(item.currency),
+  })) as Freight[]);
+  if (key === "bookings") bookings.splice(0, bookings.length, ...(parsed as Partial<Booking>[]).map((item) => ({
+    ...item,
+    originCountry: countryCode(item.originCountry),
+    destinationCountry: countryCode(item.destinationCountry),
+    currency: currencyCode(item.currency),
+  })) as Booking[]);
   if (key === "messages") messages.splice(0, messages.length, ...parsed);
   if (key === "documents") documents.splice(0, documents.length, ...parsed);
   if (key === "users") users.splice(0, users.length, ...parsed as User[]);
@@ -239,6 +294,10 @@ router.get("/dashboard", (_req, res) => {
   }));
 });
 
+router.get("/reference/eac", (_req, res) => {
+  res.json({ countries: eacCountries, corridors: eacCorridors });
+});
+
 router.post("/auth/request-otp", (req, res) => {
   const phone = text(req.body?.phone).replace(/\s+/g, " ");
   if (!/^\+256\s?\d{3}\s?\d{3}\s?\d{3}$/.test(phone)) {
@@ -296,8 +355,11 @@ router.post("/trips", async (req, res) => {
     id: id("trip"),
     carrier: "You",
     carrierRating: 5,
+    originCountry: countryCode(req.body?.originCountry),
+    destinationCountry: countryCode(req.body?.destinationCountry),
     departureTime: text(req.body?.departureTime) || "07:00",
     corridor: `${data.origin.split(",")[0]} → ${data.destination.split(",")[0]}`,
+    currency: currencyCode(req.body?.currency),
     priceType: data.priceType as Trip["priceType"],
     vehicleType: data.vehicleType,
     status: "Available",
@@ -332,9 +394,12 @@ router.post("/freight", async (req, res) => {
     ...data,
     id: id("load"),
     shipper: "You",
+    pickupCountry: countryCode(req.body?.pickupCountry),
+    dropoffCountry: countryCode(req.body?.dropoffCountry),
     cargoType: text(req.body?.cargoType) || "General cargo",
     volumeM3: number(req.body?.volumeM3) || 0,
     corridor: `${data.pickup.split(",")[0]} → ${data.dropoff.split(",")[0]}`,
+    currency: currencyCode(req.body?.currency),
     status: "Pending",
   };
   freight.unshift(load);
@@ -366,10 +431,15 @@ router.get("/bookings", (_req, res) => res.json(bookings));
 router.post("/bookings", async (req, res) => {
   const data = CreateBookingBody.parse(req.body);
   const amount = number(data.amount);
+  const trip = trips.find((item) => item.id === data.tripId);
+  const load = freight.find((item) => item.id === data.freightId);
   const booking: Booking = {
     ...data,
     id: id("booking"),
+    originCountry: countryCode(data.originCountry || trip?.originCountry),
+    destinationCountry: countryCode(data.destinationCountry || load?.dropoffCountry),
     amount,
+    currency: currencyCode(data.currency || load?.currency || trip?.currency),
     commissionAmount: Math.round(amount * 0.12),
     carrierPayout: Math.round(amount * 0.88),
     paymentStatus: "Unpaid",

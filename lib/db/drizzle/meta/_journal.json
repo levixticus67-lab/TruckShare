@@ -22,6 +22,13 @@
       "when": 1788086906615,
       "tag": "0002_legal_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788510000000,
+      "tag": "0003_eac_geography_currency",
+      "breakpoints": true
     }
   ]
 }

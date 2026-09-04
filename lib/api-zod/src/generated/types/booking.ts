@@ -12,7 +12,10 @@ export interface Booking {
   tripId: string;
   freightId: string;
   corridor: string;
+  originCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  destinationCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   amount: number;
+  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   escrowStatus: BookingEscrowStatus;
   status: string;
   bookedAt: string;

@@ -11,12 +11,15 @@ export interface Freight {
   id: string;
   shipper: string;
   pickup: string;
+  pickupCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   dropoff: string;
+  dropoffCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   corridor: string;
   description: string;
   weightTons: number;
   dimensions: string;
   pickupDate: string;
   price: number;
+  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   status: FreightStatus;
 }

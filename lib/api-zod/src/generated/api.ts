@@ -50,13 +50,16 @@ export const ListTripsResponseItem = zod.object({
   "carrier": zod.string(),
   "carrierRating": zod.number().optional(),
   "origin": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "destination": zod.string(),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "corridor": zod.string(),
   "departureDate": zod.string(),
   "vehicleType": zod.string(),
   "capacityTons": zod.number(),
   "capacityM3": zod.number(),
   "price": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "priceType": zod.enum(['Fixed', 'Per Ton']),
   "status": zod.enum(['Available', 'Booked', 'En Route to Pickup', 'Loaded', 'At Border', 'Delivered'])
 })
@@ -68,12 +71,15 @@ export const ListTripsResponse = zod.array(ListTripsResponseItem)
  */
 export const CreateTripBody = zod.object({
   "origin": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "destination": zod.string(),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "departureDate": zod.string(),
   "vehicleType": zod.string(),
   "capacityTons": zod.number(),
   "capacityM3": zod.number(),
   "price": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional(),
   "priceType": zod.string()
 })
 
@@ -82,13 +88,16 @@ export const CreateTripResponse = zod.object({
   "carrier": zod.string(),
   "carrierRating": zod.number().optional(),
   "origin": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "destination": zod.string(),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "corridor": zod.string(),
   "departureDate": zod.string(),
   "vehicleType": zod.string(),
   "capacityTons": zod.number(),
   "capacityM3": zod.number(),
   "price": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "priceType": zod.enum(['Fixed', 'Per Ton']),
   "status": zod.enum(['Available', 'Booked', 'En Route to Pickup', 'Loaded', 'At Border', 'Delivered'])
 })
@@ -103,12 +112,15 @@ export const UpdateTripParams = zod.object({
 
 export const UpdateTripBody = zod.object({
   "origin": zod.string().optional(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "destination": zod.string().optional(),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "departureDate": zod.string().optional(),
   "vehicleType": zod.string().optional(),
   "capacityTons": zod.number().optional(),
   "capacityM3": zod.number().optional(),
   "price": zod.number().optional(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional(),
   "priceType": zod.string().optional()
 })
 
@@ -117,13 +129,16 @@ export const UpdateTripResponse = zod.object({
   "carrier": zod.string(),
   "carrierRating": zod.number().optional(),
   "origin": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "destination": zod.string(),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "corridor": zod.string(),
   "departureDate": zod.string(),
   "vehicleType": zod.string(),
   "capacityTons": zod.number(),
   "capacityM3": zod.number(),
   "price": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "priceType": zod.enum(['Fixed', 'Per Ton']),
   "status": zod.enum(['Available', 'Booked', 'En Route to Pickup', 'Loaded', 'At Border', 'Delivered'])
 })
@@ -141,13 +156,16 @@ export const ListFreightResponseItem = zod.object({
   "id": zod.string(),
   "shipper": zod.string(),
   "pickup": zod.string(),
+  "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "dropoff": zod.string(),
+  "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "corridor": zod.string(),
   "description": zod.string(),
   "weightTons": zod.number(),
   "dimensions": zod.string(),
   "pickupDate": zod.string(),
   "price": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered'])
 })
 export const ListFreightResponse = zod.array(ListFreightResponseItem)
@@ -158,25 +176,31 @@ export const ListFreightResponse = zod.array(ListFreightResponseItem)
  */
 export const CreateFreightBody = zod.object({
   "pickup": zod.string(),
+  "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "dropoff": zod.string(),
+  "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "description": zod.string(),
   "weightTons": zod.number(),
   "dimensions": zod.string(),
   "pickupDate": zod.string(),
-  "price": zod.number()
+  "price": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional()
 })
 
 export const CreateFreightResponse = zod.object({
   "id": zod.string(),
   "shipper": zod.string(),
   "pickup": zod.string(),
+  "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "dropoff": zod.string(),
+  "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "corridor": zod.string(),
   "description": zod.string(),
   "weightTons": zod.number(),
   "dimensions": zod.string(),
   "pickupDate": zod.string(),
   "price": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered'])
 })
 
@@ -190,25 +214,31 @@ export const UpdateFreightParams = zod.object({
 
 export const UpdateFreightBody = zod.object({
   "pickup": zod.string().optional(),
+  "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "dropoff": zod.string().optional(),
+  "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "description": zod.string().optional(),
   "weightTons": zod.number().optional(),
   "dimensions": zod.string().optional(),
   "pickupDate": zod.string().optional(),
-  "price": zod.number().optional()
+  "price": zod.number().optional(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional()
 })
 
 export const UpdateFreightResponse = zod.object({
   "id": zod.string(),
   "shipper": zod.string(),
   "pickup": zod.string(),
+  "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "dropoff": zod.string(),
+  "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "corridor": zod.string(),
   "description": zod.string(),
   "weightTons": zod.number(),
   "dimensions": zod.string(),
   "pickupDate": zod.string(),
   "price": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered'])
 })
 
@@ -243,7 +273,10 @@ export const ListBookingsResponseItem = zod.object({
   "tripId": zod.string(),
   "freightId": zod.string(),
   "corridor": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "escrowStatus": zod.enum(['Held', 'Released']),
   "status": zod.string(),
   "bookedAt": zod.string()
@@ -258,7 +291,10 @@ export const CreateBookingBody = zod.object({
   "tripId": zod.string(),
   "freightId": zod.string(),
   "amount": zod.number(),
-  "corridor": zod.string()
+  "corridor": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional()
 })
 
 export const CreateBookingResponse = zod.object({
@@ -266,7 +302,10 @@ export const CreateBookingResponse = zod.object({
   "tripId": zod.string(),
   "freightId": zod.string(),
   "corridor": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "escrowStatus": zod.enum(['Held', 'Released']),
   "status": zod.string(),
   "bookedAt": zod.string()
@@ -289,7 +328,10 @@ export const UpdateBookingStatusResponse = zod.object({
   "tripId": zod.string(),
   "freightId": zod.string(),
   "corridor": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "escrowStatus": zod.enum(['Held', 'Released']),
   "status": zod.string(),
   "bookedAt": zod.string()

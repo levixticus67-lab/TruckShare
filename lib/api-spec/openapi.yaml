@@ -40,6 +40,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /reference/eac:
+    get:
+      operationId: getEacReference
+      tags: [reference]
+      summary: List supported EAC countries, currencies, and starter corridors
+      responses:
+        "200":
+          description: EAC reference data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [countries, corridors]
+                properties:
+                  countries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EacCountry"
+                  corridors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EacCorridor"
   /trips:
     get:
       operationId: listTrips
@@ -314,19 +336,22 @@ components:
       required: [status]
     Trip:
       type: object
-      required: [id, carrier, origin, destination, corridor, departureDate, vehicleType, capacityTons, capacityM3, price, priceType, status]
+      required: [id, carrier, origin, originCountry, destination, destinationCountry, corridor, departureDate, vehicleType, capacityTons, capacityM3, price, currency, priceType, status]
       properties:
         id: { type: string }
         carrier: { type: string }
         carrierRating: { type: number }
         origin: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
         destination: { type: string }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
         corridor: { type: string }
         departureDate: { type: string }
         vehicleType: { type: string }
         capacityTons: { type: number }
         capacityM3: { type: number }
         price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
         priceType: { type: string, enum: [Fixed, "Per Ton"] }
         status: { type: string, enum: [Available, Booked, "En Route to Pickup", Loaded, "At Border", Delivered] }
     TripInput:
@@ -334,12 +359,15 @@ components:
       required: [origin, destination, departureDate, vehicleType, capacityTons, capacityM3, price, priceType]
       properties:
         origin: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
         destination: { type: string }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
         departureDate: { type: string }
         vehicleType: { type: string }
         capacityTons: { type: number }
         capacityM3: { type: number }
         price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
         priceType: { type: string }
     TripUpdate:
       type: object
@@ -354,30 +382,36 @@ components:
         priceType: { type: string }
     Freight:
       type: object
-      required: [id, shipper, pickup, dropoff, corridor, description, weightTons, dimensions, pickupDate, price, status]
+      required: [id, shipper, pickup, pickupCountry, dropoff, dropoffCountry, corridor, description, weightTons, dimensions, pickupDate, price, currency, status]
       properties:
         id: { type: string }
         shipper: { type: string }
         pickup: { type: string }
+        pickupCountry: { $ref: "#/components/schemas/CountryCode" }
         dropoff: { type: string }
+        dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
         corridor: { type: string }
         description: { type: string }
         weightTons: { type: number }
         dimensions: { type: string }
         pickupDate: { type: string }
         price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
         status: { type: string, enum: [Pending, Matched, "In-Transit", Delivered] }
     FreightInput:
       type: object
       required: [pickup, dropoff, description, weightTons, dimensions, pickupDate, price]
       properties:
         pickup: { type: string }
+        pickupCountry: { $ref: "#/components/schemas/CountryCode" }
         dropoff: { type: string }
+        dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
         description: { type: string }
         weightTons: { type: number }
         dimensions: { type: string }
         pickupDate: { type: string }
         price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
     FreightUpdate:
       type: object
       properties:
@@ -403,13 +437,16 @@ components:
         counterpart: { type: string }
     Booking:
       type: object
-      required: [id, tripId, freightId, corridor, amount, escrowStatus, status, bookedAt]
+      required: [id, tripId, freightId, corridor, originCountry, destinationCountry, amount, currency, escrowStatus, status, bookedAt]
       properties:
         id: { type: string }
         tripId: { type: string }
         freightId: { type: string }
         corridor: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
         amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
         escrowStatus: { type: string, enum: [Held, Released] }
         status: { type: string }
         bookedAt: { type: string }
@@ -421,6 +458,9 @@ components:
         freightId: { type: string }
         amount: { type: number }
         corridor: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
     StatusInput:
       type: object
       required: [status]
@@ -479,3 +519,25 @@ components:
               detail: { type: string }
               time: { type: string }
               tone: { type: string }
+    CountryCode:
+      type: string
+      enum: [BI, CD, KE, RW, SO, SS, TZ, UG]
+    CurrencyCode:
+      type: string
+      enum: [BIF, CDF, KES, RWF, SOS, SSP, TZS, UGX]
+    EacCountry:
+      type: object
+      required: [code, name, currency]
+      properties:
+        code: { $ref: "#/components/schemas/CountryCode" }
+        name: { type: string }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    EacCorridor:
+      type: object
+      required: [origin, originCountry, destination, destinationCountry, border]
+      properties:
+        origin: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        destination: { type: string }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        border: { type: string }
