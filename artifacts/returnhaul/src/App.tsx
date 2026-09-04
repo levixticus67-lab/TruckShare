@@ -58,9 +58,9 @@ function useApi<T>(path: string, initial: T) {
   return { data, loading, error, reload, setData };
 }
 
-type Trip = { id: string; carrier: string; carrierRating: number; origin: string; destination: string; corridor: string; departureDate: string; departureTime?: string; vehicleType: string; capacityTons: number; capacityM3: number; price: number; priceType: string; status: string };
-type Freight = { id: string; shipper: string; pickup: string; dropoff: string; corridor: string; description: string; cargoType?: string; weightTons: number; volumeM3?: number; dimensions: string; pickupDate: string; price: number; status: string };
-type Booking = { id: string; tripId: string; freightId: string; corridor: string; amount: number; commissionAmount?: number; carrierPayout?: number; paymentStatus?: string; escrowStatus: string; status: string; bookedAt: string; podStatus?: string };
+type Trip = { id: string; carrier: string; carrierRating: number; origin: string; originCountry?: string; destination: string; destinationCountry?: string; corridor: string; departureDate: string; departureTime?: string; vehicleType: string; capacityTons: number; capacityM3: number; price: number; currency?: string; priceType: string; status: string };
+type Freight = { id: string; shipper: string; pickup: string; pickupCountry?: string; dropoff: string; dropoffCountry?: string; corridor: string; description: string; cargoType?: string; weightTons: number; volumeM3?: number; dimensions: string; pickupDate: string; price: number; currency?: string; status: string };
+type Booking = { id: string; tripId: string; freightId: string; corridor: string; originCountry?: string; destinationCountry?: string; amount: number; currency?: string; commissionAmount?: number; carrierPayout?: number; paymentStatus?: string; escrowStatus: string; status: string; bookedAt: string; podStatus?: string };
 type Match = { id: string; type: "trip" | "freight"; title: string; corridor: string; date: string; capacity: string; price: number; compatibility: number; counterpart: string };
 type Verification = { id: string; name: string; phone: string; nin: string; licenseNumber: string; logbookNumber: string; logbookPhotoName?: string; status: string; submittedAt: string };
 type DashboardData = { activeTrips: number; availableLoads: number; inTransit: number; delivered: number; totalEscrow: number; matchRate: number; recentActivity: { id: string; label: string; detail: string; time: string; tone: string }[] };
@@ -68,7 +68,7 @@ type WorkspaceRole = "Carrier" | "Shipper" | "Admin";
 const RoleContext = createContext<WorkspaceRole>("Carrier");
 const useRole = () => useContext(RoleContext);
 
-const money = (value = 0) => `UGX ${new Intl.NumberFormat("en-UG", { maximumFractionDigits: 0 }).format(value)}`;
+const money = (value = 0, currency = "UGX") => `${currency} ${new Intl.NumberFormat("en-UG", { maximumFractionDigits: 0 }).format(value)}`;
 const dateFmt = (value: string) => new Intl.DateTimeFormat("en-UG", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
 const button = "inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3.5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButton = "inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-xs font-bold transition hover:bg-muted disabled:opacity-50";
