@@ -10,6 +10,7 @@ export type BookingEscrowStatus = typeof BookingEscrowStatus[keyof typeof Bookin
 
 
 export const BookingEscrowStatus = {
+  Pending: 'Pending',
   Held: 'Held',
   Released: 'Released',
 } as const;

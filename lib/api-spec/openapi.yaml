@@ -574,7 +574,7 @@ components:
         destinationCountry: { $ref: "#/components/schemas/CountryCode" }
         amount: { type: number }
         currency: { $ref: "#/components/schemas/CurrencyCode" }
-        escrowStatus: { type: string, enum: [Held, Released] }
+        escrowStatus: { type: string, enum: [Pending, Held, Released] }
         status: { type: string }
         bookedAt: { type: string }
         paymentNetwork: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }

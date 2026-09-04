@@ -47,6 +47,7 @@ Cross-border and regional freight matching that turns carrier backhaul capacity 
 - Cross-border settlement quote model with EAC currencies, fees, and payment ledger
 - Booking with MTN MoMo / Airtel Money simulation and 12% / 88% split
 - Status tracking, receiver OTP proof of delivery, and payout unlock
+- Escrow state machine: Pending → Held → Released, gated by payment and delivery proof
 - Customs and border milestones with required-document tracking
 - Negotiation messages, call links, and logistics document hub
 - Uganda seed corridors: Kampala–Mbale, Kampala–Mbarara, Kampala–Gulu, Malaba–Kampala

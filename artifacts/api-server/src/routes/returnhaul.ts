@@ -80,7 +80,7 @@ type Booking = {
   carrierPayout: number;
   paymentNetwork?: PaymentNetwork;
   paymentStatus: "Unpaid" | "Paid";
-  escrowStatus: "Held" | "Released";
+  escrowStatus: "Pending" | "Held" | "Released";
   status: string;
   bookedAt: string;
   podStatus: "Not requested" | "OTP sent" | "Delivered";
@@ -193,6 +193,19 @@ function exchangeRate(from: CurrencyCode, to: CurrencyCode) {
 
 function convertedAmount(amount: number, from: CurrencyCode, to: CurrencyCode) {
   return Math.round(amount * exchangeRate(from, to));
+}
+
+const bookingStatusTransitions: Record<string, string[]> = {
+  "En Route to Pickup": ["In Transit"],
+  "In Transit": ["At Border"],
+  "At Border": ["In Transit", "Delivered"],
+  Delivered: [],
+};
+
+function releaseHeldPayment(bookingId: string) {
+  for (const payment of payments) {
+    if (payment.bookingId === bookingId && payment.status === "Held") payment.status = "Released";
+  }
 }
 
 const routes = [
@@ -520,7 +533,7 @@ router.post("/bookings", async (req, res) => {
     commissionAmount: Math.round(amount * 0.12),
     carrierPayout: Math.round(amount * 0.88),
     paymentStatus: "Unpaid",
-    escrowStatus: "Held",
+    escrowStatus: "Pending",
     status: "En Route to Pickup",
     bookedAt: nowDate(),
     podStatus: "Not requested",
@@ -580,10 +593,20 @@ router.patch("/bookings/:id/status", async (req, res) => {
   const data = UpdateBookingStatusBody.parse(req.body);
   const booking = bookings.find((item) => item.id === params.id);
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  const nextStatuses = bookingStatusTransitions[booking.status] || [];
+  if (!nextStatuses.includes(data.status)) {
+    res.status(400).json({ error: `Cannot move a booking from ${booking.status} to ${data.status}.` });
+    return;
+  }
+  if (data.status === "Delivered" && (booking.paymentStatus !== "Paid" || booking.escrowStatus !== "Held")) {
+    res.status(409).json({ error: "Payment must be held before delivery can release escrow." });
+    return;
+  }
   booking.status = data.status;
   if (data.status === "Delivered") {
     booking.escrowStatus = "Released";
     booking.podStatus = "Delivered";
+    releaseHeldPayment(booking.id);
   }
   await persistDatabaseState();
   res.json(booking);
@@ -600,6 +623,10 @@ router.post("/bookings/:id/request-pod", async (req, res) => {
 router.post("/bookings/:id/complete-delivery", async (req, res) => {
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  if (booking.paymentStatus !== "Paid" || booking.escrowStatus !== "Held") {
+    res.status(409).json({ error: "Payment must be held before delivery can release escrow." });
+    return;
+  }
   if (text(req.body?.otp) !== booking.podOtp) {
     res.status(400).json({ error: "The receiver OTP is not valid." });
     return;
@@ -608,6 +635,7 @@ router.post("/bookings/:id/complete-delivery", async (req, res) => {
   booking.escrowStatus = "Released";
   booking.podStatus = "Delivered";
   booking.deliveryPhoto = text(req.body?.photoName) || undefined;
+  releaseHeldPayment(booking.id);
   await persistDatabaseState();
   res.json({ booking, payoutUnlocked: true });
 });
@@ -686,6 +714,7 @@ router.post("/payments/simulate", async (req, res) => {
   payments.unshift(payment);
   booking.paymentNetwork = network as Booking["paymentNetwork"];
   booking.paymentStatus = "Paid";
+  booking.escrowStatus = "Held";
   await persistDatabaseState();
   res.json({ booking, payment, message: `${network} payment simulated and escrow funded.` });
 });

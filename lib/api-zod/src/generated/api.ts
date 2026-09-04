@@ -277,7 +277,7 @@ export const ListBookingsResponseItem = zod.object({
   "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "amount": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "escrowStatus": zod.enum(['Held', 'Released']),
+  "escrowStatus": zod.enum(['Pending', 'Held', 'Released']),
   "status": zod.string(),
   "bookedAt": zod.string()
 })
@@ -306,7 +306,7 @@ export const CreateBookingResponse = zod.object({
   "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "amount": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "escrowStatus": zod.enum(['Held', 'Released']),
+  "escrowStatus": zod.enum(['Pending', 'Held', 'Released']),
   "status": zod.string(),
   "bookedAt": zod.string()
 })
@@ -332,7 +332,7 @@ export const UpdateBookingStatusResponse = zod.object({
   "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "amount": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "escrowStatus": zod.enum(['Held', 'Released']),
+  "escrowStatus": zod.enum(['Pending', 'Held', 'Released']),
   "status": zod.string(),
   "bookedAt": zod.string()
 })
