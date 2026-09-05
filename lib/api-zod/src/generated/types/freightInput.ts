@@ -8,10 +8,13 @@
 
 export interface FreightInput {
   pickup: string;
+  pickupCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   dropoff: string;
+  dropoffCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   description: string;
   weightTons: number;
   dimensions: string;
   pickupDate: string;
   price: number;
+  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
 }

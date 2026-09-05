@@ -194,9 +194,18 @@ function countryCode(value: unknown, fallback: CountryCode = "UG"): CountryCode 
   return eacCountries.some((country) => country.code === code) ? code as CountryCode : fallback;
 }
 
+function optionalCountryCode(value: unknown): CountryCode | undefined {
+  const code = text(value).toUpperCase();
+  return eacCountries.some((country) => country.code === code) ? code as CountryCode : undefined;
+}
+
 function currencyCode(value: unknown, fallback: CurrencyCode = "UGX"): CurrencyCode {
   const code = text(value).toUpperCase();
   return eacCountries.some((country) => country.currency === code) ? code as CurrencyCode : fallback;
+}
+
+function currencyForCountry(country: CountryCode): CurrencyCode {
+  return eacCountries.find((item) => item.code === country)?.currency || "UGX";
 }
 
 function phoneCountry(value: string) {
@@ -461,16 +470,22 @@ router.get("/trips", (req, res) => {
 
 router.post("/trips", async (req, res) => {
   const data = CreateTripBody.parse(req.body);
+  const originCountry = optionalCountryCode(req.body?.originCountry);
+  const destinationCountry = optionalCountryCode(req.body?.destinationCountry);
+  if (!originCountry || !destinationCountry) {
+    res.status(400).json({ error: "Select a valid EAC country for both the origin and destination." });
+    return;
+  }
   const trip: Trip = {
     ...data,
     id: id("trip"),
     carrier: "You",
     carrierRating: 5,
-    originCountry: countryCode(req.body?.originCountry),
-    destinationCountry: countryCode(req.body?.destinationCountry),
+    originCountry,
+    destinationCountry,
     departureTime: text(req.body?.departureTime) || "07:00",
     corridor: `${data.origin.split(",")[0]} → ${data.destination.split(",")[0]}`,
-    currency: currencyCode(req.body?.currency),
+    currency: currencyCode(req.body?.currency, currencyForCountry(originCountry)),
     priceType: data.priceType as Trip["priceType"],
     vehicleType: data.vehicleType,
     status: "Available",
@@ -501,16 +516,22 @@ router.get("/freight", (req, res) => {
 
 router.post("/freight", async (req, res) => {
   const data = CreateFreightBody.parse(req.body);
+  const pickupCountry = optionalCountryCode(req.body?.pickupCountry);
+  const dropoffCountry = optionalCountryCode(req.body?.dropoffCountry);
+  if (!pickupCountry || !dropoffCountry) {
+    res.status(400).json({ error: "Select a valid EAC country for both the pickup and drop-off." });
+    return;
+  }
   const load: Freight = {
     ...data,
     id: id("load"),
     shipper: "You",
-    pickupCountry: countryCode(req.body?.pickupCountry),
-    dropoffCountry: countryCode(req.body?.dropoffCountry),
+    pickupCountry,
+    dropoffCountry,
     cargoType: text(req.body?.cargoType) || "General cargo",
     volumeM3: number(req.body?.volumeM3) || 0,
     corridor: `${data.pickup.split(",")[0]} → ${data.dropoff.split(",")[0]}`,
-    currency: currencyCode(req.body?.currency),
+    currency: currencyCode(req.body?.currency, currencyForCountry(pickupCountry)),
     status: "Pending",
   };
   freight.unshift(load);
