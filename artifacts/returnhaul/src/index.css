@@ -329,9 +329,10 @@
     position: relative;
     display: flex;
     width: min(13rem, 72vw);
-    height: auto;
+    min-height: 7.5rem;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     isolation: isolate;
   }
 
@@ -339,7 +340,7 @@
     position: relative;
     z-index: 1;
     width: 100%;
-    animation: truckshare-loader-drive 2.1s linear infinite;
+    animation: truckshare-loader-drive 4.5s cubic-bezier(.46, .03, .54, .97) infinite;
   }
 
   .brand-loader-image {
@@ -350,56 +351,54 @@
     filter: drop-shadow(0 12px 14px hsl(var(--foreground) / 0.12));
   }
 
-  .brand-loader-chain {
+  .brand-loader-wind {
     position: absolute;
-    inset: 0;
-    z-index: 2;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
+    z-index: 1;
+    left: -42%;
+    bottom: 49%;
+    width: 52%;
+    height: 2.75rem;
+    animation: truckshare-loader-drive 4.5s cubic-bezier(.46, .03, .54, .97) infinite;
     pointer-events: none;
   }
 
-  .brand-loader-chain-track {
-    transform-origin: center;
-    animation: truckshare-chain-track 0.9s linear infinite;
+  .brand-loader-wind i {
+    position: absolute;
+    display: block;
+    height: 0.15rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, hsl(var(--accent) / 0.72));
+    transform-origin: right center;
+    animation: truckshare-loader-gust 0.85s ease-in-out infinite;
   }
 
-  .brand-loader-chain-line {
-    fill: none;
-    stroke: hsl(var(--primary) / 0.82);
-    stroke-width: 7;
-    stroke-linecap: round;
-    stroke-dasharray: 13 16;
-    filter: drop-shadow(0 1px 1px hsl(var(--foreground) / 0.28));
+  .brand-loader-wind i:nth-child(1) {
+    top: 0.2rem;
+    left: 0.35rem;
+    width: 68%;
+    animation-delay: -0.15s;
   }
 
-  .brand-loader-chain-link {
-    fill: none;
-    stroke: hsl(var(--primary) / 0.9);
-    stroke-width: 7;
-    filter: drop-shadow(0 1px 1px hsl(var(--foreground) / 0.3));
+  .brand-loader-wind i:nth-child(2) {
+    top: 1.05rem;
+    left: 0;
+    width: 94%;
+    animation-delay: -0.5s;
   }
 
-  .brand-loader-chain-link-alt {
-    transform: rotate(90deg);
-    transform-origin: center;
+  .brand-loader-wind i:nth-child(3) {
+    top: 1.9rem;
+    left: 1rem;
+    width: 54%;
+    animation-delay: -0.7s;
   }
 
-  .brand-loader-chain-wheel {
-    fill: hsl(var(--background) / 0.7);
-    stroke: hsl(var(--accent-foreground) / 0.92);
-    stroke-width: 5;
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: truckshare-chain-wheel-roll 0.68s linear infinite;
-  }
-
-  .brand-loader-chain-wheel path {
-    fill: none;
-    stroke: hsl(var(--accent-foreground) / 0.92);
-    stroke-width: 4;
-    stroke-linecap: round;
+  .brand-loader-wind i:nth-child(4) {
+    top: 1.5rem;
+    left: 60%;
+    width: 35%;
+    height: 0.1rem;
+    animation-delay: -0.35s;
   }
 
   .brand-loader-road {
@@ -410,16 +409,9 @@
     width: 84%;
     height: 0.3rem;
     border-radius: 999px;
-    background: repeating-linear-gradient(90deg, transparent 0 0.5rem, hsl(var(--primary) / 0.55) 0.5rem 1.5rem, transparent 1.5rem 2.2rem);
+    background: repeating-linear-gradient(90deg, transparent 0 0.5rem, hsl(var(--primary) / 0.62) 0.5rem 1.5rem, transparent 1.5rem 2.2rem);
     filter: blur(1px);
     animation: truckshare-loader-road 0.7s linear infinite;
-  }
-
-  @keyframes truckshare-loader-drive {
-    0% { opacity: 0; transform: translateX(-1.75rem); }
-    12% { opacity: 1; }
-    72% { opacity: 1; transform: translateX(1.75rem); }
-    86%, 100% { opacity: 0; transform: translateX(2.1rem); }
   }
 
   @keyframes truckshare-loader-road {
@@ -427,20 +419,23 @@
     to { background-position: -2.2rem 0; }
   }
 
-  @keyframes truckshare-chain-track {
-    from { transform: translateX(0); }
-    to { transform: translateX(-1.25rem); }
+  @keyframes truckshare-loader-drive {
+    0% { opacity: 0; transform: translateX(-100%); }
+    9% { opacity: 1; }
+    76% { opacity: 1; transform: translateX(100%); }
+    91%, 100% { opacity: 0; transform: translateX(135%); }
   }
 
-  @keyframes truckshare-chain-wheel-roll {
-    to { transform: rotate(360deg); }
+  @keyframes truckshare-loader-gust {
+    0%, 100% { opacity: 0.25; transform: scaleX(.72); }
+    50% { opacity: 1; transform: scaleX(1); }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .brand-loader-vehicle,
     .brand-loader-road,
-    .brand-loader-chain-track,
-    .brand-loader-chain-wheel {
+    .brand-loader-wind,
+    .brand-loader-wind i {
       animation: none;
     }
   }

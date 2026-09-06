@@ -206,34 +206,15 @@ function Card({ children, className = "" }: { children: ReactNode; className?: s
 function Status({ value }: { value: string }) { const tone = /delivered|verified|paid|released|cleared|crossed/i.test(value) ? "bg-[#e4f1ea] text-[#28765a]" : /pending|held|transit|border|otp|planned|submitted/i.test(value) ? "bg-[#fff0d9] text-[#9a641c]" : /reject/i.test(value) ? "bg-[#fbe8e5] text-[#ad4339]" : "bg-muted text-muted-foreground"; const plain: Record<string, string> = { Held: "Payment protected", Released: "Paid out", Pending: "Waiting for payment", "En Route to Pickup": "Going to pickup", "In Transit": "On the way", "At Border": "At the border", "OTP sent": "Waiting for delivery code", Unpaid: "Not paid", Planned: "Not started", "Documents Pending": "Documents needed", Submitted: "Documents sent", Cleared: "Approved", Crossed: "Border crossed" }; return <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-mono-ui text-[9px] font-bold uppercase tracking-wide ${tone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{plain[value] || value}</span>; }
 function BrandLoader({ label = "Loading TruckShare" }: { label?: string }) {
   return <div className="brand-loader" role="status" aria-label={label}>
+    <span className="brand-loader-wind" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+      <i />
+    </span>
     <span className="brand-loader-road" aria-hidden="true" />
     <div className="brand-loader-vehicle" aria-hidden="true">
       <img className="brand-loader-image" src="/branding/truckshare-logo-transparent.png" alt="" />
-      <svg className="brand-loader-chain" viewBox="0 0 740 432" preserveAspectRatio="none">
-        <g className="brand-loader-chain-track">
-          <path className="brand-loader-chain-line" d="M154 247H642" />
-          <ellipse className="brand-loader-chain-link" cx="235" cy="247" rx="42" ry="16" />
-          <ellipse className="brand-loader-chain-link brand-loader-chain-link-alt" cx="350" cy="247" rx="42" ry="16" />
-          <ellipse className="brand-loader-chain-link" cx="465" cy="247" rx="42" ry="16" />
-          <ellipse className="brand-loader-chain-link brand-loader-chain-link-alt" cx="580" cy="247" rx="42" ry="16" />
-        </g>
-        <g className="brand-loader-chain-wheel brand-loader-chain-wheel-1">
-          <circle cx="235" cy="247" r="18" />
-          <path d="M235 226V268M214 247H256" />
-        </g>
-        <g className="brand-loader-chain-wheel brand-loader-chain-wheel-2">
-          <circle cx="350" cy="247" r="18" />
-          <path d="M350 226V268M329 247H371" />
-        </g>
-        <g className="brand-loader-chain-wheel brand-loader-chain-wheel-3">
-          <circle cx="465" cy="247" r="18" />
-          <path d="M465 226V268M444 247H486" />
-        </g>
-        <g className="brand-loader-chain-wheel brand-loader-chain-wheel-4">
-          <circle cx="580" cy="247" r="18" />
-          <path d="M580 226V268M559 247H601" />
-        </g>
-      </svg>
     </div>
     <span className="sr-only">{label}</span>
   </div>;
