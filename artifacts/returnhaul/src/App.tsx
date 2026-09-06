@@ -199,7 +199,7 @@ function Modal({ title, eyebrow, onClose, children }: { title: string; eyebrow: 
 function Field({ label, value, onChange, type = "text", placeholder, required = true }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean }) { return <label className="block"><span className={labelClass}>{label}{required && <span className="text-accent-foreground"> *</span>}</span><input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className={input} /></label>; }
 function CountrySelect({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className={labelClass}>{label} *</span><select required className={input} value={value} onChange={(event) => onChange(event.target.value)}>{regionalReference.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label>; }
 
-function AuthModal({ onClose }: { onClose: () => void }) {
+function LegacyAuthModal({ onClose }: { onClose: () => void }) {
   const [method, setMethod] = useState<"phone" | "google">("phone");
   const [phoneCountry, setPhoneCountry] = useState("UG");
   const [phone, setPhone] = useState("700 000 000");
@@ -252,6 +252,102 @@ function AuthModal({ onClose }: { onClose: () => void }) {
     }
   };
   return <Modal title="Join TruckShare EAC" eyebrow="Secure access" onClose={onClose}><div className="mb-5 flex rounded-lg border border-border bg-muted/50 p-1"><button type="button" onClick={() => { setMethod("phone"); setStep("phone"); setMessage(""); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "phone" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Phone</button><button type="button" onClick={() => { setMethod("google"); setMessage(""); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "google" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Google</button></div>{message && <div className="mb-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}</div>}{method === "google" ? <div className="py-4 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-border font-display text-lg font-bold">G</div><p className="mt-4 text-sm font-semibold">Continue with Google</p><p className="mt-1 text-xs text-muted-foreground">OAuth onboarding is simulated for this preview.</p><button type="button" disabled={busy} onClick={google} className={`${button} mt-5 w-full`}>{busy ? "Connecting..." : "Continue with Google"} <ArrowRight size={14} /></button></div> : step === "phone" ? <form onSubmit={submitPhone} className="space-y-4"><div className="grid gap-4 sm:grid-cols-[.9fr_1.1fr]"><CountrySelect label="Country" value={phoneCountry} onChange={setPhoneCountry} /><Field label={`Phone number (${dialingCodes[phoneCountry]})`} value={phone} onChange={setPhone} placeholder="700 000 000" /></div><button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Sending..." : "Send mock SMS OTP"} <ArrowRight size={14} /></button><p className="text-center font-mono-ui text-[10px] text-muted-foreground">EAC phone numbers supported · preview mode</p></form> : <form onSubmit={verify} className="space-y-4"><Field label="4-digit OTP" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" /><button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : "Verify phone"} <ShieldCheck size={14} /></button></form>}</Modal>;
+}
+
+function AuthModal({ onClose }: { onClose: () => void }) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [method, setMethod] = useState<"phone" | "google">("phone");
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<"Carrier" | "Shipper">("Carrier");
+  const [phoneCountry, setPhoneCountry] = useState("UG");
+  const [phone, setPhone] = useState("700 000 000");
+  const [challengeId, setChallengeId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const switchMode = (nextMode: "login" | "signup") => {
+    setMode(nextMode);
+    setStep("phone");
+    setMessage("");
+  };
+  const submitPhone = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const localDigits = phone.replace(/\D/g, "");
+      const result = await api<{ challengeId: string; message: string; devOtp?: string }>("/auth/request-otp", {
+        method: "POST",
+        body: JSON.stringify({
+          phone: `${dialingCodes[phoneCountry]}${localDigits}`,
+          mode,
+          ...(mode === "signup" ? { name, role } : {}),
+        }),
+      });
+      setChallengeId(result.challengeId);
+      setMessage(result.devOtp ? `${result.message} Demo code: ${result.devOtp}` : result.message);
+      setStep("otp");
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Could not send the verification code.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const verify = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string }>("/auth/verify-otp", { method: "POST", body: JSON.stringify({ challengeId, otp }) });
+      localStorage.setItem("truckshare_token", result.token);
+      onClose();
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "That verification code is not valid.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const google = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string }>("/auth/google", { method: "POST", body: JSON.stringify({ mode }) });
+      localStorage.setItem("truckshare_token", result.token);
+      onClose();
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Google sign-in could not be completed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <Modal title={mode === "login" ? "Log in to TruckShare EAC" : "Create your TruckShare account"} eyebrow={mode === "login" ? "Returning user" : "New account"} onClose={onClose}>
+    <div className="mb-3 grid grid-cols-2 rounded-lg border border-border bg-muted/50 p-1">
+      <button type="button" onClick={() => switchMode("login")} aria-pressed={mode === "login"} className={`rounded-md px-3 py-2 text-xs font-bold ${mode === "login" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Log in</button>
+      <button type="button" onClick={() => switchMode("signup")} aria-pressed={mode === "signup"} className={`rounded-md px-3 py-2 text-xs font-bold ${mode === "signup" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Create account</button>
+    </div>
+    <p className="mb-5 text-xs text-muted-foreground">{mode === "login" ? "Use your existing phone number or Google account to continue." : "Create an account to post trips, publish loads, and manage bookings across the EAC."}</p>
+    <div className="mb-5 flex rounded-lg border border-border bg-muted/50 p-1">
+      <button type="button" onClick={() => { setMethod("phone"); setStep("phone"); setMessage(""); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "phone" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Phone</button>
+      <button type="button" onClick={() => { setMethod("google"); setMessage(""); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "google" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Google</button>
+    </div>
+    {message && <div className="mb-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}</div>}
+    {method === "google" ? <div className="py-4 text-center">
+      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-border font-display text-lg font-bold">G</div>
+      <p className="mt-4 text-sm font-semibold">{mode === "login" ? "Log in with Google" : "Create account with Google"}</p>
+      <p className="mt-1 text-xs text-muted-foreground">OAuth onboarding is simulated for this preview.</p>
+      <button type="button" disabled={busy} onClick={google} className={`${button} mt-5 w-full`}>{busy ? "Connecting..." : mode === "login" ? "Log in with Google" : "Continue with Google"} <ArrowRight size={14} /></button>
+    </div> : step === "phone" ? <form onSubmit={submitPhone} className="space-y-4">
+      {mode === "signup" && <div className="grid gap-4 sm:grid-cols-2"><Field label="Full name" value={name} onChange={setName} placeholder="Your name or business name" /><label className="block"><span className={labelClass}>I am a *</span><select className={input} value={role} onChange={(event) => setRole(event.target.value as "Carrier" | "Shipper")}><option value="Carrier">Carrier / truck owner</option><option value="Shipper">Shipper / cargo owner</option></select></label></div>}
+      <div className="grid gap-4 sm:grid-cols-[.9fr_1.1fr]"><CountrySelect label="Country" value={phoneCountry} onChange={setPhoneCountry} /><Field label={`Phone number (${dialingCodes[phoneCountry]})`} value={phone} onChange={setPhone} placeholder="700 000 000" /></div>
+      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Sending..." : mode === "login" ? "Send login code" : "Send signup code"} <ArrowRight size={14} /></button>
+      <p className="text-center font-mono-ui text-[10px] text-muted-foreground">EAC phone numbers supported · preview mode</p>
+    </form> : <form onSubmit={verify} className="space-y-4">
+      <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{mode === "login" ? "Login code sent." : "Signup code sent."} Use <strong>2468</strong> in preview mode.</div>
+      <Field label="4-digit verification code" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" />
+      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : mode === "login" ? "Log in" : "Create account"} <ShieldCheck size={14} /></button>
+    </form>}
+  </Modal>;
 }
 
 function TripsPage() {

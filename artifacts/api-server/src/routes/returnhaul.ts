@@ -291,7 +291,7 @@ const verifications: Verification[] = [
 ];
 
 const sessions = new Map<string, User>();
-const otpChallenges = new Map<string, { phone: string; country: CountryCode; otp: string }>();
+const otpChallenges = new Map<string, { phone: string; country: CountryCode; otp: string; mode: "login" | "signup"; name?: string; role?: "Carrier" | "Shipper" }>();
 const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
@@ -420,32 +420,72 @@ router.get("/reference/eac", (_req, res) => {
 router.post("/auth/request-otp", (req, res) => {
   const phone = text(req.body?.phone).replace(/\s+/g, "");
   const country = phoneCountry(phone);
+  const mode = req.body?.mode === "login" ? "login" : "signup";
+  const existingUser = users.find((user) => user.phone === phone);
   if (!country || !/^\+\d{8,15}$/.test(phone)) {
     res.status(400).json({ error: "Use a valid EAC number with a supported country code." });
     return;
   }
+  if (mode === "login" && !existingUser) {
+    res.status(404).json({ error: "No account exists for this phone number. Choose Create account first." });
+    return;
+  }
+  if (mode === "signup" && existingUser) {
+    res.status(409).json({ error: "An account already exists for this phone number. Choose Log in instead." });
+    return;
+  }
+  const name = text(req.body?.name);
+  if (mode === "signup" && !name) {
+    res.status(400).json({ error: "Enter your name to create an account." });
+    return;
+  }
+  const role = req.body?.role === "Shipper" ? "Shipper" : "Carrier";
   const challengeId = id("challenge");
-  otpChallenges.set(challengeId, { phone, country, otp: "2468" });
+  otpChallenges.set(challengeId, { phone, country, otp: "2468", mode, name: name || undefined, role });
   res.json({ challengeId, phone, message: "Demo OTP sent. Use the code shown to continue.", devOtp: "2468" });
 });
 
 router.post("/auth/verify-otp", async (req, res) => {
-  const challenge = otpChallenges.get(text(req.body?.challengeId));
+  const challengeId = text(req.body?.challengeId);
+  const challenge = otpChallenges.get(challengeId);
   if (!challenge || text(req.body?.otp) !== challenge.otp) {
     res.status(400).json({ error: "That OTP is not valid or has expired." });
     return;
   }
-  const user: User = { id: id("user"), name: "New TruckShare driver", phone: challenge.phone, country: challenge.country, role: "Carrier", verified: false };
-  users.push(user);
+  otpChallenges.delete(challengeId);
+  const existingUser = users.find((user) => user.phone === challenge.phone);
+  if (challenge.mode === "login" && !existingUser) {
+    res.status(404).json({ error: "No account exists for this phone number. Choose Create account first." });
+    return;
+  }
+  const user = existingUser || {
+    id: id("user"),
+    name: challenge.name || "New TruckShare user",
+    phone: challenge.phone,
+    country: challenge.country,
+    role: challenge.role || "Carrier",
+    verified: false,
+  };
+  if (!existingUser) users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
   await persistDatabaseState();
   res.json({ token, user });
 });
 
-router.post("/auth/google", async (_req, res) => {
-  const user: User = { id: id("user"), name: "Google workspace user", email: "demo@truckshare.ug", country: "UG", role: "Shipper", verified: false };
-  users.push(user);
+router.post("/auth/google", async (req, res) => {
+  const mode = req.body?.mode === "login" ? "login" : "signup";
+  const existingUser = users.find((user) => user.email === "demo@truckshare.ug");
+  if (mode === "login" && !existingUser) {
+    res.status(404).json({ error: "No Google account exists yet. Choose Create account first." });
+    return;
+  }
+  if (mode === "signup" && existingUser) {
+    res.status(409).json({ error: "A Google account already exists. Choose Log in instead." });
+    return;
+  }
+  const user = existingUser || { id: id("user"), name: "Google workspace user", email: "demo@truckshare.ug", country: "UG", role: "Shipper", verified: false };
+  if (!existingUser) users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
   await persistDatabaseState();
