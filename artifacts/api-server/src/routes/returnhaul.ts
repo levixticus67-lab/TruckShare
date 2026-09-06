@@ -34,8 +34,10 @@ type Trip = {
   carrierRating: number;
   origin: string;
   originCountry: CountryCode;
+  originLocation?: LocationPoint;
   destination: string;
   destinationCountry: CountryCode;
+  destinationLocation?: LocationPoint;
   corridor: string;
   departureDate: string;
   departureTime: string;
@@ -61,8 +63,10 @@ type Freight = {
   shipper: string;
   pickup: string;
   pickupCountry: CountryCode;
+  pickupLocation?: LocationPoint;
   dropoff: string;
   dropoffCountry: CountryCode;
+  dropoffLocation?: LocationPoint;
   corridor: string;
   description: string;
   cargoType: string;
@@ -279,19 +283,44 @@ function locationPoint(city: string, countryCode: CountryCode): LocationPoint | 
   return locationPoints.find((point) => point.city.toLowerCase() === normalized && point.countryCode === countryCode);
 }
 
+function submittedLocation(value: unknown, fallbackCity: string, countryCode: CountryCode): LocationPoint | undefined {
+  if (!value || typeof value !== "object") return locationPoint(fallbackCity, countryCode);
+  const candidate = value as Partial<LocationPoint>;
+  if (
+    typeof candidate.city !== "string" ||
+    typeof candidate.countryName !== "string" ||
+    typeof candidate.latitude !== "number" ||
+    typeof candidate.longitude !== "number" ||
+    candidate.countryCode !== countryCode ||
+    !Number.isFinite(candidate.latitude) ||
+    !Number.isFinite(candidate.longitude) ||
+    candidate.latitude < -90 ||
+    candidate.latitude > 90 ||
+    candidate.longitude < -180 ||
+    candidate.longitude > 180
+  ) return locationPoint(fallbackCity, countryCode);
+  return {
+    city: candidate.city.trim() || fallbackCity,
+    countryCode,
+    countryName: candidate.countryName,
+    latitude: candidate.latitude,
+    longitude: candidate.longitude,
+  };
+}
+
 function tripWithLocations(trip: Trip) {
   return {
     ...trip,
-    originLocation: locationPoint(trip.origin, trip.originCountry),
-    destinationLocation: locationPoint(trip.destination, trip.destinationCountry),
+    originLocation: trip.originLocation || locationPoint(trip.origin, trip.originCountry),
+    destinationLocation: trip.destinationLocation || locationPoint(trip.destination, trip.destinationCountry),
   };
 }
 
 function freightWithLocations(load: Freight) {
   return {
     ...load,
-    pickupLocation: locationPoint(load.pickup, load.pickupCountry),
-    dropoffLocation: locationPoint(load.dropoff, load.dropoffCountry),
+    pickupLocation: load.pickupLocation || locationPoint(load.pickup, load.pickupCountry),
+    dropoffLocation: load.dropoffLocation || locationPoint(load.dropoff, load.dropoffCountry),
   };
 }
 
@@ -613,7 +642,9 @@ router.post("/trips", async (req, res) => {
     carrier: "You",
     carrierRating: 5,
     originCountry,
+    originLocation: submittedLocation(data.originLocation, data.origin, originCountry),
     destinationCountry,
+    destinationLocation: submittedLocation(data.destinationLocation, data.destination, destinationCountry),
     departureTime: text(req.body?.departureTime) || "07:00",
     corridor: `${data.origin.split(",")[0]} → ${data.destination.split(",")[0]}`,
     currency: currencyCode(req.body?.currency, currencyForCountry(originCountry)),
@@ -632,6 +663,8 @@ router.patch("/trips/:id", async (req, res) => {
   const trip = trips.find((item) => item.id === params.id);
   if (!trip) { res.status(404).json({ error: "Trip not found" }); return; }
   Object.assign(trip, data);
+  trip.originLocation = submittedLocation(data.originLocation, trip.origin, trip.originCountry);
+  trip.destinationLocation = submittedLocation(data.destinationLocation, trip.destination, trip.destinationCountry);
   trip.corridor = `${trip.origin.split(",")[0]} → ${trip.destination.split(",")[0]}`;
   await persistDatabaseState();
   res.json(UpdateTripResponse.parse(tripWithLocations(trip)));
@@ -658,7 +691,9 @@ router.post("/freight", async (req, res) => {
     id: id("load"),
     shipper: "You",
     pickupCountry,
+    pickupLocation: submittedLocation(data.pickupLocation, data.pickup, pickupCountry),
     dropoffCountry,
+    dropoffLocation: submittedLocation(data.dropoffLocation, data.dropoff, dropoffCountry),
     cargoType: text(req.body?.cargoType) || "General cargo",
     volumeM3: number(req.body?.volumeM3) || 0,
     corridor: `${data.pickup.split(",")[0]} → ${data.dropoff.split(",")[0]}`,
@@ -676,6 +711,8 @@ router.patch("/freight/:id", async (req, res) => {
   const load = freight.find((item) => item.id === params.id);
   if (!load) { res.status(404).json({ error: "Freight request not found" }); return; }
   Object.assign(load, data);
+  load.pickupLocation = submittedLocation(data.pickupLocation, load.pickup, load.pickupCountry);
+  load.dropoffLocation = submittedLocation(data.dropoffLocation, load.dropoff, load.dropoffCountry);
   load.corridor = `${load.pickup.split(",")[0]} → ${load.dropoff.split(",")[0]}`;
   await persistDatabaseState();
   res.json(UpdateFreightResponse.parse(freightWithLocations(load)));

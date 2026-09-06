@@ -7,12 +7,15 @@
  */
 import type { CountryCode } from './countryCode';
 import type { CurrencyCode } from './currencyCode';
+import type { LocationPoint } from './locationPoint';
 
 export interface TripInput {
   origin: string;
   originCountry?: CountryCode;
+  originLocation?: LocationPoint;
   destination: string;
   destinationCountry?: CountryCode;
+  destinationLocation?: LocationPoint;
   departureDate: string;
   vehicleType: string;
   capacityTons: number;

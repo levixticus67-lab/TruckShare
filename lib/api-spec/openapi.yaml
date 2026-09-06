@@ -515,8 +515,10 @@ components:
       properties:
         origin: { type: string }
         originCountry: { $ref: "#/components/schemas/CountryCode" }
+        originLocation: { $ref: "#/components/schemas/LocationPoint" }
         destination: { type: string }
         destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationLocation: { $ref: "#/components/schemas/LocationPoint" }
         departureDate: { type: string }
         vehicleType: { type: string }
         capacityTons: { type: number }
@@ -528,7 +530,11 @@ components:
       type: object
       properties:
         origin: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        originLocation: { $ref: "#/components/schemas/LocationPoint" }
         destination: { type: string }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationLocation: { $ref: "#/components/schemas/LocationPoint" }
         departureDate: { type: string }
         vehicleType: { type: string }
         capacityTons: { type: number }
@@ -561,8 +567,10 @@ components:
       properties:
         pickup: { type: string }
         pickupCountry: { $ref: "#/components/schemas/CountryCode" }
+        pickupLocation: { $ref: "#/components/schemas/LocationPoint" }
         dropoff: { type: string }
         dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
+        dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
         description: { type: string }
         weightTons: { type: number }
         dimensions: { type: string }
@@ -573,7 +581,11 @@ components:
       type: object
       properties:
         pickup: { type: string }
+        pickupCountry: { $ref: "#/components/schemas/CountryCode" }
+        pickupLocation: { $ref: "#/components/schemas/LocationPoint" }
         dropoff: { type: string }
+        dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
+        dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
         description: { type: string }
         weightTons: { type: number }
         dimensions: { type: string }

@@ -89,8 +89,10 @@ export interface Trip {
 export interface TripInput {
   origin: string;
   originCountry?: CountryCode;
+  originLocation?: LocationPoint;
   destination: string;
   destinationCountry?: CountryCode;
+  destinationLocation?: LocationPoint;
   departureDate: string;
   vehicleType: string;
   capacityTons: number;
@@ -102,7 +104,11 @@ export interface TripInput {
 
 export interface TripUpdate {
   origin?: string;
+  originCountry?: CountryCode;
+  originLocation?: LocationPoint;
   destination?: string;
+  destinationCountry?: CountryCode;
+  destinationLocation?: LocationPoint;
   departureDate?: string;
   vehicleType?: string;
   capacityTons?: number;
@@ -143,8 +149,10 @@ export interface Freight {
 export interface FreightInput {
   pickup: string;
   pickupCountry?: CountryCode;
+  pickupLocation?: LocationPoint;
   dropoff: string;
   dropoffCountry?: CountryCode;
+  dropoffLocation?: LocationPoint;
   description: string;
   weightTons: number;
   dimensions: string;
@@ -155,7 +163,11 @@ export interface FreightInput {
 
 export interface FreightUpdate {
   pickup?: string;
+  pickupCountry?: CountryCode;
+  pickupLocation?: LocationPoint;
   dropoff?: string;
+  dropoffCountry?: CountryCode;
+  dropoffLocation?: LocationPoint;
   description?: string;
   weightTons?: number;
   dimensions?: string;

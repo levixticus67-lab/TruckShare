@@ -117,8 +117,22 @@ export const ListTripsResponse = zod.array(ListTripsResponseItem)
 export const CreateTripBody = zod.object({
   "origin": zod.string(),
   "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "originLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "destination": zod.string(),
   "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "destinationLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "departureDate": zod.string(),
   "vehicleType": zod.string(),
   "capacityTons": zod.number(),
@@ -171,7 +185,23 @@ export const UpdateTripParams = zod.object({
 
 export const UpdateTripBody = zod.object({
   "origin": zod.string().optional(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "originLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "destination": zod.string().optional(),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "destinationLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "departureDate": zod.string().optional(),
   "vehicleType": zod.string().optional(),
   "capacityTons": zod.number().optional(),
@@ -261,8 +291,22 @@ export const ListFreightResponse = zod.array(ListFreightResponseItem)
 export const CreateFreightBody = zod.object({
   "pickup": zod.string(),
   "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "pickupLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "dropoff": zod.string(),
   "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "dropoffLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "description": zod.string(),
   "weightTons": zod.number(),
   "dimensions": zod.string(),
@@ -312,7 +356,23 @@ export const UpdateFreightParams = zod.object({
 
 export const UpdateFreightBody = zod.object({
   "pickup": zod.string().optional(),
+  "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "pickupLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "dropoff": zod.string().optional(),
+  "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "dropoffLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "description": zod.string().optional(),
   "weightTons": zod.number().optional(),
   "dimensions": zod.string().optional(),

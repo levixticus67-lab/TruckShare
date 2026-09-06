@@ -7,12 +7,15 @@
  */
 import type { CountryCode } from './countryCode';
 import type { CurrencyCode } from './currencyCode';
+import type { LocationPoint } from './locationPoint';
 
 export interface FreightInput {
   pickup: string;
   pickupCountry?: CountryCode;
+  pickupLocation?: LocationPoint;
   dropoff: string;
   dropoffCountry?: CountryCode;
+  dropoffLocation?: LocationPoint;
   description: string;
   weightTons: number;
   dimensions: string;

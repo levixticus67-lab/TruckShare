@@ -5,10 +5,16 @@
  * ReturnHaul freight matching API
  * OpenAPI spec version: 0.1.0
  */
+import type { CountryCode } from './countryCode';
+import type { LocationPoint } from './locationPoint';
 
 export interface TripUpdate {
   origin?: string;
+  originCountry?: CountryCode;
+  originLocation?: LocationPoint;
   destination?: string;
+  destinationCountry?: CountryCode;
+  destinationLocation?: LocationPoint;
   departureDate?: string;
   vehicleType?: string;
   capacityTons?: number;
