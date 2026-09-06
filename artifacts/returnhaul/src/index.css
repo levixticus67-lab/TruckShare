@@ -302,6 +302,29 @@
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
   }
 
+  .app-logo-link {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .app-logo-surface {
+    display: flex;
+    width: min(11.5rem, 100%);
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 0.9rem;
+    background: hsl(0 0% 100% / 0.94);
+    padding: 0.35rem 0.55rem;
+  }
+
+  .app-logo {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
   .brand-loader {
     position: relative;
     display: flex;
@@ -452,6 +475,13 @@ header.sticky button[aria-label="Notifications"] + div {
   background: hsl(var(--secondary));
   color: hsl(var(--foreground));
 }
+
+  .mobile-nav-brand-logo {
+    display: block;
+    width: 2.1rem;
+    height: 2.1rem;
+    object-fit: contain;
+  }
 
 .mobile-nav-brand.is-active {
   background: hsl(var(--primary));
@@ -624,6 +654,24 @@ header.sticky button[aria-label="Notifications"] + div {
     background: hsl(var(--primary));
     color: hsl(var(--primary-foreground));
     box-shadow: 0 6px 16px hsl(var(--primary) / 0.2);
+  }
+
+  .mobile-topbar-logo-surface {
+    display: flex;
+    width: min(9rem, 42vw);
+    max-height: 3rem;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 0.7rem;
+    background: hsl(0 0% 100% / 0.94);
+    padding: 0.18rem 0.35rem;
+  }
+
+  .mobile-topbar-logo {
+    display: block;
+    width: 100%;
+    height: auto;
   }
 
   .mobile-topbar-brand p {

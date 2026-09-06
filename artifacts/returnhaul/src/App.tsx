@@ -119,7 +119,7 @@ const nav = [
 ] as const;
 
 function Logo() {
-  return <Link href="/" className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-accent text-primary"><Truck size={20} /></span><span><strong className="block font-display text-[18px] tracking-[-.04em]">TruckShare EAC</strong><small className="block font-mono-ui text-[8px] uppercase tracking-[.12em] text-sidebar-foreground/45">Every trip pays</small></span></Link>;
+  return <Link href="/" className="app-logo-link"><span className="app-logo-surface"><img className="app-logo" src="/branding/truckshare-logo-transparent.png" alt="TruckShare EAC" /></span></Link>;
 }
 
 function ThemeToggle() {
@@ -133,7 +133,7 @@ function ThemeToggle() {
 
 function MobileHeader({ notificationsOpen, onNotifications, onAuth }: { notificationsOpen: boolean; onNotifications: () => void; onAuth: () => void }) {
   return <header className="mobile-topbar">
-    <div className="mobile-topbar-brand"><span className="mobile-topbar-mark"><Truck size={18} /></span><div className="min-w-0"><p>TruckShare UG</p></div></div>
+    <div className="mobile-topbar-brand"><span className="mobile-topbar-logo-surface"><img className="mobile-topbar-logo" src="/branding/truckshare-logo-transparent.png" alt="TruckShare EAC" /></span></div>
     <div className="mobile-topbar-actions">
       <div className="relative"><button type="button" onClick={onNotifications} className="mobile-topbar-icon" aria-label="Notifications" aria-expanded={notificationsOpen}><Bell size={17} /><span /></button>{notificationsOpen && <div className="mobile-notifications"><div className="flex items-center justify-between"><p className="font-display text-base font-semibold">Notifications</p><span className="font-mono-ui text-[9px] uppercase tracking-wide text-muted-foreground">3 updates</span></div><div className="mt-3 space-y-3 text-xs"><div className="border-b border-border pb-3"><p className="font-semibold">New match found</p><p className="mt-1 text-muted-foreground">Kampala → Mbale is 92% compatible.</p></div><div className="border-b border-border pb-3"><p className="font-semibold">Payment held</p><p className="mt-1 text-muted-foreground">Eastline Hardware escrow is secured.</p></div><div><p className="font-semibold">Verification queue updated</p><p className="mt-1 text-muted-foreground">Thabo Transport is awaiting review.</p></div></div></div>}</div>
       <button type="button" onClick={onAuth} className="mobile-account-button" aria-label="Sign in or register"><UserRound size={16} /><span className="max-[380px]:hidden">Sign in / Register</span><span className="min-[381px]:hidden">Account</span></button>
@@ -187,7 +187,7 @@ function Shell({ children }: { children: ReactNode }) {
       <div className="mt-auto space-y-3"><div className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9a35c] text-xs font-bold text-primary">NS</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">Nadia S.</p><p className="truncate text-[10px] text-sidebar-foreground/45">{role} account</p></div></div></div>
     </aside>
      <nav className={`mobile-bottom-nav fixed inset-x-3 bottom-3 z-40 flex h-[70px] items-center gap-1 rounded-[22px] border border-border/80 px-2 shadow-xl lg:hidden ${mobileOpen ? "pointer-events-none opacity-0" : ""}`} aria-label="Mobile navigation">
-       <Link href="/" onClick={() => setMobileOpen(false)} aria-label="TruckShare home" className={`mobile-nav-brand ${location === "/" ? "is-active" : ""}`}><Truck size={19} /></Link>
+        <Link href="/" onClick={() => setMobileOpen(false)} aria-label="TruckShare home" className={`mobile-nav-brand ${location === "/" ? "is-active" : ""}`}><img className="mobile-nav-brand-logo" src="/branding/truckshare-mark.png" alt="" /></Link>
        {mobileNavItems.map(([href, label, Icon]) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} aria-current={location === href ? "page" : undefined} className={`mobile-nav-item ${location === href ? "is-active" : ""}`}><Icon size={18} /><span>{mobileLabels[label] || label}</span>{location === href && <i aria-hidden="true" />}</Link>)}
        <button type="button" onClick={() => setMobileOpen(true)} className={`mobile-nav-item ${!mobileNavItems.some(([href]) => href === location) && location !== "/" ? "is-active" : ""}`} aria-label="Open more navigation"><Menu size={18} /><span>More</span>{!mobileNavItems.some(([href]) => href === location) && location !== "/" && <i aria-hidden="true" />}</button>
      </nav>
