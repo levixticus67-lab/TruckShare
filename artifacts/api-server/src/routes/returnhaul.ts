@@ -143,6 +143,7 @@ type User = {
   email?: string;
   country: CountryCode;
   role: "Carrier" | "Shipper" | "Admin";
+  roles?: Array<"Carrier" | "Shipper">;
   verified: boolean;
 };
 
@@ -215,6 +216,11 @@ function phoneCountry(value: string) {
 
 function normalizePhone(value: string) {
   return value.replace(/\s+/g, "");
+}
+
+function requestedRoles(value: unknown): Array<"Carrier" | "Shipper"> {
+  if (!Array.isArray(value)) return [];
+  return value.filter((role): role is "Carrier" | "Shipper" => role === "Carrier" || role === "Shipper");
 }
 
 function exchangeRate(from: CurrencyCode, to: CurrencyCode) {
@@ -295,7 +301,7 @@ const verifications: Verification[] = [
 ];
 
 const sessions = new Map<string, User>();
-const otpChallenges = new Map<string, { phone: string; country: CountryCode; otp: string; mode: "login" | "signup"; name?: string; role?: "Carrier" | "Shipper" | "Admin" }>();
+const otpChallenges = new Map<string, { phone: string; country: CountryCode; otp: string; mode: "login" | "signup"; name?: string; role?: "Carrier" | "Shipper" | "Admin"; roles?: Array<"Carrier" | "Shipper"> }>();
 const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
@@ -456,9 +462,15 @@ router.post("/auth/request-otp", (req, res) => {
     res.status(400).json({ error: "Enter your name to create an account." });
     return;
   }
-  const role = isAdminPhone(phone) ? "Admin" : req.body?.role === "Shipper" ? "Shipper" : "Carrier";
+  const roles = requestedRoles(req.body?.roles);
+  if (roles.length === 0 && (req.body?.role === "Carrier" || req.body?.role === "Shipper")) roles.push(req.body.role);
+  if (mode === "signup" && roles.length === 0) {
+    res.status(400).json({ error: "Choose at least one account role." });
+    return;
+  }
+  const role = isAdminPhone(phone) ? "Admin" : roles.includes("Carrier") ? "Carrier" : "Shipper";
   const challengeId = id("challenge");
-  otpChallenges.set(challengeId, { phone, country, otp: "2468", mode, name: name || undefined, role });
+  otpChallenges.set(challengeId, { phone, country, otp: "2468", mode, name: name || undefined, role, roles });
   res.json({ challengeId, phone, message: "Demo OTP sent. Use the code shown to continue.", devOtp: "2468" });
 });
 
@@ -481,9 +493,13 @@ router.post("/auth/verify-otp", async (req, res) => {
     phone: challenge.phone,
     country: challenge.country,
     role: challenge.role || "Carrier",
+    roles: challenge.roles,
     verified: false,
   };
-  if (isAdminPhone(challenge.phone)) user.role = "Admin";
+  if (isAdminPhone(challenge.phone)) {
+    user.role = "Admin";
+    user.roles = undefined;
+  }
   if (!existingUser) users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
@@ -502,7 +518,12 @@ router.post("/auth/google", async (req, res) => {
     res.status(409).json({ error: "A Google account already exists. Choose Log in instead." });
     return;
   }
-  const user = existingUser || { id: id("user"), name: "Google workspace user", email: "demo@truckshare.ug", country: "UG", role: "Shipper", verified: false };
+  const roles = requestedRoles(req.body?.roles);
+  if (mode === "signup" && roles.length === 0) {
+    res.status(400).json({ error: "Choose at least one account role." });
+    return;
+  }
+  const user = existingUser || { id: id("user"), name: text(req.body?.name) || "Google workspace user", email: "demo@truckshare.ug", country: "UG", role: roles.includes("Carrier") ? "Carrier" : "Shipper", roles, verified: false };
   if (!existingUser) users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);

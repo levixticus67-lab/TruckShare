@@ -674,11 +674,11 @@ header.sticky button[aria-label="Notifications"] + div {
     text-align: center;
   }
 
-  .home-action-grid > a:not(:last-child) {
+  .home-action-grid > a {
     text-align: center;
   }
 
-  .home-action-grid > a:not(:last-child) > svg {
+  .home-action-grid > a > svg {
     margin-inline: auto;
   }
 }

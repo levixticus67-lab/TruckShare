@@ -69,7 +69,7 @@ type EacReference = { countries: { code: string; name: string; currency: string 
 type BorderMilestone = { id: string; bookingId: string; sequence: number; country: string; checkpoint: string; status: string; requiredDocuments: string[]; updatedAt: string };
 type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: string; amount: number; currency: string; settlementAmount: number; settlementCurrency: string; exchangeRate: number; fee: number; commissionAmount: number; carrierPayout: number; indicative: boolean; expiresInSeconds: number };
 type WorkspaceRole = "Carrier" | "Shipper" | "Admin";
-type AuthUser = { id: string; name: string; phone?: string; email?: string; country: string; role: WorkspaceRole; verified: boolean };
+type AuthUser = { id: string; name: string; phone?: string; email?: string; country: string; role: WorkspaceRole; roles?: Array<"Carrier" | "Shipper">; verified: boolean };
 const RoleContext = createContext<WorkspaceRole>("Carrier");
 const useRole = () => useContext(RoleContext);
 
@@ -148,27 +148,37 @@ function Shell({ children }: { children: ReactNode }) {
   const [authOpen, setAuthOpen] = useState(false);
   const [authRefresh, setAuthRefresh] = useState(0);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   useEffect(() => {
-    api<{ user: AuthUser | null }>("/auth/me").then((result) => setAuthUser(result.user)).catch(() => setAuthUser(null));
+    setAuthLoading(true);
+    api<{ user: AuthUser | null }>("/auth/me").then((result) => setAuthUser(result.user)).catch(() => setAuthUser(null)).finally(() => setAuthLoading(false));
   }, [authRefresh]);
   const current = nav.find(([href]) => href === location) || nav[0];
-  const availableRoles: WorkspaceRole[] = authUser?.role === "Admin" ? ["Carrier", "Shipper", "Admin"] : ["Carrier", "Shipper"];
+  const accountRoles = authUser?.roles?.length ? authUser.roles : authUser?.role && authUser.role !== "Admin" ? [authUser.role] : [];
+  const availableRoles: WorkspaceRole[] = authUser?.role === "Admin" ? ["Admin"] : accountRoles;
   const changeRole = (nextRole: WorkspaceRole) => {
-    if (nextRole === "Admin" && authUser?.role !== "Admin") return;
+    if (!availableRoles.includes(nextRole)) return;
     setRole(nextRole);
     navigate(nextRole === "Carrier" ? "/trips" : nextRole === "Shipper" ? "/freight" : "/admin");
   };
   const visibleNav = nav.filter(([href]) => role === "Carrier"
-    ? href !== "/admin"
+    ? ["/", "/trips", "/freight", "/matches", "/bookings", "/tracking", "/messages", "/documents", "/verification", "/payments", "/regional"].includes(href)
     : role === "Shipper"
-      ? !["/admin", "/verification"].includes(href)
+      ? ["/", "/freight", "/trips", "/matches", "/bookings", "/tracking", "/messages", "/documents", "/payments", "/regional"].includes(href)
       : ["/", "/admin", "/verification", "/documents", "/messages", "/regional"].includes(href));
   const primaryHrefs = ["/", "/trips", "/freight", "/bookings"];
   const primaryNav = visibleNav.filter(([href]) => primaryHrefs.includes(href));
   const moreNav = visibleNav.filter(([href]) => !primaryHrefs.includes(href));
   const mobileNavItems = primaryNav.filter(([href]) => href !== "/").slice(0, 3);
   const [moreOpen, setMoreOpen] = useState(false);
+  const finishAuth = (user: AuthUser) => {
+    setAuthUser(user);
+    setRole(user.role === "Admin" ? "Admin" : user.roles?.[0] || user.role);
+    setAuthOpen(false);
+  };
+  if (authLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-background text-sm text-muted-foreground">Loading TruckShare...</div>;
+  if (!authUser) return <AuthModal required onComplete={finishAuth} />;
   return <RoleContext.Provider value={role}><div className="noise min-h-[100dvh] bg-background">
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[258px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground shadow-2xl transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="mb-7 flex items-center justify-between px-2"><Logo /><div className="flex items-center gap-1"><ThemeToggle /><button className="rounded-lg p-2 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={18} /></button></div></div>
@@ -182,7 +192,7 @@ function Shell({ children }: { children: ReactNode }) {
        <button type="button" onClick={() => setMobileOpen(true)} className={`mobile-nav-item ${!mobileNavItems.some(([href]) => href === location) && location !== "/" ? "is-active" : ""}`} aria-label="Open more navigation"><Menu size={18} /><span>More</span>{!mobileNavItems.some(([href]) => href === location) && location !== "/" && <i aria-hidden="true" />}</button>
      </nav>
     {mobileOpen && <button className="fixed inset-0 z-30 bg-primary/35 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}
-     <main className="min-h-[100dvh] lg:pl-[258px]"><header className="sticky top-0 z-20 flex h-[64px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button className="rounded-lg border border-border bg-card p-2 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={18} /></button><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">TruckShare EAC</p><h1 className="mt-0.5 font-display text-lg font-semibold tracking-[-.03em]">{current[1]}</h1></div></div><div className="flex items-center gap-2"><div className="relative"><button type="button" onClick={() => setNotificationsOpen((open) => !open)} className="rounded-lg border border-border bg-card p-2 text-muted-foreground" aria-label="Notifications" aria-expanded={notificationsOpen}><Bell size={16} /></button>{notificationsOpen && <div className="absolute right-0 top-11 z-30 w-72 rounded-xl border border-border bg-card p-4 text-left shadow-xl"><p className="font-display text-base font-semibold">Notifications</p><div className="mt-3 space-y-3 text-xs"><div className="border-b border-border pb-3"><p className="font-semibold">New match found</p><p className="mt-1 text-muted-foreground">Kampala → Mbale is 92% compatible.</p></div><div className="border-b border-border pb-3"><p className="font-semibold">Payment protected</p><p className="mt-1 text-muted-foreground">Eastline Hardware booking is secure.</p></div><div><p className="font-semibold">Verification needed</p><p className="mt-1 text-muted-foreground">Thabo Transport is waiting for review.</p></div></div></div>}</div><button onClick={() => setAuthOpen(true)} className={`${secondaryButton} inline-flex whitespace-nowrap`}>Account</button></div></header><div className="mx-auto max-w-[1180px] px-5 py-6 sm:px-8 sm:py-8">{children}</div></main>{authOpen && <AuthModal onClose={() => { setAuthOpen(false); setAuthRefresh((value) => value + 1); }} />}</div></RoleContext.Provider>;
+     <main className="min-h-[100dvh] lg:pl-[258px]"><header className="sticky top-0 z-20 flex h-[64px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button className="rounded-lg border border-border bg-card p-2 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={18} /></button><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">TruckShare EAC</p><h1 className="mt-0.5 font-display text-lg font-semibold tracking-[-.03em]">{current[1]}</h1></div></div><div className="flex items-center gap-2"><div className="relative"><button type="button" onClick={() => setNotificationsOpen((open) => !open)} className="rounded-lg border border-border bg-card p-2 text-muted-foreground" aria-label="Notifications" aria-expanded={notificationsOpen}><Bell size={16} /></button>{notificationsOpen && <div className="absolute right-0 top-11 z-30 w-72 rounded-xl border border-border bg-card p-4 text-left shadow-xl"><p className="font-display text-base font-semibold">Notifications</p><div className="mt-3 space-y-3 text-xs"><div className="border-b border-border pb-3"><p className="font-semibold">New match found</p><p className="mt-1 text-muted-foreground">Kampala → Mbale is 92% compatible.</p></div><div className="border-b border-border pb-3"><p className="font-semibold">Payment protected</p><p className="mt-1 text-muted-foreground">Eastline Hardware booking is secure.</p></div><div><p className="font-semibold">Verification needed</p><p className="mt-1 text-muted-foreground">Thabo Transport is waiting for review.</p></div></div></div>}</div><button onClick={() => setAuthOpen(true)} className={`${secondaryButton} inline-flex whitespace-nowrap`}>Account</button></div></header><div className="mx-auto max-w-[1180px] px-5 py-6 sm:px-8 sm:py-8">{children}</div></main>{authOpen && <AuthModal onClose={() => { setAuthOpen(false); setAuthRefresh((value) => value + 1); }} onComplete={finishAuth} />}</div></RoleContext.Provider>;
 }
 
 function Header({ eyebrow, title, detail, action }: { eyebrow: string; title: string; detail?: string; action?: ReactNode }) {
@@ -203,7 +213,7 @@ function Dashboard() {
   return <div className="space-y-6"><Header eyebrow="Operations / Uganda" title="Every trip pays. Every load moves." detail="A live command center for backhaul capacity across Uganda’s busiest freight corridors." action={<Link href="/trips" className={button}><Plus size={14} /> Post a return trip</Link>} /><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Stat label="Active trips" value={query.data.activeTrips} note="Across 4 corridors" icon={RouteIcon} /><Stat label="Available loads" value={query.data.availableLoads} note="Ready to match" icon={PackageCheck} accent /><Stat label="In transit" value={query.data.inTransit} note="Live handoffs" icon={MapPin} /><Stat label="Escrow secured" value={money(query.data.totalEscrow)} note="Held until delivery" icon={LockKeyhole} /></div><div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]"><Card><div className="mb-5 flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-muted-foreground">Corridor pulse</p><h3 className="mt-1 font-display text-xl font-semibold">Uganda’s return network</h3></div><span className="rounded-md bg-[#e6f1eb] px-2 py-1 font-mono-ui text-[10px] font-bold text-[#24795b]">LIVE</span></div><div className="paper-grid relative h-[220px] overflow-hidden rounded-lg border border-border/70 bg-[#f4f0e7] p-5"><svg className="absolute inset-0 h-full w-full" viewBox="0 0 800 220" preserveAspectRatio="none"><path d="M95 55 C180 85, 160 145, 260 130 S420 90, 520 74 S650 120, 715 160" fill="none" stroke="#d7984e" strokeDasharray="5 7" strokeWidth="2" /><path d="M260 130 C350 175, 430 170, 520 74" fill="none" stroke="#2d8066" strokeDasharray="4 6" strokeWidth="1.5" /></svg>{["Kampala", "Mbale", "Mbarara", "Gulu", "Malaba"].map((city, index) => <span key={city} className={`absolute ${["left-[10%] top-[24%]", "left-[31%] top-[55%]", "left-[48%] top-[67%]", "right-[10%] top-[70%]", "right-[26%] top-[27%]"][index]} h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-accent/15`} title={city} />)}<div className="absolute bottom-4 left-5 rounded-md border border-border bg-card/90 px-2.5 py-1.5"><p className="font-mono-ui text-[9px] text-muted-foreground">KAMPALA → MBALE</p><p className="text-[11px] font-bold">92% match confidence</p></div><div className="absolute right-5 top-4 text-right"><p className="font-mono-ui text-[9px] text-muted-foreground">MATCH RATE</p><p className="font-display text-xl font-semibold">{query.data.matchRate}%</p></div></div><div className="mt-4 grid grid-cols-3 gap-2 text-center"><div><p className="font-display text-lg font-semibold">4</p><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">Open corridors</p></div><div className="border-x border-border"><p className="font-display text-lg font-semibold">2.8h</p><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">Avg. match time</p></div><div><p className="font-display text-lg font-semibold">12%</p><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">Platform fee</p></div></div></Card><Card><div className="mb-4 flex items-center justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-muted-foreground">Signal log</p><h3 className="mt-1 font-display text-xl font-semibold">Recent activity</h3></div><Activity size={18} className="text-accent-foreground" /></div><div className="divide-y divide-border">{query.data.recentActivity.map((item) => <div key={item.id} className="flex gap-3 py-3 first:pt-0"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" /><div className="min-w-0 flex-1"><p className="text-xs font-semibold">{item.label}</p><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{item.detail}</p></div><time className="shrink-0 font-mono-ui text-[9px] text-muted-foreground">{item.time}</time></div>)}</div></Card></div><Card><div className="mb-4 flex items-center justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-muted-foreground">Next departures</p><h3 className="mt-1 font-display text-xl font-semibold">Return trips on deck</h3></div><Link href="/trips" className="text-xs font-bold text-accent-foreground">View all <ArrowRight className="ml-1 inline" size={13} /></Link></div>{trips.loading ? <Loading error={trips.error} retry={trips.reload} /> : <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{trips.data.slice(0, 4).map((trip) => <div key={trip.id} className="rounded-lg border border-border p-4"><div className="flex items-center justify-between"><Truck size={18} className="text-accent-foreground" /><Status value={trip.status} /></div><p className="mt-4 text-sm font-bold">{trip.origin} <ArrowRight className="mx-1 inline" size={12} /> {trip.destination}</p><p className="mt-1 text-[11px] text-muted-foreground">{trip.vehicleType} · {trip.capacityTons} tons · {dateFmt(trip.departureDate)}</p><p className="mt-3 font-display text-lg font-semibold">{money(trip.price)}</p></div>)}</div>}</Card></div>;
 }
 
-function Modal({ title, eyebrow, onClose, children }: { title: string; eyebrow: string; onClose: () => void; children: ReactNode }) { return <div className="fixed inset-0 z-50 flex items-end justify-center bg-primary/35 p-0 backdrop-blur-sm sm:items-center sm:p-5"><div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl"><div className="flex items-start justify-between border-b border-border p-5"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">{eyebrow}</p><h2 className="mt-1 font-display text-2xl font-semibold tracking-[-.04em]">{title}</h2></div><button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="Close"><X size={18} /></button></div><div className="p-5">{children}</div></div></div>; }
+function Modal({ title, eyebrow, onClose, children, closable = true }: { title: string; eyebrow: string; onClose: () => void; children: ReactNode; closable?: boolean }) { return <div className="fixed inset-0 z-50 flex items-end justify-center bg-primary/35 p-0 backdrop-blur-sm sm:items-center sm:p-5"><div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl"><div className="flex items-start justify-between border-b border-border p-5"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">{eyebrow}</p><h2 className="mt-1 font-display text-2xl font-semibold tracking-[-.04em]">{title}</h2></div>{closable && <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="Close"><X size={18} /></button>}</div><div className="p-5">{children}</div></div></div>; }
 function Field({ label, value, onChange, type = "text", placeholder, required = true }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean }) { return <label className="block"><span className={labelClass}>{label}{required && <span className="text-accent-foreground"> *</span>}</span><input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className={input} /></label>; }
 function CountrySelect({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className={labelClass}>{label} *</span><select required className={input} value={value} onChange={(event) => onChange(event.target.value)}>{regionalReference.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label>; }
 
@@ -262,7 +272,7 @@ function LegacyAuthModal({ onClose }: { onClose: () => void }) {
   return <Modal title="Join TruckShare EAC" eyebrow="Secure access" onClose={onClose}><div className="mb-5 flex rounded-lg border border-border bg-muted/50 p-1"><button type="button" onClick={() => { setMethod("phone"); setStep("phone"); setMessage(""); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "phone" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Phone</button><button type="button" onClick={() => { setMethod("google"); setMessage(""); }} className={`flex-1 rounded-md px-3 py-2 text-xs font-bold ${method === "google" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Google</button></div>{message && <div className="mb-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}</div>}{method === "google" ? <div className="py-4 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-border font-display text-lg font-bold">G</div><p className="mt-4 text-sm font-semibold">Continue with Google</p><p className="mt-1 text-xs text-muted-foreground">OAuth onboarding is simulated for this preview.</p><button type="button" disabled={busy} onClick={google} className={`${button} mt-5 w-full`}>{busy ? "Connecting..." : "Continue with Google"} <ArrowRight size={14} /></button></div> : step === "phone" ? <form onSubmit={submitPhone} className="space-y-4"><div className="grid gap-4 sm:grid-cols-[.9fr_1.1fr]"><CountrySelect label="Country" value={phoneCountry} onChange={setPhoneCountry} /><Field label={`Phone number (${dialingCodes[phoneCountry]})`} value={phone} onChange={setPhone} placeholder="700 000 000" /></div><button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Sending..." : "Send mock SMS OTP"} <ArrowRight size={14} /></button><p className="text-center font-mono-ui text-[10px] text-muted-foreground">EAC phone numbers supported · preview mode</p></form> : <form onSubmit={verify} className="space-y-4"><Field label="4-digit OTP" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" /><button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : "Verify phone"} <ShieldCheck size={14} /></button></form>}</Modal>;
 }
 
-function AuthModal({ onClose }: { onClose: () => void }) {
+function LegacyOnboardingAuthModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [method, setMethod] = useState<"phone" | "google">("phone");
   const [name, setName] = useState("");
@@ -354,6 +364,141 @@ function AuthModal({ onClose }: { onClose: () => void }) {
       <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{mode === "login" ? "Login code sent." : "Signup code sent."} Use <strong>2468</strong> in preview mode.</div>
       <Field label="4-digit verification code" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" />
       <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : mode === "login" ? "Log in" : "Create account"} <ShieldCheck size={14} /></button>
+    </form>}
+  </Modal>;
+}
+
+function AuthModal({ onComplete, onClose = () => {}, required = false }: { onComplete: (user: AuthUser) => void; onClose?: () => void; required?: boolean }) {
+  type AccountRole = "Carrier" | "Shipper";
+  const [method, setMethod] = useState<"phone" | "google">();
+  const [authMode, setAuthMode] = useState<"login" | "signup">();
+  const [step, setStep] = useState<"method" | "phone" | "account" | "profile" | "roles" | "otp">("method");
+  const [phoneCountry, setPhoneCountry] = useState("UG");
+  const [phone, setPhone] = useState("700 000 000");
+  const [name, setName] = useState("");
+  const [roles, setRoles] = useState<AccountRole[]>([]);
+  const [challengeId, setChallengeId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const continueWithPhone = () => { setMethod("phone"); setStep("phone"); setMessage(""); };
+  const continueWithGoogle = () => { setMethod("google"); setStep("account"); setMessage(""); };
+  const requestOtp = async (mode: "login" | "signup") => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const localDigits = phone.replace(/\D/g, "");
+      const result = await api<{ challengeId: string; message: string; devOtp?: string }>("/auth/request-otp", {
+        method: "POST",
+        body: JSON.stringify({
+          phone: `${dialingCodes[phoneCountry]}${localDigits}`,
+          mode,
+          ...(mode === "signup" ? { name, roles } : {}),
+        }),
+      });
+      setAuthMode(mode);
+      setChallengeId(result.challengeId);
+      setMessage(result.devOtp ? `${result.message} Demo code: ${result.devOtp}` : result.message);
+      setStep("otp");
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "We could not send the verification code.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const continueAccount = (mode: "login" | "signup") => {
+    setAuthMode(mode);
+    if (mode === "signup") {
+      setStep("profile");
+    } else if (method === "phone") {
+      void requestOtp("login");
+    } else {
+      void finishGoogle("login");
+    }
+  };
+  const finishGoogle = async (mode: "login" | "signup") => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string; user: AuthUser }>("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ mode, ...(mode === "signup" ? { name, roles } : {}) }),
+      });
+      localStorage.setItem("truckshare_token", result.token);
+      onComplete(result.user);
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Google sign-in could not be completed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submitProfile = (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim()) {
+      setMessage("Tell us your name first.");
+      return;
+    }
+    setMessage("");
+    setStep("roles");
+  };
+  const toggleRole = (nextRole: AccountRole) => setRoles((current) => current.includes(nextRole) ? current.filter((item) => item !== nextRole) : [...current, nextRole]);
+  const submitRoles = (event: FormEvent) => {
+    event.preventDefault();
+    if (!roles.length) {
+      setMessage("Choose at least one role to continue.");
+      return;
+    }
+    if (method === "phone") void requestOtp("signup");
+    else void finishGoogle("signup");
+  };
+  const verify = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string; user: AuthUser }>("/auth/verify-otp", { method: "POST", body: JSON.stringify({ challengeId, otp }) });
+      localStorage.setItem("truckshare_token", result.token);
+      onComplete(result.user);
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "That verification code is not valid.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const question = step === "method" ? "How would you like to continue?" : step === "phone" ? "What phone number should we use?" : step === "account" ? "Have you used TruckShare before?" : step === "profile" ? "First, tell us your name." : step === "roles" ? "What will you use TruckShare for?" : "What is your verification code?";
+  return <Modal title="Welcome to TruckShare EAC" eyebrow={required ? "Set up your account" : "Account access"} onClose={onClose} closable={!required}>
+    <div className="mb-5 flex items-center gap-2">{(["method", "profile", "roles"] as const).map((item, index) => <span key={item} className={`h-1.5 flex-1 rounded-full ${step === item || (step === "phone" && index === 0) || (step === "account" && index === 0) || (step === "otp" && index === 2) || (step === "roles" && index <= 2) ? "bg-primary" : "bg-muted"}`} />)}</div>
+    <p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-muted-foreground">Question {step === "method" || step === "phone" || step === "account" ? "1" : step === "profile" ? "2" : "3"} of 3</p>
+    <h3 className="mt-2 font-display text-2xl font-semibold tracking-[-.04em]">{question}</h3>
+    {message && <div className="mt-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}</div>}
+    {step === "method" && <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      <button type="button" onClick={continueWithPhone} className={`${secondaryButton} min-h-24 flex-col`}><Phone size={22} /><span>Continue with phone</span><small className="font-normal text-muted-foreground">Use an EAC number</small></button>
+      <button type="button" onClick={continueWithGoogle} className={`${secondaryButton} min-h-24 flex-col`}><span className="font-display text-2xl font-bold">G</span><span>Continue with Google</span><small className="font-normal text-muted-foreground">Use your Google account</small></button>
+    </div>}
+    {step === "phone" && <form onSubmit={(event) => { event.preventDefault(); setStep("account"); }} className="mt-6 space-y-4">
+      <div className="grid gap-4 sm:grid-cols-[.9fr_1.1fr]"><CountrySelect label="Country" value={phoneCountry} onChange={setPhoneCountry} /><Field label={`Phone number (${dialingCodes[phoneCountry]})`} value={phone} onChange={setPhone} placeholder="700 000 000" /></div>
+      <button type="submit" className={`${button} w-full`}>Continue <ArrowRight size={14} /></button>
+    </form>}
+    {step === "account" && <div className="mt-6 space-y-3">
+      <button type="button" onClick={() => continueAccount("login")} disabled={busy} className={`${secondaryButton} w-full justify-between`}><span>I already have an account</span><ArrowRight size={14} /></button>
+      <button type="button" onClick={() => continueAccount("signup")} disabled={busy} className={`${button} w-full justify-between`}><span>I am new to TruckShare</span><ArrowRight size={14} /></button>
+    </div>}
+    {step === "profile" && <form onSubmit={submitProfile} className="mt-6 space-y-4">
+      <p className="text-sm text-muted-foreground">This is how other people will identify you on trips, loads, and bookings.</p>
+      <Field label="Full name or business name" value={name} onChange={setName} placeholder="Your name or company" />
+      <button type="submit" className={`${button} w-full`}>Continue <ArrowRight size={14} /></button>
+    </form>}
+    {step === "roles" && <form onSubmit={submitRoles} className="mt-6 space-y-4">
+      <p className="text-sm text-muted-foreground">Select one or both. Choosing both gives you a role switcher.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {([["Carrier", "I have trucks or available space.", Truck], ["Shipper", "I need goods moved.", PackageCheck] ] as const).map(([value, detail, Icon]) => <button type="button" key={value} onClick={() => toggleRole(value)} className={`rounded-xl border p-4 text-left transition ${roles.includes(value) ? "border-primary bg-[#e5f1e9] text-primary" : "border-border bg-card"}`}><Icon size={20} /><p className="mt-3 text-sm font-bold">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p><span className="mt-3 block text-[10px] font-bold uppercase tracking-wider">{roles.includes(value) ? "Selected" : "Choose"}</span></button>)}
+      </div>
+      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Continuing..." : method === "phone" ? "Send verification code" : "Create account with Google"} <ArrowRight size={14} /></button>
+    </form>}
+    {step === "otp" && <form onSubmit={verify} className="mt-6 space-y-4">
+      <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{authMode === "login" ? "Login code sent." : "Signup code sent."} Use <strong>2468</strong> in preview mode.</div>
+      <Field label="4-digit verification code" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" />
+      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : authMode === "login" ? "Log in" : "Create account"} <ShieldCheck size={14} /></button>
     </form>}
   </Modal>;
 }
