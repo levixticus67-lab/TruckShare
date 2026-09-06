@@ -37,6 +37,37 @@ export const GetDashboardResponse = zod.object({
 
 
 /**
+ * @summary Check whether a phone number already has a TruckShare account
+ */
+export const GetAccountStatusBody = zod.object({
+  "phone": zod.string()
+})
+
+export const GetAccountStatusResponse = zod.object({
+  "exists": zod.boolean()
+})
+
+
+/**
+ * @summary List supported EAC countries, currencies, and starter corridors
+ */
+export const GetEacReferenceResponse = zod.object({
+  "countries": zod.array(zod.object({
+  "code": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "name": zod.string(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX'])
+})),
+  "corridors": zod.array(zod.object({
+  "origin": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destination": zod.string(),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "border": zod.string()
+}))
+})
+
+
+/**
  * @summary List return trips
  */
 export const ListTripsQueryParams = zod.object({
@@ -51,8 +82,22 @@ export const ListTripsResponseItem = zod.object({
   "carrierRating": zod.number().optional(),
   "origin": zod.string(),
   "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "originLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "destination": zod.string(),
   "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destinationLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "corridor": zod.string(),
   "departureDate": zod.string(),
   "vehicleType": zod.string(),
@@ -89,8 +134,22 @@ export const CreateTripResponse = zod.object({
   "carrierRating": zod.number().optional(),
   "origin": zod.string(),
   "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "originLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "destination": zod.string(),
   "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destinationLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "corridor": zod.string(),
   "departureDate": zod.string(),
   "vehicleType": zod.string(),
@@ -112,15 +171,12 @@ export const UpdateTripParams = zod.object({
 
 export const UpdateTripBody = zod.object({
   "origin": zod.string().optional(),
-  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "destination": zod.string().optional(),
-  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "departureDate": zod.string().optional(),
   "vehicleType": zod.string().optional(),
   "capacityTons": zod.number().optional(),
   "capacityM3": zod.number().optional(),
   "price": zod.number().optional(),
-  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional(),
   "priceType": zod.string().optional()
 })
 
@@ -130,8 +186,22 @@ export const UpdateTripResponse = zod.object({
   "carrierRating": zod.number().optional(),
   "origin": zod.string(),
   "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "originLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "destination": zod.string(),
   "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destinationLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "corridor": zod.string(),
   "departureDate": zod.string(),
   "vehicleType": zod.string(),
@@ -157,8 +227,22 @@ export const ListFreightResponseItem = zod.object({
   "shipper": zod.string(),
   "pickup": zod.string(),
   "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "pickupLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "dropoff": zod.string(),
   "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "dropoffLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "corridor": zod.string(),
   "description": zod.string(),
   "weightTons": zod.number(),
@@ -192,8 +276,22 @@ export const CreateFreightResponse = zod.object({
   "shipper": zod.string(),
   "pickup": zod.string(),
   "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "pickupLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "dropoff": zod.string(),
   "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "dropoffLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "corridor": zod.string(),
   "description": zod.string(),
   "weightTons": zod.number(),
@@ -214,15 +312,12 @@ export const UpdateFreightParams = zod.object({
 
 export const UpdateFreightBody = zod.object({
   "pickup": zod.string().optional(),
-  "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "dropoff": zod.string().optional(),
-  "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "description": zod.string().optional(),
   "weightTons": zod.number().optional(),
   "dimensions": zod.string().optional(),
   "pickupDate": zod.string().optional(),
-  "price": zod.number().optional(),
-  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional()
+  "price": zod.number().optional()
 })
 
 export const UpdateFreightResponse = zod.object({
@@ -230,8 +325,22 @@ export const UpdateFreightResponse = zod.object({
   "shipper": zod.string(),
   "pickup": zod.string(),
   "pickupCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "pickupLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "dropoff": zod.string(),
   "dropoffCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "dropoffLocation": zod.object({
+  "city": zod.string(),
+  "countryCode": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "countryName": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}).optional(),
   "corridor": zod.string(),
   "description": zod.string(),
   "weightTons": zod.number(),
@@ -279,7 +388,9 @@ export const ListBookingsResponseItem = zod.object({
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "escrowStatus": zod.enum(['Pending', 'Held', 'Released']),
   "status": zod.string(),
-  "bookedAt": zod.string()
+  "bookedAt": zod.string(),
+  "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional()
 })
 export const ListBookingsResponse = zod.array(ListBookingsResponseItem)
 
@@ -308,7 +419,9 @@ export const CreateBookingResponse = zod.object({
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "escrowStatus": zod.enum(['Pending', 'Held', 'Released']),
   "status": zod.string(),
-  "bookedAt": zod.string()
+  "bookedAt": zod.string(),
+  "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional()
 })
 
 
@@ -334,7 +447,196 @@ export const UpdateBookingStatusResponse = zod.object({
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
   "escrowStatus": zod.enum(['Pending', 'Held', 'Released']),
   "status": zod.string(),
-  "bookedAt": zod.string()
+  "bookedAt": zod.string(),
+  "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional()
+})
+
+
+/**
+ * @summary List customs and border milestones for a booking
+ */
+export const ListBorderMilestonesParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListBorderMilestonesResponseItem = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "sequence": zod.number().int(),
+  "checkpoint": zod.string(),
+  "country": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "border": zod.string(),
+  "requiredDocuments": zod.array(zod.string()),
+  "status": zod.enum(['Planned', 'Documents Pending', 'Submitted', 'Cleared', 'Held', 'Crossed']),
+  "completedAt": zod.string().optional()
+})
+export const ListBorderMilestonesResponse = zod.array(ListBorderMilestonesResponseItem)
+
+
+/**
+ * @summary Add a customs or border milestone
+ */
+export const CreateBorderMilestoneParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const CreateBorderMilestoneBody = zod.object({
+  "checkpoint": zod.string().optional(),
+  "country": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "border": zod.string().optional(),
+  "requiredDocuments": zod.array(zod.string()).optional(),
+  "status": zod.enum(['Planned', 'Documents Pending', 'Submitted', 'Cleared', 'Held', 'Crossed']).optional()
+})
+
+export const CreateBorderMilestoneResponse = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "sequence": zod.number().int(),
+  "checkpoint": zod.string(),
+  "country": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "border": zod.string(),
+  "requiredDocuments": zod.array(zod.string()),
+  "status": zod.enum(['Planned', 'Documents Pending', 'Submitted', 'Cleared', 'Held', 'Crossed']),
+  "completedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Update a customs or border milestone
+ */
+export const UpdateBorderMilestoneParams = zod.object({
+  "id": zod.coerce.string(),
+  "milestoneId": zod.coerce.string()
+})
+
+export const UpdateBorderMilestoneBody = zod.object({
+  "status": zod.enum(['Planned', 'Documents Pending', 'Submitted', 'Cleared', 'Held', 'Crossed'])
+})
+
+export const UpdateBorderMilestoneResponse = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "sequence": zod.number().int(),
+  "checkpoint": zod.string(),
+  "country": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "border": zod.string(),
+  "requiredDocuments": zod.array(zod.string()),
+  "status": zod.enum(['Planned', 'Documents Pending', 'Submitted', 'Cleared', 'Held', 'Crossed']),
+  "completedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary List payment settlement records
+ */
+export const ListPaymentsResponseItem = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "network": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']),
+  "phone": zod.string(),
+  "payerCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "payeeCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "settlementAmount": zod.number(),
+  "settlementCurrency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "exchangeRate": zod.number(),
+  "commissionAmount": zod.number(),
+  "carrierPayout": zod.number(),
+  "fee": zod.number(),
+  "reference": zod.string(),
+  "status": zod.enum(['Initiated', 'Held', 'Released', 'Failed']),
+  "createdAt": zod.string()
+})
+export const ListPaymentsResponse = zod.array(ListPaymentsResponseItem)
+
+
+/**
+ * @summary Quote a cross-border settlement
+ */
+export const getPaymentQuoteQueryAmountExclusiveMin = 0;
+
+
+
+export const GetPaymentQuoteQueryParams = zod.object({
+  "amount": zod.coerce.number().gt(getPaymentQuoteQueryAmountExclusiveMin),
+  "fromCurrency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional(),
+  "toCurrency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional(),
+  "payerCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "payeeCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional()
+})
+
+export const GetPaymentQuoteResponse = zod.object({
+  "quoteId": zod.string(),
+  "payerCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "payeeCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "settlementAmount": zod.number(),
+  "settlementCurrency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "exchangeRate": zod.number(),
+  "fee": zod.number(),
+  "commissionAmount": zod.number(),
+  "carrierPayout": zod.number(),
+  "commissionRate": zod.number(),
+  "carrierRate": zod.number(),
+  "expiresInSeconds": zod.number().int(),
+  "indicative": zod.boolean()
+})
+
+
+/**
+ * @summary Simulate a payment and hold its settlement amount
+ */
+export const simulatePaymentBodyAmountExclusiveMin = 0;
+
+
+
+export const SimulatePaymentBody = zod.object({
+  "bookingId": zod.string(),
+  "network": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']),
+  "phone": zod.string(),
+  "payerCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "amount": zod.number().gt(simulatePaymentBodyAmountExclusiveMin).optional(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional()
+})
+
+export const SimulatePaymentResponse = zod.object({
+  "booking": zod.object({
+  "id": zod.string(),
+  "tripId": zod.string(),
+  "freightId": zod.string(),
+  "corridor": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "escrowStatus": zod.enum(['Pending', 'Held', 'Released']),
+  "status": zod.string(),
+  "bookedAt": zod.string(),
+  "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional()
+}),
+  "payment": zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "network": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']),
+  "phone": zod.string(),
+  "payerCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "payeeCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "settlementAmount": zod.number(),
+  "settlementCurrency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "exchangeRate": zod.number(),
+  "commissionAmount": zod.number(),
+  "carrierPayout": zod.number(),
+  "fee": zod.number(),
+  "reference": zod.string(),
+  "status": zod.enum(['Initiated', 'Held', 'Released', 'Failed']),
+  "createdAt": zod.string()
+})
 })
 
 

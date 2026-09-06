@@ -8,12 +8,8 @@
 import type { CountryCode } from './countryCode';
 import type { CurrencyCode } from './currencyCode';
 
-export interface BookingInput {
-  tripId: string;
-  freightId: string;
-  amount: number;
-  corridor: string;
-  originCountry?: CountryCode;
-  destinationCountry?: CountryCode;
-  currency?: CurrencyCode;
+export interface EacCountry {
+  code: CountryCode;
+  name: string;
+  currency: CurrencyCode;
 }

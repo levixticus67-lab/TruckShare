@@ -6,17 +6,23 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BookingEscrowStatus } from './bookingEscrowStatus';
+import type { BookingPaymentNetwork } from './bookingPaymentNetwork';
+import type { BookingPaymentStatus } from './bookingPaymentStatus';
+import type { CountryCode } from './countryCode';
+import type { CurrencyCode } from './currencyCode';
 
 export interface Booking {
   id: string;
   tripId: string;
   freightId: string;
   corridor: string;
-  originCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
-  destinationCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  originCountry: CountryCode;
+  destinationCountry: CountryCode;
   amount: number;
-  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  currency: CurrencyCode;
   escrowStatus: BookingEscrowStatus;
   status: string;
   bookedAt: string;
+  paymentNetwork?: BookingPaymentNetwork;
+  paymentStatus?: BookingPaymentStatus;
 }

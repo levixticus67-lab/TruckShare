@@ -48,6 +48,14 @@ type Trip = {
   status: string;
 };
 
+type LocationPoint = {
+  city: string;
+  countryCode: CountryCode;
+  countryName: string;
+  latitude: number;
+  longitude: number;
+};
+
 type Freight = {
   id: string;
   shipper: string;
@@ -250,6 +258,42 @@ const routes = [
   { origin: "Kampala", originCountry: "UG", destination: "Gulu", destinationCountry: "UG" },
   { origin: "Malaba", originCountry: "UG", destination: "Kampala", destinationCountry: "UG" },
 ];
+
+const locationPoints: LocationPoint[] = [
+  { city: "Bujumbura", countryCode: "BI", countryName: "Burundi", latitude: -3.3614, longitude: 29.3599 },
+  { city: "Lubumbashi", countryCode: "CD", countryName: "DRC", latitude: -11.6876, longitude: 27.5026 },
+  { city: "Nairobi", countryCode: "KE", countryName: "Kenya", latitude: -1.2921, longitude: 36.8219 },
+  { city: "Kigali", countryCode: "RW", countryName: "Rwanda", latitude: -1.9441, longitude: 30.0619 },
+  { city: "Mogadishu", countryCode: "SO", countryName: "Somalia", latitude: 2.0469, longitude: 45.3182 },
+  { city: "Juba", countryCode: "SS", countryName: "South Sudan", latitude: 4.8594, longitude: 31.5713 },
+  { city: "Dar es Salaam", countryCode: "TZ", countryName: "Tanzania", latitude: -6.7924, longitude: 39.2083 },
+  { city: "Gulu", countryCode: "UG", countryName: "Uganda", latitude: 2.7746, longitude: 32.299 },
+  { city: "Kampala", countryCode: "UG", countryName: "Uganda", latitude: 0.3476, longitude: 32.5825 },
+  { city: "Malaba", countryCode: "UG", countryName: "Uganda", latitude: 0.635, longitude: 34.255 },
+  { city: "Mbarara", countryCode: "UG", countryName: "Uganda", latitude: -0.6072, longitude: 30.6545 },
+  { city: "Mbale", countryCode: "UG", countryName: "Uganda", latitude: 1.0806, longitude: 34.175 },
+];
+
+function locationPoint(city: string, countryCode: CountryCode): LocationPoint | undefined {
+  const normalized = city.trim().toLowerCase();
+  return locationPoints.find((point) => point.city.toLowerCase() === normalized && point.countryCode === countryCode);
+}
+
+function tripWithLocations(trip: Trip) {
+  return {
+    ...trip,
+    originLocation: locationPoint(trip.origin, trip.originCountry),
+    destinationLocation: locationPoint(trip.destination, trip.destinationCountry),
+  };
+}
+
+function freightWithLocations(load: Freight) {
+  return {
+    ...load,
+    pickupLocation: locationPoint(load.pickup, load.pickupCountry),
+    dropoffLocation: locationPoint(load.dropoff, load.dropoffCountry),
+  };
+}
 
 const trips: Trip[] = [
   { id: "trip-1", carrier: "Moses K.", carrierRating: 4.9, origin: "Kampala", originCountry: "UG", destination: "Mbale", destinationCountry: "UG", corridor: "Kampala → Mbale", departureDate: "2026-08-28", departureTime: "07:30", vehicleType: "Fuso", capacityTons: 8, capacityM3: 42, price: 680000, currency: "UGX", priceType: "Fixed", status: "Available" },
@@ -552,7 +596,7 @@ router.get("/trips", (req, res) => {
     (!query.date || trip.departureDate === query.date) &&
     (!query.vehicleType || trip.vehicleType === query.vehicleType),
   );
-  res.json(ListTripsResponse.parse(filtered));
+  res.json(ListTripsResponse.parse(filtered.map(tripWithLocations)));
 });
 
 router.post("/trips", async (req, res) => {
@@ -579,7 +623,7 @@ router.post("/trips", async (req, res) => {
   };
   trips.unshift(trip);
   await persistDatabaseState();
-  res.status(201).json(trip);
+  res.status(201).json(tripWithLocations(trip));
 });
 
 router.patch("/trips/:id", async (req, res) => {
@@ -590,7 +634,7 @@ router.patch("/trips/:id", async (req, res) => {
   Object.assign(trip, data);
   trip.corridor = `${trip.origin.split(",")[0]} → ${trip.destination.split(",")[0]}`;
   await persistDatabaseState();
-  res.json(UpdateTripResponse.parse(trip));
+  res.json(UpdateTripResponse.parse(tripWithLocations(trip)));
 });
 
 router.get("/freight", (req, res) => {
@@ -598,7 +642,7 @@ router.get("/freight", (req, res) => {
   res.json(ListFreightResponse.parse(freight.filter((load) =>
     (!query.corridor || load.corridor.toLowerCase().includes(query.corridor.toLowerCase())) &&
     (!query.date || load.pickupDate === query.date),
-  )));
+  ).map(freightWithLocations)));
 });
 
 router.post("/freight", async (req, res) => {
@@ -623,7 +667,7 @@ router.post("/freight", async (req, res) => {
   };
   freight.unshift(load);
   await persistDatabaseState();
-  res.status(201).json(load);
+  res.status(201).json(freightWithLocations(load));
 });
 
 router.patch("/freight/:id", async (req, res) => {
@@ -634,7 +678,7 @@ router.patch("/freight/:id", async (req, res) => {
   Object.assign(load, data);
   load.corridor = `${load.pickup.split(",")[0]} → ${load.dropoff.split(",")[0]}`;
   await persistDatabaseState();
-  res.json(UpdateFreightResponse.parse(load));
+  res.json(UpdateFreightResponse.parse(freightWithLocations(load)));
 });
 
 router.get("/matches", (req, res) => {

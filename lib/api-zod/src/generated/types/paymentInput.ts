@@ -7,16 +7,14 @@
  */
 import type { CountryCode } from './countryCode';
 import type { CurrencyCode } from './currencyCode';
+import type { PaymentInputNetwork } from './paymentInputNetwork';
 
-export interface FreightInput {
-  pickup: string;
-  pickupCountry?: CountryCode;
-  dropoff: string;
-  dropoffCountry?: CountryCode;
-  description: string;
-  weightTons: number;
-  dimensions: string;
-  pickupDate: string;
-  price: number;
+export interface PaymentInput {
+  bookingId: string;
+  network: PaymentInputNetwork;
+  phone: string;
+  payerCountry?: CountryCode;
+  /** @exclusiveMinimum 0 */
+  amount?: number;
   currency?: CurrencyCode;
 }

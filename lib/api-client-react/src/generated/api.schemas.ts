@@ -29,50 +29,85 @@ export const TripStatus = {
   Delivered: 'Delivered',
 } as const;
 
+export type CountryCode = typeof CountryCode[keyof typeof CountryCode];
+
+
+export const CountryCode = {
+  BI: 'BI',
+  CD: 'CD',
+  KE: 'KE',
+  RW: 'RW',
+  SO: 'SO',
+  SS: 'SS',
+  TZ: 'TZ',
+  UG: 'UG',
+} as const;
+
+export interface LocationPoint {
+  city: string;
+  countryCode: CountryCode;
+  countryName: string;
+  latitude: number;
+  longitude: number;
+}
+
+export type CurrencyCode = typeof CurrencyCode[keyof typeof CurrencyCode];
+
+
+export const CurrencyCode = {
+  BIF: 'BIF',
+  CDF: 'CDF',
+  KES: 'KES',
+  RWF: 'RWF',
+  SOS: 'SOS',
+  SSP: 'SSP',
+  TZS: 'TZS',
+  UGX: 'UGX',
+} as const;
+
 export interface Trip {
   id: string;
   carrier: string;
   carrierRating?: number;
   origin: string;
-  originCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  originCountry: CountryCode;
+  originLocation?: LocationPoint;
   destination: string;
-  destinationCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  destinationCountry: CountryCode;
+  destinationLocation?: LocationPoint;
   corridor: string;
   departureDate: string;
   vehicleType: string;
   capacityTons: number;
   capacityM3: number;
   price: number;
-  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  currency: CurrencyCode;
   priceType: TripPriceType;
   status: TripStatus;
 }
 
 export interface TripInput {
   origin: string;
-  originCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  originCountry?: CountryCode;
   destination: string;
-  destinationCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  destinationCountry?: CountryCode;
   departureDate: string;
   vehicleType: string;
   capacityTons: number;
   capacityM3: number;
   price: number;
-  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  currency?: CurrencyCode;
   priceType: string;
 }
 
 export interface TripUpdate {
   origin?: string;
-  originCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   destination?: string;
-  destinationCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   departureDate?: string;
   vehicleType?: string;
   capacityTons?: number;
   capacityM3?: number;
   price?: number;
-  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
   priceType?: string;
 }
 
@@ -90,43 +125,42 @@ export interface Freight {
   id: string;
   shipper: string;
   pickup: string;
-  pickupCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  pickupCountry: CountryCode;
+  pickupLocation?: LocationPoint;
   dropoff: string;
-  dropoffCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  dropoffCountry: CountryCode;
+  dropoffLocation?: LocationPoint;
   corridor: string;
   description: string;
   weightTons: number;
   dimensions: string;
   pickupDate: string;
   price: number;
-  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  currency: CurrencyCode;
   status: FreightStatus;
 }
 
 export interface FreightInput {
   pickup: string;
-  pickupCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  pickupCountry?: CountryCode;
   dropoff: string;
-  dropoffCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  dropoffCountry?: CountryCode;
   description: string;
   weightTons: number;
   dimensions: string;
   pickupDate: string;
   price: number;
-  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  currency?: CurrencyCode;
 }
 
 export interface FreightUpdate {
   pickup?: string;
-  pickupCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   dropoff?: string;
-  dropoffCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
   description?: string;
   weightTons?: number;
   dimensions?: string;
   pickupDate?: string;
   price?: number;
-  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
 }
 
 export type MatchType = typeof MatchType[keyof typeof MatchType];
@@ -158,18 +192,37 @@ export const BookingEscrowStatus = {
   Released: 'Released',
 } as const;
 
+export type BookingPaymentNetwork = typeof BookingPaymentNetwork[keyof typeof BookingPaymentNetwork];
+
+
+export const BookingPaymentNetwork = {
+  MTN_MoMo: 'MTN MoMo',
+  Airtel_Money: 'Airtel Money',
+  Bank_Transfer: 'Bank Transfer',
+} as const;
+
+export type BookingPaymentStatus = typeof BookingPaymentStatus[keyof typeof BookingPaymentStatus];
+
+
+export const BookingPaymentStatus = {
+  Unpaid: 'Unpaid',
+  Paid: 'Paid',
+} as const;
+
 export interface Booking {
   id: string;
   tripId: string;
   freightId: string;
   corridor: string;
-  originCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
-  destinationCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  originCountry: CountryCode;
+  destinationCountry: CountryCode;
   amount: number;
-  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  currency: CurrencyCode;
   escrowStatus: BookingEscrowStatus;
   status: string;
   bookedAt: string;
+  paymentNetwork?: BookingPaymentNetwork;
+  paymentStatus?: BookingPaymentStatus;
 }
 
 export interface BookingInput {
@@ -177,9 +230,117 @@ export interface BookingInput {
   freightId: string;
   amount: number;
   corridor: string;
-  originCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
-  destinationCountry?: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
-  currency?: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  originCountry?: CountryCode;
+  destinationCountry?: CountryCode;
+  currency?: CurrencyCode;
+}
+
+export type PaymentInputNetwork = typeof PaymentInputNetwork[keyof typeof PaymentInputNetwork];
+
+
+export const PaymentInputNetwork = {
+  MTN_MoMo: 'MTN MoMo',
+  Airtel_Money: 'Airtel Money',
+  Bank_Transfer: 'Bank Transfer',
+} as const;
+
+export interface PaymentInput {
+  bookingId: string;
+  network: PaymentInputNetwork;
+  phone: string;
+  payerCountry?: CountryCode;
+  /** @exclusiveMinimum 0 */
+  amount?: number;
+  currency?: CurrencyCode;
+}
+
+export type PaymentNetwork = typeof PaymentNetwork[keyof typeof PaymentNetwork];
+
+
+export const PaymentNetwork = {
+  MTN_MoMo: 'MTN MoMo',
+  Airtel_Money: 'Airtel Money',
+  Bank_Transfer: 'Bank Transfer',
+} as const;
+
+export type PaymentStatus = typeof PaymentStatus[keyof typeof PaymentStatus];
+
+
+export const PaymentStatus = {
+  Initiated: 'Initiated',
+  Held: 'Held',
+  Released: 'Released',
+  Failed: 'Failed',
+} as const;
+
+export interface Payment {
+  id: string;
+  bookingId: string;
+  network: PaymentNetwork;
+  phone: string;
+  payerCountry: CountryCode;
+  payeeCountry: CountryCode;
+  amount: number;
+  currency: CurrencyCode;
+  settlementAmount: number;
+  settlementCurrency: CurrencyCode;
+  exchangeRate: number;
+  commissionAmount: number;
+  carrierPayout: number;
+  fee: number;
+  reference: string;
+  status: PaymentStatus;
+  createdAt: string;
+}
+
+export interface PaymentQuote {
+  quoteId: string;
+  payerCountry: CountryCode;
+  payeeCountry: CountryCode;
+  amount: number;
+  currency: CurrencyCode;
+  settlementAmount: number;
+  settlementCurrency: CurrencyCode;
+  exchangeRate: number;
+  fee: number;
+  commissionAmount: number;
+  carrierPayout: number;
+  commissionRate: number;
+  carrierRate: number;
+  expiresInSeconds: number;
+  indicative: boolean;
+}
+
+export type BorderMilestoneStatus = typeof BorderMilestoneStatus[keyof typeof BorderMilestoneStatus];
+
+
+export const BorderMilestoneStatus = {
+  Planned: 'Planned',
+  Documents_Pending: 'Documents Pending',
+  Submitted: 'Submitted',
+  Cleared: 'Cleared',
+  Held: 'Held',
+  Crossed: 'Crossed',
+} as const;
+
+export interface BorderMilestone {
+  id: string;
+  bookingId: string;
+  sequence: number;
+  checkpoint: string;
+  country: CountryCode;
+  border: string;
+  requiredDocuments: string[];
+  status: BorderMilestoneStatus;
+  completedAt?: string;
+}
+
+export interface BorderMilestoneInput {
+  checkpoint?: string;
+  country?: CountryCode;
+  border?: string;
+  requiredDocuments?: string[];
+  status?: BorderMilestoneStatus;
 }
 
 export interface StatusInput {
@@ -241,6 +402,20 @@ export interface Dashboard {
   recentActivity: DashboardRecentActivityItem[];
 }
 
+export interface EacCountry {
+  code: CountryCode;
+  name: string;
+  currency: CurrencyCode;
+}
+
+export interface EacCorridor {
+  origin: string;
+  originCountry: CountryCode;
+  destination: string;
+  destinationCountry: CountryCode;
+  border: string;
+}
+
 export type CorridorParameter = string;
 
 export type DateParameter = string;
@@ -263,6 +438,19 @@ export const ModeParameter = {
   carrier: 'carrier',
 } as const;
 
+export type GetAccountStatusBody = {
+  phone: string;
+};
+
+export type GetAccountStatus200 = {
+  exists: boolean;
+};
+
+export type GetEacReference200 = {
+  countries: EacCountry[];
+  corridors: EacCorridor[];
+};
+
 export type ListTripsParams = {
 corridor?: CorridorParameter;
 date?: DateParameter;
@@ -277,5 +465,25 @@ date?: DateParameter;
 export type ListMatchesParams = {
 mode?: ModeParameter;
 corridor?: CorridorParameter;
+};
+
+export type UpdateBorderMilestoneBody = {
+  status: BorderMilestoneStatus;
+};
+
+export type GetPaymentQuoteParams = {
+/**
+ * @exclusiveMinimum 0
+ */
+amount: number;
+fromCurrency?: CurrencyCode;
+toCurrency?: CurrencyCode;
+payerCountry?: CountryCode;
+payeeCountry?: CountryCode;
+};
+
+export type SimulatePayment200 = {
+  booking: Booking;
+  payment: Payment;
 };
 

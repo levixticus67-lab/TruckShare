@@ -5,21 +5,26 @@
  * ReturnHaul freight matching API
  * OpenAPI spec version: 0.1.0
  */
+import type { CountryCode } from './countryCode';
+import type { CurrencyCode } from './currencyCode';
 import type { FreightStatus } from './freightStatus';
+import type { LocationPoint } from './locationPoint';
 
 export interface Freight {
   id: string;
   shipper: string;
   pickup: string;
-  pickupCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  pickupCountry: CountryCode;
+  pickupLocation?: LocationPoint;
   dropoff: string;
-  dropoffCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  dropoffCountry: CountryCode;
+  dropoffLocation?: LocationPoint;
   corridor: string;
   description: string;
   weightTons: number;
   dimensions: string;
   pickupDate: string;
   price: number;
-  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  currency: CurrencyCode;
   status: FreightStatus;
 }

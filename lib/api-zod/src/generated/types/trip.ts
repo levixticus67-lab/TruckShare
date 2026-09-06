@@ -5,6 +5,9 @@
  * ReturnHaul freight matching API
  * OpenAPI spec version: 0.1.0
  */
+import type { CountryCode } from './countryCode';
+import type { CurrencyCode } from './currencyCode';
+import type { LocationPoint } from './locationPoint';
 import type { TripPriceType } from './tripPriceType';
 import type { TripStatus } from './tripStatus';
 
@@ -13,16 +16,18 @@ export interface Trip {
   carrier: string;
   carrierRating?: number;
   origin: string;
-  originCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  originCountry: CountryCode;
+  originLocation?: LocationPoint;
   destination: string;
-  destinationCountry: 'BI' | 'CD' | 'KE' | 'RW' | 'SO' | 'SS' | 'TZ' | 'UG';
+  destinationCountry: CountryCode;
+  destinationLocation?: LocationPoint;
   corridor: string;
   departureDate: string;
   vehicleType: string;
   capacityTons: number;
   capacityM3: number;
   price: number;
-  currency: 'BIF' | 'CDF' | 'KES' | 'RWF' | 'SOS' | 'SSP' | 'TZS' | 'UGX';
+  currency: CurrencyCode;
   priceType: TripPriceType;
   status: TripStatus;
 }

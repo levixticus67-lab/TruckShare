@@ -8,12 +8,13 @@
 import type { CountryCode } from './countryCode';
 import type { CurrencyCode } from './currencyCode';
 
-export interface BookingInput {
-  tripId: string;
-  freightId: string;
-  amount: number;
-  corridor: string;
-  originCountry?: CountryCode;
-  destinationCountry?: CountryCode;
-  currency?: CurrencyCode;
-}
+export type GetPaymentQuoteParams = {
+/**
+ * @exclusiveMinimum 0
+ */
+amount: number;
+fromCurrency?: CurrencyCode;
+toCurrency?: CurrencyCode;
+payerCountry?: CountryCode;
+payeeCountry?: CountryCode;
+};

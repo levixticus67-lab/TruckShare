@@ -22,12 +22,18 @@ import type {
 import type {
   Booking,
   BookingInput,
+  BorderMilestone,
+  BorderMilestoneInput,
   Dashboard,
   Document,
   DocumentInput,
   Freight,
   FreightInput,
   FreightUpdate,
+  GetAccountStatus200,
+  GetAccountStatusBody,
+  GetEacReference200,
+  GetPaymentQuoteParams,
   HealthStatus,
   ListFreightParams,
   ListMatchesParams,
@@ -35,10 +41,15 @@ import type {
   Match,
   Message,
   MessageInput,
+  Payment,
+  PaymentInput,
+  PaymentQuote,
+  SimulatePayment200,
   StatusInput,
   Trip,
   TripInput,
-  TripUpdate
+  TripUpdate,
+  UpdateBorderMilestoneBody
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -210,6 +221,154 @@ export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDashboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAccountStatusUrl = () => {
+
+
+
+
+  return `/api/auth/account-status`
+}
+
+/**
+ * @summary Check whether a phone number already has a TruckShare account
+ */
+export const getAccountStatus = async (getAccountStatusBody: GetAccountStatusBody, options?: Parameters<typeof customFetch>[1]): Promise<GetAccountStatus200> => {
+
+  return customFetch<GetAccountStatus200>(getGetAccountStatusUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(getAccountStatusBody)
+  }
+);}
+
+
+
+
+
+export const getGetAccountStatusMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getAccountStatus>>, TError,{data: BodyType<GetAccountStatusBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof getAccountStatus>>, TError,{data: BodyType<GetAccountStatusBody>}, TContext> => {
+
+const mutationKey = ['getAccountStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getAccountStatus>>, {data: BodyType<GetAccountStatusBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  getAccountStatus(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetAccountStatusMutationResult = NonNullable<Awaited<ReturnType<typeof getAccountStatus>>>
+    export type GetAccountStatusMutationBody = BodyType<GetAccountStatusBody>
+    export type GetAccountStatusMutationError = ErrorType<void>
+
+    /**
+ * @summary Check whether a phone number already has a TruckShare account
+ */
+export const useGetAccountStatus = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getAccountStatus>>, TError,{data: BodyType<GetAccountStatusBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof getAccountStatus>>,
+        TError,
+        {data: BodyType<GetAccountStatusBody>},
+        TContext
+      > => {
+      return useMutation(getGetAccountStatusMutationOptions(options));
+    }
+
+export const getGetEacReferenceUrl = () => {
+
+
+
+
+  return `/api/reference/eac`
+}
+
+/**
+ * @summary List supported EAC countries, currencies, and starter corridors
+ */
+export const getEacReference = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetEacReference200> => {
+
+  return customFetch<GetEacReference200>(getGetEacReferenceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEacReferenceQueryKey = () => {
+    return [
+    `/api/reference/eac`
+    ] as const;
+    }
+
+
+export const getGetEacReferenceQueryOptions = <TData = Awaited<ReturnType<typeof getEacReference>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEacReference>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEacReferenceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEacReference>>> = ({ signal }) => getEacReference({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEacReference>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEacReferenceQueryResult = NonNullable<Awaited<ReturnType<typeof getEacReference>>>
+export type GetEacReferenceQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List supported EAC countries, currencies, and starter corridors
+ */
+
+export function useGetEacReference<TData = Awaited<ReturnType<typeof getEacReference>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEacReference>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEacReferenceQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -978,6 +1137,461 @@ export const useUpdateBookingStatus = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateBookingStatusMutationOptions(options));
+    }
+
+export const getListBorderMilestonesUrl = (id: string,) => {
+
+
+
+
+  return `/api/bookings/${id}/border-milestones`
+}
+
+/**
+ * @summary List customs and border milestones for a booking
+ */
+export const listBorderMilestones = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<BorderMilestone[]> => {
+
+  return customFetch<BorderMilestone[]>(getListBorderMilestonesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBorderMilestonesQueryKey = (id: string,) => {
+    return [
+    `/api/bookings/${id}/border-milestones`
+    ] as const;
+    }
+
+
+export const getListBorderMilestonesQueryOptions = <TData = Awaited<ReturnType<typeof listBorderMilestones>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBorderMilestones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBorderMilestonesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBorderMilestones>>> = ({ signal }) => listBorderMilestones(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBorderMilestones>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBorderMilestonesQueryResult = NonNullable<Awaited<ReturnType<typeof listBorderMilestones>>>
+export type ListBorderMilestonesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List customs and border milestones for a booking
+ */
+
+export function useListBorderMilestones<TData = Awaited<ReturnType<typeof listBorderMilestones>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBorderMilestones>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBorderMilestonesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateBorderMilestoneUrl = (id: string,) => {
+
+
+
+
+  return `/api/bookings/${id}/border-milestones`
+}
+
+/**
+ * @summary Add a customs or border milestone
+ */
+export const createBorderMilestone = async (id: string,
+    borderMilestoneInput: BorderMilestoneInput, options?: Parameters<typeof customFetch>[1]): Promise<BorderMilestone> => {
+
+  return customFetch<BorderMilestone>(getCreateBorderMilestoneUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(borderMilestoneInput)
+  }
+);}
+
+
+
+
+
+export const getCreateBorderMilestoneMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBorderMilestone>>, TError,{id: string;data: BodyType<BorderMilestoneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBorderMilestone>>, TError,{id: string;data: BodyType<BorderMilestoneInput>}, TContext> => {
+
+const mutationKey = ['createBorderMilestone'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBorderMilestone>>, {id: string;data: BodyType<BorderMilestoneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createBorderMilestone(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBorderMilestoneMutationResult = NonNullable<Awaited<ReturnType<typeof createBorderMilestone>>>
+    export type CreateBorderMilestoneMutationBody = BodyType<BorderMilestoneInput>
+    export type CreateBorderMilestoneMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a customs or border milestone
+ */
+export const useCreateBorderMilestone = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBorderMilestone>>, TError,{id: string;data: BodyType<BorderMilestoneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBorderMilestone>>,
+        TError,
+        {id: string;data: BodyType<BorderMilestoneInput>},
+        TContext
+      > => {
+      return useMutation(getCreateBorderMilestoneMutationOptions(options));
+    }
+
+export const getUpdateBorderMilestoneUrl = (id: string,
+    milestoneId: string,) => {
+
+
+
+
+  return `/api/bookings/${id}/border-milestones/${milestoneId}`
+}
+
+/**
+ * @summary Update a customs or border milestone
+ */
+export const updateBorderMilestone = async (id: string,
+    milestoneId: string,
+    updateBorderMilestoneBody: UpdateBorderMilestoneBody, options?: Parameters<typeof customFetch>[1]): Promise<BorderMilestone> => {
+
+  return customFetch<BorderMilestone>(getUpdateBorderMilestoneUrl(id,milestoneId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateBorderMilestoneBody)
+  }
+);}
+
+
+
+
+
+export const getUpdateBorderMilestoneMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBorderMilestone>>, TError,{id: string;milestoneId: string;data: BodyType<UpdateBorderMilestoneBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBorderMilestone>>, TError,{id: string;milestoneId: string;data: BodyType<UpdateBorderMilestoneBody>}, TContext> => {
+
+const mutationKey = ['updateBorderMilestone'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBorderMilestone>>, {id: string;milestoneId: string;data: BodyType<UpdateBorderMilestoneBody>}> = (props) => {
+          const {id,milestoneId,data} = props ?? {};
+
+          return  updateBorderMilestone(id,milestoneId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBorderMilestoneMutationResult = NonNullable<Awaited<ReturnType<typeof updateBorderMilestone>>>
+    export type UpdateBorderMilestoneMutationBody = BodyType<UpdateBorderMilestoneBody>
+    export type UpdateBorderMilestoneMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a customs or border milestone
+ */
+export const useUpdateBorderMilestone = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBorderMilestone>>, TError,{id: string;milestoneId: string;data: BodyType<UpdateBorderMilestoneBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBorderMilestone>>,
+        TError,
+        {id: string;milestoneId: string;data: BodyType<UpdateBorderMilestoneBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateBorderMilestoneMutationOptions(options));
+    }
+
+export const getListPaymentsUrl = () => {
+
+
+
+
+  return `/api/payments`
+}
+
+/**
+ * @summary List payment settlement records
+ */
+export const listPayments = async ( options?: Parameters<typeof customFetch>[1]): Promise<Payment[]> => {
+
+  return customFetch<Payment[]>(getListPaymentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPaymentsQueryKey = () => {
+    return [
+    `/api/payments`
+    ] as const;
+    }
+
+
+export const getListPaymentsQueryOptions = <TData = Awaited<ReturnType<typeof listPayments>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPaymentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPayments>>> = ({ signal }) => listPayments({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPayments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPaymentsQueryResult = NonNullable<Awaited<ReturnType<typeof listPayments>>>
+export type ListPaymentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List payment settlement records
+ */
+
+export function useListPayments<TData = Awaited<ReturnType<typeof listPayments>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPaymentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPaymentQuoteUrl = (params: GetPaymentQuoteParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/payments/quote?${stringifiedParams}` : `/api/payments/quote`
+}
+
+/**
+ * @summary Quote a cross-border settlement
+ */
+export const getPaymentQuote = async (params: GetPaymentQuoteParams, options?: Parameters<typeof customFetch>[1]): Promise<PaymentQuote> => {
+
+  return customFetch<PaymentQuote>(getGetPaymentQuoteUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPaymentQuoteQueryKey = (params?: GetPaymentQuoteParams,) => {
+    return [
+    `/api/payments/quote`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPaymentQuoteQueryOptions = <TData = Awaited<ReturnType<typeof getPaymentQuote>>, TError = ErrorType<unknown>>(params: GetPaymentQuoteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaymentQuote>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPaymentQuoteQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaymentQuote>>> = ({ signal }) => getPaymentQuote(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPaymentQuote>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPaymentQuoteQueryResult = NonNullable<Awaited<ReturnType<typeof getPaymentQuote>>>
+export type GetPaymentQuoteQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Quote a cross-border settlement
+ */
+
+export function useGetPaymentQuote<TData = Awaited<ReturnType<typeof getPaymentQuote>>, TError = ErrorType<unknown>>(
+ params: GetPaymentQuoteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaymentQuote>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPaymentQuoteQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSimulatePaymentUrl = () => {
+
+
+
+
+  return `/api/payments/simulate`
+}
+
+/**
+ * @summary Simulate a payment and hold its settlement amount
+ */
+export const simulatePayment = async (paymentInput: PaymentInput, options?: Parameters<typeof customFetch>[1]): Promise<SimulatePayment200> => {
+
+  return customFetch<SimulatePayment200>(getSimulatePaymentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(paymentInput)
+  }
+);}
+
+
+
+
+
+export const getSimulatePaymentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof simulatePayment>>, TError,{data: BodyType<PaymentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof simulatePayment>>, TError,{data: BodyType<PaymentInput>}, TContext> => {
+
+const mutationKey = ['simulatePayment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof simulatePayment>>, {data: BodyType<PaymentInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  simulatePayment(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SimulatePaymentMutationResult = NonNullable<Awaited<ReturnType<typeof simulatePayment>>>
+    export type SimulatePaymentMutationBody = BodyType<PaymentInput>
+    export type SimulatePaymentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Simulate a payment and hold its settlement amount
+ */
+export const useSimulatePayment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof simulatePayment>>, TError,{data: BodyType<PaymentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof simulatePayment>>,
+        TError,
+        {data: BodyType<PaymentInput>},
+        TContext
+      > => {
+      return useMutation(getSimulatePaymentMutationOptions(options));
     }
 
 export const getListMessagesUrl = () => {

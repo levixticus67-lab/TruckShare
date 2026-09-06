@@ -496,8 +496,10 @@ components:
         carrierRating: { type: number }
         origin: { type: string }
         originCountry: { $ref: "#/components/schemas/CountryCode" }
+        originLocation: { $ref: "#/components/schemas/LocationPoint" }
         destination: { type: string }
         destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationLocation: { $ref: "#/components/schemas/LocationPoint" }
         corridor: { type: string }
         departureDate: { type: string }
         vehicleType: { type: string }
@@ -541,8 +543,10 @@ components:
         shipper: { type: string }
         pickup: { type: string }
         pickupCountry: { $ref: "#/components/schemas/CountryCode" }
+        pickupLocation: { $ref: "#/components/schemas/LocationPoint" }
         dropoff: { type: string }
         dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
+        dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
         corridor: { type: string }
         description: { type: string }
         weightTons: { type: number }
@@ -755,6 +759,15 @@ components:
     CountryCode:
       type: string
       enum: [BI, CD, KE, RW, SO, SS, TZ, UG]
+    LocationPoint:
+      type: object
+      required: [city, countryCode, countryName, latitude, longitude]
+      properties:
+        city: { type: string }
+        countryCode: { $ref: "#/components/schemas/CountryCode" }
+        countryName: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
     CurrencyCode:
       type: string
       enum: [BIF, CDF, KES, RWF, SOS, SSP, TZS, UGX]
