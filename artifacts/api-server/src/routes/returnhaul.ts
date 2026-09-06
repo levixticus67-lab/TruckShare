@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { createHmac, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, databaseConfigured, runtimeStateTable } from "@workspace/db";
@@ -213,6 +213,10 @@ function phoneCountry(value: string) {
   return (Object.entries(dialingCodes).find(([, prefix]) => normalized.startsWith(prefix))?.[0] || undefined) as CountryCode | undefined;
 }
 
+function normalizePhone(value: string) {
+  return value.replace(/\s+/g, "");
+}
+
 function exchangeRate(from: CurrencyCode, to: CurrencyCode) {
   return indicativeFxToUgx[from] / indicativeFxToUgx[to];
 }
@@ -291,7 +295,7 @@ const verifications: Verification[] = [
 ];
 
 const sessions = new Map<string, User>();
-const otpChallenges = new Map<string, { phone: string; country: CountryCode; otp: string; mode: "login" | "signup"; name?: string; role?: "Carrier" | "Shipper" }>();
+const otpChallenges = new Map<string, { phone: string; country: CountryCode; otp: string; mode: "login" | "signup"; name?: string; role?: "Carrier" | "Shipper" | "Admin" }>();
 const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
@@ -385,6 +389,19 @@ function issueToken(user: User) {
   return `${payload}.${signature}`;
 }
 
+function configuredAdminPhones() {
+  return (process.env.ADMIN_PHONES || "").split(",").map((phone) => phone.replace(/\s+/g, "")).filter(Boolean);
+}
+
+function isAdminPhone(phone: string) {
+  return configuredAdminPhones().includes(phone);
+}
+
+function authenticatedUser(req: Request) {
+  const token = text(req.headers.authorization).replace(/^Bearer\s+/i, "");
+  return sessions.get(token);
+}
+
 const router: IRouter = Router();
 
 router.use(async (_req, _res, next) => {
@@ -418,10 +435,10 @@ router.get("/reference/eac", (_req, res) => {
 });
 
 router.post("/auth/request-otp", (req, res) => {
-  const phone = text(req.body?.phone).replace(/\s+/g, "");
+  const phone = normalizePhone(text(req.body?.phone));
   const country = phoneCountry(phone);
   const mode = req.body?.mode === "login" ? "login" : "signup";
-  const existingUser = users.find((user) => user.phone === phone);
+  const existingUser = users.find((user) => normalizePhone(user.phone || "") === phone);
   if (!country || !/^\+\d{8,15}$/.test(phone)) {
     res.status(400).json({ error: "Use a valid EAC number with a supported country code." });
     return;
@@ -439,7 +456,7 @@ router.post("/auth/request-otp", (req, res) => {
     res.status(400).json({ error: "Enter your name to create an account." });
     return;
   }
-  const role = req.body?.role === "Shipper" ? "Shipper" : "Carrier";
+  const role = isAdminPhone(phone) ? "Admin" : req.body?.role === "Shipper" ? "Shipper" : "Carrier";
   const challengeId = id("challenge");
   otpChallenges.set(challengeId, { phone, country, otp: "2468", mode, name: name || undefined, role });
   res.json({ challengeId, phone, message: "Demo OTP sent. Use the code shown to continue.", devOtp: "2468" });
@@ -453,7 +470,7 @@ router.post("/auth/verify-otp", async (req, res) => {
     return;
   }
   otpChallenges.delete(challengeId);
-  const existingUser = users.find((user) => user.phone === challenge.phone);
+  const existingUser = users.find((user) => normalizePhone(user.phone || "") === challenge.phone);
   if (challenge.mode === "login" && !existingUser) {
     res.status(404).json({ error: "No account exists for this phone number. Choose Create account first." });
     return;
@@ -466,6 +483,7 @@ router.post("/auth/verify-otp", async (req, res) => {
     role: challenge.role || "Carrier",
     verified: false,
   };
+  if (isAdminPhone(challenge.phone)) user.role = "Admin";
   if (!existingUser) users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
@@ -493,9 +511,7 @@ router.post("/auth/google", async (req, res) => {
 });
 
 router.get("/auth/me", (req, res) => {
-  const token = text(req.headers.authorization).replace(/^Bearer\s+/i, "");
-  const user = sessions.get(token);
-  res.json({ user: user || null });
+  res.json({ user: authenticatedUser(req) || null });
 });
 
 router.get("/trips", (req, res) => {
@@ -856,7 +872,16 @@ router.patch("/verification/:id/review", async (req, res) => {
   res.json(verification);
 });
 
-router.get("/admin/summary", (_req, res) => {
+router.get("/admin/summary", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in with an admin account to view this area." });
+    return;
+  }
+  if (user.role !== "Admin") {
+    res.status(403).json({ error: "This area is restricted to admins." });
+    return;
+  }
   const gross = bookings.reduce((sum, booking) => sum + booking.amount, 0);
   res.json({
     users,
