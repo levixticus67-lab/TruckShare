@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { latLngBounds, type LatLngExpression } from "leaflet";
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 
@@ -14,6 +14,7 @@ type RouteMapProps = {
   stops: RouteStop[];
   className?: string;
   height?: string;
+  routing?: boolean;
 };
 
 const stopStyles: Record<RouteStop["status"], { fillColor: string; color: string }> = {
@@ -37,8 +38,26 @@ function FitRoute({ positions }: { positions: LatLngExpression[] }) {
   return null;
 }
 
-export function RouteMap({ stops, className = "", height = "360px" }: RouteMapProps) {
+export function RouteMap({ stops, className = "", height = "360px", routing = false }: RouteMapProps) {
   const positions = useMemo<LatLngExpression[]>(() => stops.map((stop) => stop.position), [stops]);
+  const [routePath, setRoutePath] = useState<LatLngExpression[]>(positions);
+
+  useEffect(() => {
+    setRoutePath(positions);
+    if (!routing || positions.length < 2) return;
+    const controller = new AbortController();
+    const coordinates = stops.map((stop) => `${stop.position[1]},${stop.position[0]}`).join(";");
+    fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<{ routes?: Array<{ geometry?: { coordinates?: Array<[number, number]> } }> }> : Promise.reject(new Error("Route service unavailable")))
+      .then((data) => {
+        const geometry = data.routes?.[0]?.geometry?.coordinates;
+        if (geometry?.length) setRoutePath(geometry.map(([longitude, latitude]) => [latitude, longitude]));
+      })
+      .catch(() => {
+        // The straight corridor remains visible when the free routing service is unavailable.
+      });
+    return () => controller.abort();
+  }, [positions, routing, stops]);
 
   return (
     <div className={`route-map overflow-hidden rounded-lg border border-border ${className}`} style={{ height }}>
@@ -54,9 +73,9 @@ export function RouteMap({ stops, className = "", height = "360px" }: RouteMapPr
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {positions.length > 1 && (
+        {routePath.length > 1 && (
           <Polyline
-            positions={positions}
+            positions={routePath}
             pathOptions={{ color: "#d7984e", weight: 5, opacity: 0.9, dashArray: "10 9" }}
           />
         )}
