@@ -474,6 +474,16 @@ router.post("/auth/request-otp", (req, res) => {
   res.json({ challengeId, phone, message: "Demo OTP sent. Use the code shown to continue.", devOtp: "2468" });
 });
 
+router.post("/auth/account-status", (req, res) => {
+  const phone = normalizePhone(text(req.body?.phone));
+  const country = phoneCountry(phone);
+  if (!country || !/^\+\d{8,15}$/.test(phone)) {
+    res.status(400).json({ error: "Use a valid EAC number with a supported country code." });
+    return;
+  }
+  res.json({ exists: users.some((user) => normalizePhone(user.phone || "") === phone) });
+});
+
 router.post("/auth/verify-otp", async (req, res) => {
   const challengeId = text(req.body?.challengeId);
   const challenge = otpChallenges.get(challengeId);

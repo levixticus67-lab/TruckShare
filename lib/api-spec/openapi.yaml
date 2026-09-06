@@ -40,6 +40,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /auth/account-status:
+    post:
+      operationId: getAccountStatus
+      tags: [auth]
+      summary: Check whether a phone number already has a TruckShare account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string }
+      responses:
+        "200":
+          description: Account status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exists]
+                properties:
+                  exists: { type: boolean }
+        "400":
+          description: Invalid phone number
   /reference/eac:
     get:
       operationId: getEacReference

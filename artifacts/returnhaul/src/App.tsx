@@ -1,6 +1,6 @@
 import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
-  Activity, ArrowRight, BadgeCheck, Banknote, BarChart3, Bell, Box, CalendarDays,
+  Activity, ArrowLeft, ArrowRight, BadgeCheck, Banknote, BarChart3, Bell, Box, CalendarDays,
   Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, ClipboardCheck, Clock3, FileCheck2,
   FilePlus2, FileText, Gauge, LayoutDashboard, LockKeyhole, MapPin, Menu, MessageSquare,
   PackageCheck, Phone, Plus, RefreshCw, Route as RouteIcon, Search, Send, ShieldCheck,
@@ -406,6 +406,28 @@ function AuthModal({ onComplete, onClose = () => {}, required = false }: { onCom
       setBusy(false);
     }
   };
+  const checkPhoneAccount = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const localDigits = phone.replace(/\D/g, "");
+      const result = await api<{ exists: boolean }>("/auth/account-status", {
+        method: "POST",
+        body: JSON.stringify({ phone: `${dialingCodes[phoneCountry]}${localDigits}` }),
+      });
+      if (result.exists) {
+        setAuthMode("login");
+        await requestOtp("login");
+      } else {
+        setAuthMode("signup");
+        setStep("profile");
+      }
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "We could not check that phone number.");
+    } finally {
+      setBusy(false);
+    }
+  };
   const continueAccount = (mode: "login" | "signup") => {
     setAuthMode(mode);
     if (mode === "signup") {
@@ -465,9 +487,18 @@ function AuthModal({ onComplete, onClose = () => {}, required = false }: { onCom
       setBusy(false);
     }
   };
+  const goBack = () => {
+    setMessage("");
+    if (step === "phone") setStep("method");
+    else if (step === "account") setStep(method === "phone" ? "phone" : "method");
+    else if (step === "profile") setStep(method === "phone" ? "phone" : "account");
+    else if (step === "roles") setStep("profile");
+    else if (step === "otp") setStep(authMode === "signup" ? "roles" : method === "phone" ? "phone" : "account");
+  };
   const question = step === "method" ? "How would you like to continue?" : step === "phone" ? "What phone number should we use?" : step === "account" ? "Have you used TruckShare before?" : step === "profile" ? "First, tell us your name." : step === "roles" ? "What will you use TruckShare for?" : "What is your verification code?";
   return <Modal title="Welcome to TruckShare EAC" eyebrow={required ? "Set up your account" : "Account access"} onClose={onClose} closable={!required}>
     <div className="mb-5 flex items-center gap-2">{(["method", "profile", "roles"] as const).map((item, index) => <span key={item} className={`h-1.5 flex-1 rounded-full ${step === item || (step === "phone" && index === 0) || (step === "account" && index === 0) || (step === "otp" && index === 2) || (step === "roles" && index <= 2) ? "bg-primary" : "bg-muted"}`} />)}</div>
+    {step !== "method" && <button type="button" onClick={goBack} className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground transition hover:text-foreground"><ArrowLeft size={14} /> Back</button>}
     <p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-muted-foreground">Question {step === "method" || step === "phone" || step === "account" ? "1" : step === "profile" ? "2" : "3"} of 3</p>
     <h3 className="mt-2 font-display text-2xl font-semibold tracking-[-.04em]">{question}</h3>
     {message && <div className="mt-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}</div>}
@@ -475,9 +506,10 @@ function AuthModal({ onComplete, onClose = () => {}, required = false }: { onCom
       <button type="button" onClick={continueWithPhone} className={`${secondaryButton} min-h-24 flex-col`}><Phone size={22} /><span>Continue with phone</span><small className="font-normal text-muted-foreground">Use an EAC number</small></button>
       <button type="button" onClick={continueWithGoogle} className={`${secondaryButton} min-h-24 flex-col`}><span className="font-display text-2xl font-bold">G</span><span>Continue with Google</span><small className="font-normal text-muted-foreground">Use your Google account</small></button>
     </div>}
-    {step === "phone" && <form onSubmit={(event) => { event.preventDefault(); setStep("account"); }} className="mt-6 space-y-4">
+    {step === "phone" && <form onSubmit={(event) => { event.preventDefault(); void checkPhoneAccount(); }} className="mt-6 space-y-4">
       <div className="grid gap-4 sm:grid-cols-[.9fr_1.1fr]"><CountrySelect label="Country" value={phoneCountry} onChange={setPhoneCountry} /><Field label={`Phone number (${dialingCodes[phoneCountry]})`} value={phone} onChange={setPhone} placeholder="700 000 000" /></div>
-      <button type="submit" className={`${button} w-full`}>Continue <ArrowRight size={14} /></button>
+      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Checking account..." : "Continue"} <ArrowRight size={14} /></button>
+      <p className="text-center text-xs text-muted-foreground">We’ll take you straight to login or account setup based on this number.</p>
     </form>}
     {step === "account" && <div className="mt-6 space-y-3">
       <button type="button" onClick={() => continueAccount("login")} disabled={busy} className={`${secondaryButton} w-full justify-between`}><span>I already have an account</span><ArrowRight size={14} /></button>
