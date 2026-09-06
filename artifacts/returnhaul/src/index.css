@@ -301,6 +301,58 @@
     z-index: 50;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
   }
+
+  .brand-loader {
+    position: relative;
+    display: flex;
+    width: min(13rem, 72vw);
+    align-items: center;
+    justify-content: center;
+    isolation: isolate;
+  }
+
+  .brand-loader-image {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 12px 14px hsl(var(--foreground) / 0.12));
+    transform-origin: 50% 70%;
+    animation: truckshare-loader-drive 1.8s cubic-bezier(.45, .05, .55, .95) infinite;
+  }
+
+  .brand-loader-aura {
+    position: absolute;
+    z-index: 0;
+    bottom: 13%;
+    left: 17%;
+    width: 66%;
+    height: 18%;
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.34);
+    filter: blur(13px);
+    animation: truckshare-loader-aura 1.8s ease-in-out infinite;
+  }
+
+  @keyframes truckshare-loader-drive {
+    0%, 100% { opacity: .76; transform: translateX(-4px) scale(.97); }
+    45% { opacity: 1; transform: translateX(5px) scale(1.01); }
+    62% { opacity: 1; transform: translateX(3px) scale(1); }
+  }
+
+  @keyframes truckshare-loader-aura {
+    0%, 100% { opacity: .35; transform: translateX(-3px) scaleX(.86); }
+    45% { opacity: .78; transform: translateX(5px) scaleX(1); }
+    62% { opacity: .62; transform: translateX(3px) scaleX(.96); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand-loader-image,
+    .brand-loader-aura {
+      animation: none;
+    }
+  }
 }
 
 /* Softened palette and restrained glass surfaces. */

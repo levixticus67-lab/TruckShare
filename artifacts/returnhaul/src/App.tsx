@@ -177,7 +177,7 @@ function Shell({ children }: { children: ReactNode }) {
     setRole(user.role === "Admin" ? "Admin" : user.roles?.[0] || user.role);
     setAuthOpen(false);
   };
-  if (authLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-background text-sm text-muted-foreground">Loading TruckShare...</div>;
+  if (authLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-background"><BrandLoader label="Loading your TruckShare account" /></div>;
   if (!authUser) return <AuthModal required onComplete={finishAuth} />;
   return <RoleContext.Provider value={role}><div className="noise min-h-[100dvh] bg-background">
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[258px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground shadow-2xl transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
@@ -204,7 +204,14 @@ function Header({ eyebrow, title, detail, action }: { eyebrow: string; title: st
 
 function Card({ children, className = "" }: { children: ReactNode; className?: string }) { return <div className={`glass-surface rounded-xl border border-border bg-card p-5 sm:p-6 ${className}`}>{children}</div>; }
 function Status({ value }: { value: string }) { const tone = /delivered|verified|paid|released|cleared|crossed/i.test(value) ? "bg-[#e4f1ea] text-[#28765a]" : /pending|held|transit|border|otp|planned|submitted/i.test(value) ? "bg-[#fff0d9] text-[#9a641c]" : /reject/i.test(value) ? "bg-[#fbe8e5] text-[#ad4339]" : "bg-muted text-muted-foreground"; const plain: Record<string, string> = { Held: "Payment protected", Released: "Paid out", Pending: "Waiting for payment", "En Route to Pickup": "Going to pickup", "In Transit": "On the way", "At Border": "At the border", "OTP sent": "Waiting for delivery code", Unpaid: "Not paid", Planned: "Not started", "Documents Pending": "Documents needed", Submitted: "Documents sent", Cleared: "Approved", Crossed: "Border crossed" }; return <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-mono-ui text-[9px] font-bold uppercase tracking-wide ${tone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{plain[value] || value}</span>; }
-function Loading({ error, retry }: { error: string; retry: () => void }) { if (error) return <div className="rounded-xl border border-[#e4b4a9] bg-[#fbefeb] p-6 text-center text-sm text-[#ad4339]"><CircleAlert className="mx-auto mb-2" size={20} />{error}<button onClick={retry} className={`${secondaryButton} mt-4`}>Retry</button></div>; return <div className="h-32 animate-pulse rounded-xl border border-border bg-card/70" />; }
+function BrandLoader({ label = "Loading TruckShare" }: { label?: string }) {
+  return <div className="brand-loader" role="status" aria-label={label}>
+    <span className="brand-loader-aura" aria-hidden="true" />
+    <img className="brand-loader-image" src="/branding/truckshare-logo-transparent.png" alt="" />
+    <span className="sr-only">{label}</span>
+  </div>;
+}
+function Loading({ error, retry }: { error: string; retry: () => void }) { if (error) return <div className="rounded-xl border border-[#e4b4a9] bg-[#fbefeb] p-6 text-center text-sm text-[#ad4339]"><CircleAlert className="mx-auto mb-2" size={20} />{error}<button onClick={retry} className={`${secondaryButton} mt-4`}>Retry</button></div>; return <div className="flex h-32 items-center justify-center rounded-xl border border-border bg-card/70"><BrandLoader label="Loading TruckShare data" /></div>; }
 function Stat({ label, value, note, icon: Icon, accent = false }: { label: string; value: string | number; note: string; icon: typeof Activity; accent?: boolean }) { return <Card className={accent ? "border-accent/40 bg-[#fff5e3]" : ""}><div className="flex min-w-0 items-start justify-between gap-2"><div className="min-w-0 flex-1 pr-1"><p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">{label}</p><p className="mt-3 break-words font-display text-3xl font-semibold leading-[1.05] tracking-[-.05em]">{value}</p><p className="mt-1 break-words text-[11px] text-muted-foreground">{note}</p></div><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-primary"><Icon size={17} /></span></div></Card>; }
 function Dashboard() {
   const query = useApi<DashboardData>("/dashboard", { activeTrips: 0, availableLoads: 0, inTransit: 0, delivered: 0, totalEscrow: 0, matchRate: 0, recentActivity: [] });
