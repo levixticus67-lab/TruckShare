@@ -669,6 +669,18 @@ header.sticky button[aria-label="Notifications"] + div {
   main > .mx-auto {
     padding-bottom: 6.5rem !important;
   }
+
+  .home-heading {
+    text-align: center;
+  }
+
+  .home-action-grid > a:not(:last-child) {
+    text-align: center;
+  }
+
+  .home-action-grid > a:not(:last-child) > svg {
+    margin-inline: auto;
+  }
 }
 
 @media (max-width: 380px) {
