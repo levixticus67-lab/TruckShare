@@ -350,6 +350,58 @@
     filter: drop-shadow(0 12px 14px hsl(var(--foreground) / 0.12));
   }
 
+  .brand-loader-chain {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .brand-loader-chain-track {
+    transform-origin: center;
+    animation: truckshare-chain-track 0.9s linear infinite;
+  }
+
+  .brand-loader-chain-line {
+    fill: none;
+    stroke: hsl(var(--primary) / 0.82);
+    stroke-width: 7;
+    stroke-linecap: round;
+    stroke-dasharray: 13 16;
+    filter: drop-shadow(0 1px 1px hsl(var(--foreground) / 0.28));
+  }
+
+  .brand-loader-chain-link {
+    fill: none;
+    stroke: hsl(var(--primary) / 0.9);
+    stroke-width: 7;
+    filter: drop-shadow(0 1px 1px hsl(var(--foreground) / 0.3));
+  }
+
+  .brand-loader-chain-link-alt {
+    transform: rotate(90deg);
+    transform-origin: center;
+  }
+
+  .brand-loader-chain-wheel {
+    fill: hsl(var(--background) / 0.7);
+    stroke: hsl(var(--accent-foreground) / 0.92);
+    stroke-width: 5;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: truckshare-chain-wheel-roll 0.68s linear infinite;
+  }
+
+  .brand-loader-chain-wheel path {
+    fill: none;
+    stroke: hsl(var(--accent-foreground) / 0.92);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
   .brand-loader-road {
     position: absolute;
     z-index: 0;
@@ -363,35 +415,6 @@
     animation: truckshare-loader-road 0.7s linear infinite;
   }
 
-  .brand-loader-wheel {
-    position: absolute;
-    top: 54%;
-    z-index: 2;
-    width: 11%;
-    aspect-ratio: 1;
-    border: 1.5px solid hsl(var(--accent-foreground) / 0.58);
-    border-radius: 50%;
-    background:
-      linear-gradient(90deg, transparent 46%, hsl(var(--accent-foreground) / 0.5) 47% 53%, transparent 54%),
-      linear-gradient(0deg, transparent 46%, hsl(var(--accent-foreground) / 0.5) 47% 53%, transparent 54%);
-    opacity: 0.72;
-    animation: truckshare-chain-spin 0.72s linear infinite;
-    pointer-events: none;
-  }
-
-  .brand-loader-wheel::after {
-    position: absolute;
-    inset: 22%;
-    border: 1px solid hsl(var(--accent-foreground) / 0.46);
-    border-radius: 50%;
-    content: "";
-  }
-
-  .brand-loader-wheel-1 { left: 35%; }
-  .brand-loader-wheel-2 { left: 49%; }
-  .brand-loader-wheel-3 { left: 63%; }
-  .brand-loader-wheel-4 { left: 78%; }
-
   @keyframes truckshare-loader-drive {
     0% { opacity: 0; transform: translateX(-1.75rem); }
     12% { opacity: 1; }
@@ -404,14 +427,20 @@
     to { background-position: -2.2rem 0; }
   }
 
-  @keyframes truckshare-chain-spin {
+  @keyframes truckshare-chain-track {
+    from { transform: translateX(0); }
+    to { transform: translateX(-1.25rem); }
+  }
+
+  @keyframes truckshare-chain-wheel-roll {
     to { transform: rotate(360deg); }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .brand-loader-vehicle,
     .brand-loader-road,
-    .brand-loader-wheel {
+    .brand-loader-chain-track,
+    .brand-loader-chain-wheel {
       animation: none;
     }
   }

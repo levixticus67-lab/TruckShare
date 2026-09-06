@@ -209,10 +209,31 @@ function BrandLoader({ label = "Loading TruckShare" }: { label?: string }) {
     <span className="brand-loader-road" aria-hidden="true" />
     <div className="brand-loader-vehicle" aria-hidden="true">
       <img className="brand-loader-image" src="/branding/truckshare-logo-transparent.png" alt="" />
-      <span className="brand-loader-wheel brand-loader-wheel-1" />
-      <span className="brand-loader-wheel brand-loader-wheel-2" />
-      <span className="brand-loader-wheel brand-loader-wheel-3" />
-      <span className="brand-loader-wheel brand-loader-wheel-4" />
+      <svg className="brand-loader-chain" viewBox="0 0 740 432" preserveAspectRatio="none">
+        <g className="brand-loader-chain-track">
+          <path className="brand-loader-chain-line" d="M154 247H642" />
+          <ellipse className="brand-loader-chain-link" cx="235" cy="247" rx="42" ry="16" />
+          <ellipse className="brand-loader-chain-link brand-loader-chain-link-alt" cx="350" cy="247" rx="42" ry="16" />
+          <ellipse className="brand-loader-chain-link" cx="465" cy="247" rx="42" ry="16" />
+          <ellipse className="brand-loader-chain-link brand-loader-chain-link-alt" cx="580" cy="247" rx="42" ry="16" />
+        </g>
+        <g className="brand-loader-chain-wheel brand-loader-chain-wheel-1">
+          <circle cx="235" cy="247" r="18" />
+          <path d="M235 226V268M214 247H256" />
+        </g>
+        <g className="brand-loader-chain-wheel brand-loader-chain-wheel-2">
+          <circle cx="350" cy="247" r="18" />
+          <path d="M350 226V268M329 247H371" />
+        </g>
+        <g className="brand-loader-chain-wheel brand-loader-chain-wheel-3">
+          <circle cx="465" cy="247" r="18" />
+          <path d="M465 226V268M444 247H486" />
+        </g>
+        <g className="brand-loader-chain-wheel brand-loader-chain-wheel-4">
+          <circle cx="580" cy="247" r="18" />
+          <path d="M580 226V268M559 247H601" />
+        </g>
+      </svg>
     </div>
     <span className="sr-only">{label}</span>
   </div>;
