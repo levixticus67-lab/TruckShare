@@ -87,3 +87,56 @@ export function RouteMap({ stops, className = "", height = "360px" }: RouteMapPr
     </div>
   );
 }
+
+const networkStops: RouteStop[] = [
+  { label: "Kampala", city: "Kampala", country: "Uganda", position: [0.3476, 32.5825], status: "active" },
+  { label: "Malaba", city: "Malaba", country: "Uganda", position: [0.635, 34.255], status: "upcoming" },
+  { label: "Mbale", city: "Mbale", country: "Uganda", position: [1.0806, 34.175], status: "upcoming" },
+  { label: "Mbarara", city: "Mbarara", country: "Uganda", position: [-0.6072, 30.6545], status: "upcoming" },
+  { label: "Gulu", city: "Gulu", country: "Uganda", position: [2.7746, 32.299], status: "upcoming" },
+  { label: "Nairobi", city: "Nairobi", country: "Kenya", position: [-1.2921, 36.8219], status: "upcoming" },
+  { label: "Kigali", city: "Kigali", country: "Rwanda", position: [-1.9441, 30.0619], status: "upcoming" },
+  { label: "Dar es Salaam", city: "Dar es Salaam", country: "Tanzania", position: [-6.7924, 39.2083], status: "upcoming" },
+  { label: "Juba", city: "Juba", country: "South Sudan", position: [4.8594, 31.5713], status: "upcoming" },
+];
+
+const networkRoutes: [number, number][][] = [
+  [networkStops[0].position, networkStops[1].position],
+  [networkStops[0].position, networkStops[2].position],
+  [networkStops[0].position, networkStops[3].position],
+  [networkStops[0].position, networkStops[4].position],
+  [networkStops[0].position, networkStops[5].position],
+  [networkStops[0].position, networkStops[6].position],
+  [networkStops[0].position, networkStops[7].position],
+  [networkStops[0].position, networkStops[8].position],
+];
+
+export function EacNetworkMap({ height = "390px" }: { height?: string }) {
+  const positions = useMemo<LatLngExpression[]>(() => networkStops.map((stop) => stop.position), []);
+  const bounds = useMemo(() => latLngBounds(positions), [positions]);
+
+  return (
+    <div className="route-map overflow-hidden rounded-lg border border-border" style={{ height }}>
+      <MapContainer center={[0.3476, 32.5825]} zoom={5} scrollWheelZoom className="h-full w-full" attributionControl>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {networkRoutes.map((route, index) => (
+          <Polyline key={`network-route-${index}`} positions={route} pathOptions={{ color: "#d7984e", weight: 3, opacity: 0.72 }} />
+        ))}
+        {networkStops.map((stop) => (
+          <CircleMarker
+            key={stop.label}
+            center={stop.position}
+            radius={stop.label === "Kampala" ? 9 : 6}
+            pathOptions={{ color: stop.label === "Kampala" ? "#a96824" : "#32775f", fillColor: stop.label === "Kampala" ? "#d7984e" : "#7dbb9b", fillOpacity: 1, weight: 2 }}
+          >
+            <Tooltip direction="top" offset={[0, -6]}>{stop.label}</Tooltip>
+          </CircleMarker>
+        ))}
+        <FitRoute positions={positions} />
+      </MapContainer>
+    </div>
+  );
+}
