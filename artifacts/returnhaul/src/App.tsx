@@ -206,8 +206,14 @@ function Card({ children, className = "" }: { children: ReactNode; className?: s
 function Status({ value }: { value: string }) { const tone = /delivered|verified|paid|released|cleared|crossed/i.test(value) ? "bg-[#e4f1ea] text-[#28765a]" : /pending|held|transit|border|otp|planned|submitted/i.test(value) ? "bg-[#fff0d9] text-[#9a641c]" : /reject/i.test(value) ? "bg-[#fbe8e5] text-[#ad4339]" : "bg-muted text-muted-foreground"; const plain: Record<string, string> = { Held: "Payment protected", Released: "Paid out", Pending: "Waiting for payment", "En Route to Pickup": "Going to pickup", "In Transit": "On the way", "At Border": "At the border", "OTP sent": "Waiting for delivery code", Unpaid: "Not paid", Planned: "Not started", "Documents Pending": "Documents needed", Submitted: "Documents sent", Cleared: "Approved", Crossed: "Border crossed" }; return <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-mono-ui text-[9px] font-bold uppercase tracking-wide ${tone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{plain[value] || value}</span>; }
 function BrandLoader({ label = "Loading TruckShare" }: { label?: string }) {
   return <div className="brand-loader" role="status" aria-label={label}>
-    <span className="brand-loader-aura" aria-hidden="true" />
-    <img className="brand-loader-image" src="/branding/truckshare-logo-transparent.png" alt="" />
+    <span className="brand-loader-road" aria-hidden="true" />
+    <div className="brand-loader-vehicle" aria-hidden="true">
+      <img className="brand-loader-image" src="/branding/truckshare-logo-transparent.png" alt="" />
+      <span className="brand-loader-wheel brand-loader-wheel-1" />
+      <span className="brand-loader-wheel brand-loader-wheel-2" />
+      <span className="brand-loader-wheel brand-loader-wheel-3" />
+      <span className="brand-loader-wheel brand-loader-wheel-4" />
+    </div>
     <span className="sr-only">{label}</span>
   </div>;
 }
