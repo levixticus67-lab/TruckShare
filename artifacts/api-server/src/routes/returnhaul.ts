@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, databaseConfigured, runtimeStateTable } from "@workspace/db";
 import {
@@ -374,7 +374,9 @@ const verifications: Verification[] = [
 ];
 
 const sessions = new Map<string, User>();
-const otpChallenges = new Map<string, { phone: string; country: CountryCode; otp: string; mode: "login" | "signup"; name?: string; role?: "Carrier" | "Shipper" | "Admin"; roles?: Array<"Carrier" | "Shipper"> }>();
+const otpRequestCooldowns = new Map<string, number>();
+const OTP_CHALLENGE_TTL_MS = 10 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
 const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
@@ -466,6 +468,81 @@ function issueToken(user: User) {
   const payload = Buffer.from(JSON.stringify({ sub: user.id, role: user.role, exp: Date.now() + 86400000 })).toString("base64url");
   const signature = createHmac("sha256", process.env.JWT_SECRET || "truckshare-dev-secret").update(payload).digest("base64url");
   return `${payload}.${signature}`;
+}
+
+type OtpChallenge = {
+  phone: string;
+  country: CountryCode;
+  mode: "login" | "signup";
+  name?: string;
+  role?: "Carrier" | "Shipper" | "Admin";
+  roles?: Array<"Carrier" | "Shipper">;
+  exp: number;
+};
+
+function signChallenge(challenge: Omit<OtpChallenge, "exp">) {
+  const payload = Buffer.from(JSON.stringify({ ...challenge, exp: Date.now() + OTP_CHALLENGE_TTL_MS })).toString("base64url");
+  const signature = createHmac("sha256", process.env.JWT_SECRET || "truckshare-dev-secret").update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+function readChallenge(value: string): OtpChallenge | undefined {
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return undefined;
+
+  const expected = createHmac("sha256", process.env.JWT_SECRET || "truckshare-dev-secret").update(payload).digest("base64url");
+  const expectedBuffer = Buffer.from(expected);
+  const signatureBuffer = Buffer.from(signature);
+  if (expectedBuffer.length !== signatureBuffer.length || !timingSafeEqual(expectedBuffer, signatureBuffer)) return undefined;
+
+  try {
+    const challenge = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as OtpChallenge;
+    if (!challenge.phone || !challenge.country || !challenge.mode || !Number.isFinite(challenge.exp) || challenge.exp < Date.now()) return undefined;
+    return challenge;
+  } catch {
+    return undefined;
+  }
+}
+
+function twilioVerifyConfiguration() {
+  const accountSid = text(process.env.TWILIO_ACCOUNT_SID);
+  const authToken = text(process.env.TWILIO_AUTH_TOKEN);
+  const serviceSid = text(process.env.TWILIO_VERIFY_SERVICE_SID);
+  return accountSid && authToken && serviceSid ? { accountSid, authToken, serviceSid } : undefined;
+}
+
+async function sendTwilioVerification(phone: string) {
+  const config = twilioVerifyConfiguration();
+  if (!config) return false;
+
+  const endpoint = `https://verify.twilio.com/v2/Services/${encodeURIComponent(config.serviceSid)}/Verifications`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ To: phone, Channel: "sms" }),
+  });
+  return response.ok;
+}
+
+async function checkTwilioVerification(phone: string, code: string) {
+  const config = twilioVerifyConfiguration();
+  if (!config) return false;
+
+  const endpoint = `https://verify.twilio.com/v2/Services/${encodeURIComponent(config.serviceSid)}/VerificationCheck`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ To: phone, Code: code }),
+  });
+  if (!response.ok) return false;
+  const body = await response.json() as { status?: unknown };
+  return body.status === "approved";
 }
 
 function configuredAdminPhones() {
@@ -618,7 +695,7 @@ router.get("/geocode/reverse", async (req, res) => {
   }
 });
 
-router.post("/auth/request-otp", (req, res) => {
+router.post("/auth/request-otp", async (req, res) => {
   const phone = normalizePhone(text(req.body?.phone));
   const country = phoneCountry(phone);
   const mode = req.body?.mode === "login" ? "login" : "signup";
@@ -646,10 +723,35 @@ router.post("/auth/request-otp", (req, res) => {
     res.status(400).json({ error: "Choose at least one account role." });
     return;
   }
+
+  const lastRequestedAt = otpRequestCooldowns.get(phone) || 0;
+  const retryAfterSeconds = Math.ceil((lastRequestedAt + OTP_RESEND_COOLDOWN_MS - Date.now()) / 1000);
+  if (retryAfterSeconds > 0) {
+    res.status(429).json({ error: `Please wait ${retryAfterSeconds}s before requesting another code.` });
+    return;
+  }
+
+  if (!twilioVerifyConfiguration()) {
+    res.status(503).json({ error: "Phone verification is not configured yet. Add the Twilio Verify secrets to the API service." });
+    return;
+  }
+
   const role = isAdminPhone(phone) ? "Admin" : roles.includes("Carrier") ? "Carrier" : "Shipper";
-  const challengeId = id("challenge");
-  otpChallenges.set(challengeId, { phone, country, otp: "2468", mode, name: name || undefined, role, roles });
-  res.json({ challengeId, phone, message: "Demo OTP sent. Use the code shown to continue.", devOtp: "2468" });
+  try {
+    const sent = await sendTwilioVerification(phone);
+    if (!sent) {
+      res.status(502).json({ error: "We could not send the verification code. Please try again." });
+      return;
+    }
+    otpRequestCooldowns.set(phone, Date.now());
+    res.json({
+      challengeId: signChallenge({ phone, country, mode, name: name || undefined, role, roles }),
+      phone,
+      message: "We sent a verification code to your phone. It expires in 10 minutes.",
+    });
+  } catch {
+    res.status(502).json({ error: "We could not send the verification code. Please try again." });
+  }
 });
 
 router.post("/auth/account-status", (req, res) => {
@@ -664,12 +766,22 @@ router.post("/auth/account-status", (req, res) => {
 
 router.post("/auth/verify-otp", async (req, res) => {
   const challengeId = text(req.body?.challengeId);
-  const challenge = otpChallenges.get(challengeId);
-  if (!challenge || text(req.body?.otp) !== challenge.otp) {
+  const challenge = readChallenge(challengeId);
+  const otp = text(req.body?.otp).replace(/\D/g, "");
+  if (!challenge || !/^\d{4,10}$/.test(otp)) {
     res.status(400).json({ error: "That OTP is not valid or has expired." });
     return;
   }
-  otpChallenges.delete(challengeId);
+  try {
+    if (!await checkTwilioVerification(challenge.phone, otp)) {
+      res.status(400).json({ error: "That OTP is not valid or has expired." });
+      return;
+    }
+  } catch {
+    res.status(502).json({ error: "We could not verify that code. Please try again." });
+    return;
+  }
+
   const existingUser = users.find((user) => normalizePhone(user.phone || "") === challenge.phone);
   if (challenge.mode === "login" && !existingUser) {
     res.status(404).json({ error: "No account exists for this phone number. Choose Create account first." });

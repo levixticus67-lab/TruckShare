@@ -267,7 +267,7 @@ function LegacyAuthModal({ onClose }: { onClose: () => void }) {
       const localDigits = phone.replace(/\D/g, "");
       const result = await api<{ challengeId: string; message: string; devOtp?: string }>("/auth/request-otp", { method: "POST", body: JSON.stringify({ phone: `${dialingCodes[phoneCountry]}${localDigits}` }) });
       setChallengeId(result.challengeId);
-      setMessage(result.devOtp ? `${result.message} Demo code: ${result.devOtp}` : result.message);
+      setMessage(result.message);
       setStep("otp");
     } catch (reason: unknown) {
       setMessage(reason instanceof Error ? reason.message : "Could not send OTP.");
@@ -328,7 +328,7 @@ function LegacyOnboardingAuthModal({ onClose }: { onClose: () => void }) {
     setMessage("");
     try {
       const localDigits = phone.replace(/\D/g, "");
-      const result = await api<{ challengeId: string; message: string; devOtp?: string }>("/auth/request-otp", {
+      const result = await api<{ challengeId: string; message: string }>("/auth/request-otp", {
         method: "POST",
         body: JSON.stringify({
           phone: `${dialingCodes[phoneCountry]}${localDigits}`,
@@ -337,7 +337,7 @@ function LegacyOnboardingAuthModal({ onClose }: { onClose: () => void }) {
         }),
       });
       setChallengeId(result.challengeId);
-      setMessage(result.devOtp ? `${result.message} Demo code: ${result.devOtp}` : result.message);
+      setMessage(result.message);
       setStep("otp");
     } catch (reason: unknown) {
       setMessage(reason instanceof Error ? reason.message : "Could not send the verification code.");
@@ -392,10 +392,10 @@ function LegacyOnboardingAuthModal({ onClose }: { onClose: () => void }) {
       {mode === "signup" && <div className="grid gap-4 sm:grid-cols-2"><Field label="Full name" value={name} onChange={setName} placeholder="Your name or business name" /><label className="block"><span className={labelClass}>I am a *</span><select className={input} value={role} onChange={(event) => setRole(event.target.value as "Carrier" | "Shipper")}><option value="Carrier">Carrier / truck owner</option><option value="Shipper">Shipper / cargo owner</option></select></label></div>}
       <div className="grid gap-4 sm:grid-cols-[.9fr_1.1fr]"><CountrySelect label="Country" value={phoneCountry} onChange={setPhoneCountry} /><Field label={`Phone number (${dialingCodes[phoneCountry]})`} value={phone} onChange={setPhone} placeholder="700 000 000" /></div>
       <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Sending..." : mode === "login" ? "Send login code" : "Send signup code"} <ArrowRight size={14} /></button>
-      <p className="text-center font-mono-ui text-[10px] text-muted-foreground">EAC phone numbers supported · preview mode</p>
+      <p className="text-center font-mono-ui text-[10px] text-muted-foreground">EAC phone numbers supported · SMS charges may apply</p>
     </form> : <form onSubmit={verify} className="space-y-4">
-      <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{mode === "login" ? "Login code sent." : "Signup code sent."} Use <strong>2468</strong> in preview mode.</div>
-      <Field label="4-digit verification code" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" />
+      <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{mode === "login" ? "Login code sent." : "Signup code sent."} Enter the code from your SMS. It expires in 10 minutes.</div>
+      <Field label="Verification code" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 10))} placeholder="123456" />
       <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : mode === "login" ? "Log in" : "Create account"} <ShieldCheck size={14} /></button>
     </form>}
   </Modal>;
@@ -421,7 +421,7 @@ function AuthModal({ onComplete, onClose = () => {}, required = false }: { onCom
     setMessage("");
     try {
       const localDigits = phone.replace(/\D/g, "");
-      const result = await api<{ challengeId: string; message: string; devOtp?: string }>("/auth/request-otp", {
+      const result = await api<{ challengeId: string; message: string }>("/auth/request-otp", {
         method: "POST",
         body: JSON.stringify({
           phone: `${dialingCodes[phoneCountry]}${localDigits}`,
@@ -431,7 +431,7 @@ function AuthModal({ onComplete, onClose = () => {}, required = false }: { onCom
       });
       setAuthMode(mode);
       setChallengeId(result.challengeId);
-      setMessage(result.devOtp ? `${result.message} Demo code: ${result.devOtp}` : result.message);
+      setMessage(result.message);
       setStep("otp");
     } catch (reason: unknown) {
       setMessage(reason instanceof Error ? reason.message : "We could not send the verification code.");
@@ -561,9 +561,10 @@ function AuthModal({ onComplete, onClose = () => {}, required = false }: { onCom
       <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Continuing..." : method === "phone" ? "Send verification code" : "Create account with Google"} <ArrowRight size={14} /></button>
     </form>}
     {step === "otp" && <form onSubmit={verify} className="mt-6 space-y-4">
-      <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{authMode === "login" ? "Login code sent." : "Signup code sent."} Use <strong>2468</strong> in preview mode.</div>
-      <Field label="4-digit verification code" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 4))} placeholder="2468" />
+      <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{authMode === "login" ? "Login code sent." : "Signup code sent."} Enter the code from your SMS. It expires in 10 minutes.</div>
+      <Field label="Verification code" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 10))} placeholder="123456" />
       <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : authMode === "login" ? "Log in" : "Create account"} <ShieldCheck size={14} /></button>
+      <button type="button" disabled={busy} onClick={() => authMode && void requestOtp(authMode)} className="w-full text-xs font-bold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Resend code</button>
     </form>}
   </Modal>;
 }
