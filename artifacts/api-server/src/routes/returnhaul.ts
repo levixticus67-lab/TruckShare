@@ -513,7 +513,7 @@ router.get("/reference/eac", (_req, res) => {
   res.json({ countries: eacCountries, corridors: eacCorridors });
 });
 
-router.get("/locations/search", async (req, res) => {
+router.get("/geocode/search", async (req, res) => {
   const query = text(req.query.q).trim();
   if (query.length < 2) {
     res.json([]);
@@ -566,6 +566,55 @@ router.get("/locations/search", async (req, res) => {
     res.json(results.slice(0, 3));
   } catch {
     res.status(502).json({ error: "Map search is temporarily unavailable." });
+  }
+});
+
+router.get("/geocode/reverse", async (req, res) => {
+  const latitude = Number(req.query.lat);
+  const longitude = Number(req.query.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    res.json({ display_name: null, location: null });
+    return;
+  }
+
+  const reverseUrl = new URL("https://nominatim.openstreetmap.org/reverse");
+  reverseUrl.searchParams.set("lat", String(latitude));
+  reverseUrl.searchParams.set("lon", String(longitude));
+  reverseUrl.searchParams.set("format", "jsonv2");
+  reverseUrl.searchParams.set("addressdetails", "1");
+
+  try {
+    const response = await fetch(reverseUrl, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "TruckShare/1.0 (location search)",
+      },
+    });
+    if (!response.ok) {
+      res.status(502).json({ display_name: null, location: null });
+      return;
+    }
+
+    const result = await response.json() as {
+      display_name?: unknown;
+      address?: Record<string, unknown>;
+    };
+    const resultCountry = optionalCountryCode(result.address?.country_code);
+    const country = eacCountries.find((item) => item.code === resultCountry);
+    const displayName = text(result.display_name).trim() || null;
+    const location = resultCountry && country && displayName
+      ? {
+          city: displayName,
+          countryCode: resultCountry,
+          countryName: country.name,
+          latitude,
+          longitude,
+        } satisfies LocationPoint
+      : null;
+
+    res.json({ display_name: displayName, location });
+  } catch {
+    res.status(502).json({ display_name: null, location: null });
   }
 });
 

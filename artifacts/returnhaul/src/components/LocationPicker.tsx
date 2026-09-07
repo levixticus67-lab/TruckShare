@@ -45,7 +45,8 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
   const [query, setQuery] = useState(value?.city || "");
   const [open, setOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
-  const [gpsState, setGpsState] = useState<"idle" | "loading" | "error">("idle");
+  const [locationState, setLocationState] = useState<"idle" | "loading" | "error">("idle");
+  const [locationError, setLocationError] = useState("");
   const [suggestions, setSuggestions] = useState<LocationPoint[]>([]);
   const [searchState, setSearchState] = useState<"idle" | "loading" | "error">("idle");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,7 +88,7 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
       try {
         const params = new URLSearchParams({ q: normalized });
         if (countryCode) params.set("countryCode", countryCode);
-        const response = await fetch(`${LOCATION_API_ROOT}/locations/search?${params.toString()}`, { signal: controller.signal });
+        const response = await fetch(`${LOCATION_API_ROOT}/geocode/search?${params.toString()}`, { signal: controller.signal });
         if (!response.ok) throw new Error("Location search failed");
         const body = await response.json();
         if (!controller.signal.aborted) {
@@ -112,33 +113,52 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
     setQuery(location.city);
     setOpen(false);
     setSuggestions([]);
-    setGpsState("idle");
+    setLocationState("idle");
+    setLocationError("");
     inputRef.current?.setCustomValidity("");
     onChange(location);
   };
 
-  const pin = (latitude: number, longitude: number) => {
-    const nearest = nearestLocation(latitude, longitude, countryCode);
-    choose({
-      ...nearest,
-      city: query.trim() || `Near ${nearest.city}`,
-      latitude,
-      longitude,
-    });
+  const pin = async (latitude: number, longitude: number) => {
+    if (!LOCATION_API_ROOT) {
+      setLocationState("error");
+      setLocationError("Map lookup is unavailable. Please try again later.");
+      return;
+    }
+    setLocationState("loading");
+    setLocationError("");
+    try {
+      const response = await fetch(`${LOCATION_API_ROOT}/geocode/reverse?lat=${latitude}&lon=${longitude}`);
+      if (!response.ok) throw new Error("Map lookup failed.");
+      const body = await response.json() as { location?: LocationPoint | null };
+      const location = body.location;
+      if (!location) throw new Error("That point could not be named on the map.");
+      if (countryCode && location.countryCode !== countryCode) {
+        throw new Error("That point is outside the selected country.");
+      }
+      choose(location);
+    } catch (error) {
+      setLocationState("error");
+      setLocationError(error instanceof Error ? error.message : "Map lookup failed. Try another point.");
+    }
   };
 
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
-      setGpsState("error");
+      setLocationState("error");
+      setLocationError("This browser does not support GPS.");
       return;
     }
-    setGpsState("loading");
+    setLocationState("loading");
+    setLocationError("");
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        setGpsState("idle");
-        pin(coords.latitude, coords.longitude);
+        void pin(coords.latitude, coords.longitude);
       },
-      () => setGpsState("error"),
+      () => {
+        setLocationState("error");
+        setLocationError("GPS is blocked or unavailable. Tap a point on the map instead.");
+      },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   };
@@ -233,7 +253,7 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
                 <div className="min-w-0">
                   <p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">Location precision</p>
                   <h3 id={`${label.replace(/\s+/g, "-").toLowerCase()}-map-title`} className="mt-1 truncate font-display text-xl font-semibold">Pin the {label.toLowerCase()}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">Tap the map or use your phone’s location. We’ll keep the nearest area name for matching.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Tap the map or use your phone’s location. We’ll reverse-check the point and save the real mapped address.</p>
                 </div>
               </div>
               <button type="button" onClick={() => setMapOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close map">
@@ -246,9 +266,9 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
                   <p className="text-xs font-bold">{value?.city || mapLocation.city}</p>
                   <p className="truncate text-[10px] text-muted-foreground">{value ? `${value.latitude.toFixed(4)}, ${value.longitude.toFixed(4)}` : "No exact point selected yet"}</p>
                 </div>
-                <button type="button" onClick={useCurrentLocation} disabled={gpsState === "loading"} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-primary/25 px-3 text-[10px] font-bold text-primary transition hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60">
+                <button type="button" onClick={useCurrentLocation} disabled={locationState === "loading"} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-primary/25 px-3 text-[10px] font-bold text-primary transition hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60">
                   <Crosshair size={14} aria-hidden="true" />
-                  {gpsState === "loading" ? "Locating…" : "Use my GPS"}
+                  {locationState === "loading" ? "Locating…" : "Use my GPS"}
                 </button>
               </div>
               <div className="overflow-hidden rounded-xl border border-border shadow-inner">
@@ -263,8 +283,8 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
                 </MapContainer>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] text-muted-foreground">Click anywhere to move the pin.</p>
-                {gpsState === "error" && <p className="text-right text-[10px] font-semibold text-destructive">GPS unavailable — tap the map instead.</p>}
+                <p className="text-[10px] text-muted-foreground">{locationState === "loading" ? "Resolving this point on the map…" : "Click anywhere to move the pin."}</p>
+                {locationError && <p className="text-right text-[10px] font-semibold text-destructive">{locationError}</p>}
               </div>
             </div>
             <div className="flex items-center justify-between gap-3 border-t border-border bg-muted/30 px-4 py-3 sm:px-5">
