@@ -8,6 +8,7 @@ type LocationPickerProps = {
   value?: LocationPoint;
   countryCode?: string;
   onChange: (location: LocationPoint) => void;
+  onLabelChange?: (label: string) => void;
 };
 
 function distanceSquared(latitude: number, longitude: number, point: LocationPoint) {
@@ -34,24 +35,21 @@ function MapClick({ onPick }: { onPick: (latitude: number, longitude: number) =>
   return null;
 }
 
-export function LocationPicker({ label, value, countryCode, onChange }: LocationPickerProps) {
+export function LocationPicker({ label, value, countryCode, onChange, onLabelChange }: LocationPickerProps) {
   const [query, setQuery] = useState(value?.city || "");
   const [open, setOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [gpsState, setGpsState] = useState<"idle" | "loading" | "error">("idle");
   const options = useMemo(() => {
     const normalized = query.trim().toLowerCase();
+    if (normalized.length < 2) return [];
     return EAC_LOCATIONS
       .filter((location) => !countryCode || location.countryCode === countryCode)
       .filter((location) => !normalized || `${location.city} ${location.countryName}`.toLowerCase().includes(normalized))
-      .slice(0, 6);
+      .slice(0, 3);
   }, [countryCode, query]);
   const mapLocation = value || options[0] || nearestLocation(0.3476, 32.5825, countryCode);
   const center: [number, number] = [mapLocation.latitude, mapLocation.longitude];
-
-  useEffect(() => {
-    setQuery(value?.city || "");
-  }, [value?.city]);
 
   useEffect(() => {
     if (!mapOpen) return;
@@ -61,6 +59,11 @@ export function LocationPicker({ label, value, countryCode, onChange }: Location
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [mapOpen]);
+
+  useEffect(() => {
+    setQuery(value?.city || "");
+    setOpen(false);
+  }, [countryCode]);
 
   const choose = (location: LocationPoint) => {
     setQuery(location.city);
@@ -73,7 +76,7 @@ export function LocationPicker({ label, value, countryCode, onChange }: Location
     const nearest = nearestLocation(latitude, longitude, countryCode);
     choose({
       ...nearest,
-      city: `Near ${nearest.city}`,
+      city: query.trim() || `Near ${nearest.city}`,
       latitude,
       longitude,
     });
@@ -111,8 +114,14 @@ export function LocationPicker({ label, value, countryCode, onChange }: Location
             role="combobox"
             aria-autocomplete="list"
             aria-expanded={open && options.length > 0}
-            onFocus={() => setOpen(true)}
-            onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+            autoComplete="off"
+            onFocus={() => setOpen(query.trim().length >= 2)}
+            onChange={(event) => {
+              const nextQuery = event.target.value;
+              setQuery(nextQuery);
+              setOpen(nextQuery.trim().length >= 2);
+              onLabelChange?.(nextQuery.trim());
+            }}
             onKeyDown={(event) => {
               if (event.key === "Escape") setOpen(false);
               if (event.key === "Enter" && open && options[0]) {
@@ -145,7 +154,7 @@ export function LocationPicker({ label, value, countryCode, onChange }: Location
               >
                 <span>
                   <span className="block text-xs font-bold">{location.city}</span>
-                  <span className="block text-[10px] text-muted-foreground">{location.countryName}</span>
+                  <span className="block text-[10px] text-muted-foreground">{location.countryName} · use this area name</span>
                 </span>
                 <Check size={14} className="text-primary opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
               </button>
@@ -155,7 +164,7 @@ export function LocationPicker({ label, value, countryCode, onChange }: Location
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-[10px]">
         <span className="min-w-0 truncate text-muted-foreground">
-          {value ? `Exact point saved · ${value.city}` : "City or area is required"}
+          {value ? `Coordinates saved · ${value.city}` : query.trim() ? "Location description ready · map is optional" : "Enter a landmark, worksite, warehouse, or area"}
         </span>
         {value && (
           <button type="button" onClick={() => setMapOpen(true)} className="shrink-0 font-bold text-primary hover:underline">
