@@ -18,9 +18,9 @@ type RouteMapProps = {
 };
 
 const stopStyles: Record<RouteStop["status"], { fillColor: string; color: string }> = {
-  complete: { fillColor: "#32775f", color: "#236048" },
-  active: { fillColor: "#d7984e", color: "#a96824" },
-  upcoming: { fillColor: "#8f9b99", color: "#687572" },
+  complete: { fillColor: "#304a7a", color: "#1b2d55" },
+  active: { fillColor: "#f26522", color: "#bc4612" },
+  upcoming: { fillColor: "#9aa4b5", color: "#68738a" },
 };
 
 function FitRoute({ positions }: { positions: LatLngExpression[] }) {
@@ -142,14 +142,14 @@ export function EacNetworkMap({ height = "390px" }: { height?: string }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {networkRoutes.map((route, index) => (
-          <Polyline key={`network-route-${index}`} positions={route} pathOptions={{ color: "#d7984e", weight: 3, opacity: 0.72 }} />
+          <Polyline key={`network-route-${index}`} positions={route} pathOptions={{ color: "#f26522", weight: 3, opacity: 0.78 }} />
         ))}
         {networkStops.map((stop) => (
           <CircleMarker
             key={stop.label}
             center={stop.position}
             radius={stop.label === "Kampala" ? 9 : 6}
-            pathOptions={{ color: stop.label === "Kampala" ? "#a96824" : "#32775f", fillColor: stop.label === "Kampala" ? "#d7984e" : "#7dbb9b", fillOpacity: 1, weight: 2 }}
+            pathOptions={{ color: stop.label === "Kampala" ? "#bc4612" : "#1b2d55", fillColor: stop.label === "Kampala" ? "#f26522" : "#304a7a", fillOpacity: 1, weight: 2 }}
           >
             <Tooltip direction="top" offset={[0, -6]}>{stop.label}</Tooltip>
           </CircleMarker>
