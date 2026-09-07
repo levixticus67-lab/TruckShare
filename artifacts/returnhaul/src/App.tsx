@@ -250,6 +250,7 @@ function RoutePreview({ origin, originCountry, originLocation, destination, dest
   return <RouteMap stops={stops} height="150px" className="mt-5" />;
 }
 
+/* Legacy phone-only preview auth components retained for historical reference.
 function LegacyAuthModal({ onClose }: { onClose: () => void }) {
   const [method, setMethod] = useState<"phone" | "google">("phone");
   const [phoneCountry, setPhoneCountry] = useState("UG");
@@ -401,7 +402,7 @@ function LegacyOnboardingAuthModal({ onClose }: { onClose: () => void }) {
   </Modal>;
 }
 
-function AuthModal({ onComplete, onClose = () => {}, required = false }: { onComplete: (user: AuthUser) => void; onClose?: () => void; required?: boolean }) {
+function LegacyEmailAuthModal({ onComplete, onClose = () => {}, required = false }: { onComplete: (user: AuthUser) => void; onClose?: () => void; required?: boolean }) {
   type AccountRole = "Carrier" | "Shipper";
   const [method, setMethod] = useState<"phone" | "google">();
   const [authMode, setAuthMode] = useState<"login" | "signup">();
@@ -566,6 +567,249 @@ function AuthModal({ onComplete, onClose = () => {}, required = false }: { onCom
       <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : authMode === "login" ? "Log in" : "Create account"} <ShieldCheck size={14} /></button>
       <button type="button" disabled={busy} onClick={() => authMode && void requestOtp(authMode)} className="w-full text-xs font-bold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Resend code</button>
     </form>}
+  </Modal>;
+}
+
+*/
+
+function AuthModal({ onComplete, onClose = () => {}, required = false }: { onComplete: (user: AuthUser) => void; onClose?: () => void; required?: boolean }) {
+  type AccountRole = "Carrier" | "Shipper";
+  type Step = "method" | "email" | "account" | "profile" | "roles" | "emailOtp" | "phoneVerify";
+  const [method, setMethod] = useState<"email" | "google">();
+  const [authMode, setAuthMode] = useState<"login" | "signup">();
+  const [step, setStep] = useState<Step>("method");
+  const [email, setEmail] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState("UG");
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [roles, setRoles] = useState<AccountRole[]>([]);
+  const [emailChallengeId, setEmailChallengeId] = useState("");
+  const [phoneChallengeId, setPhoneChallengeId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [phoneOtp, setPhoneOtp] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const continueWithEmail = () => { setMethod("email"); setStep("email"); setMessage(""); };
+  const continueWithGoogle = () => { setMethod("google"); setStep("account"); setMessage(""); };
+
+  const requestEmailOtp = async (mode: "login" | "signup") => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ challengeId: string; message: string }>("/auth/request-email-otp", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim(), mode, ...(mode === "signup" ? { name, roles } : {}) }),
+      });
+      setAuthMode(mode);
+      setEmailChallengeId(result.challengeId);
+      setMessage(result.message);
+      setStep("emailOtp");
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "We could not send the verification email.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const checkEmailAccount = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ exists: boolean }>("/auth/account-status", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (result.exists) {
+        setAuthMode("login");
+        await requestEmailOtp("login");
+      } else {
+        setAuthMode("signup");
+        setStep("profile");
+      }
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "We could not check that email address.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const continueAccount = (mode: "login" | "signup") => {
+    setAuthMode(mode);
+    if (mode === "signup") setStep("profile");
+    else if (method === "email") void requestEmailOtp("login");
+    else void finishGoogle("login");
+  };
+
+  const finishGoogle = async (mode: "login" | "signup") => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string; user: AuthUser }>("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ mode, ...(mode === "signup" ? { name, roles } : {}) }),
+      });
+      localStorage.setItem("truckshare_token", result.token);
+      onComplete(result.user);
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Google sign-in could not be completed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitProfile = (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim()) {
+      setMessage("Tell us your name first.");
+      return;
+    }
+    setMessage("");
+    setStep("roles");
+  };
+
+  const toggleRole = (nextRole: AccountRole) => setRoles((current) => current.includes(nextRole) ? current.filter((item) => item !== nextRole) : [...current, nextRole]);
+
+  const submitRoles = (event: FormEvent) => {
+    event.preventDefault();
+    if (!roles.length) {
+      setMessage("Choose at least one role to continue.");
+      return;
+    }
+    if (method === "email") void requestEmailOtp("signup");
+    else void finishGoogle("signup");
+  };
+
+  const verifyEmail = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string; user: AuthUser; requiresPhoneVerification?: boolean }>("/auth/verify-email-otp", {
+        method: "POST",
+        body: JSON.stringify({ challengeId: emailChallengeId, otp }),
+      });
+      localStorage.setItem("truckshare_token", result.token);
+      if (result.requiresPhoneVerification) {
+        setStep("phoneVerify");
+        setMessage("One last step: verify your phone number. You will not need to do this again unless you change it.");
+      } else {
+        onComplete(result.user);
+      }
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "That verification code is not valid.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requestPhoneOtp = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const localDigits = phone.replace(/\D/g, "");
+      const fullPhone = `${dialingCodes[phoneCountry]}${localDigits}`;
+      const result = await api<{ challengeId: string; message: string; alreadyVerified?: boolean; user?: AuthUser }>("/auth/request-phone-otp", {
+        method: "POST",
+        body: JSON.stringify({ phone: fullPhone }),
+      });
+      if (result.alreadyVerified) {
+        if (result.user) onComplete(result.user);
+        return;
+      }
+      setPhoneChallengeId(result.challengeId);
+      setMessage(result.message);
+      setStep("phoneVerify");
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "We could not send the phone verification code.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyPhone = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ user: AuthUser }>("/auth/verify-phone-otp", {
+        method: "POST",
+        body: JSON.stringify({ challengeId: phoneChallengeId, otp: phoneOtp }),
+      });
+      onComplete(result.user);
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "That phone verification code is not valid.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const goBack = () => {
+    setMessage("");
+    if (step === "email") setStep("method");
+    else if (step === "account") setStep(method === "email" ? "email" : "method");
+    else if (step === "profile") setStep("email");
+    else if (step === "roles") setStep("profile");
+    else if (step === "emailOtp") setStep(authMode === "signup" ? "roles" : "email");
+  };
+
+  const question = step === "method" ? "How would you like to continue?"
+    : step === "email" ? "What email should we use?"
+      : step === "account" ? "Have you used TruckShare before?"
+        : step === "profile" ? "First, tell us your name."
+          : step === "roles" ? "What will you use TruckShare for?"
+            : step === "phoneVerify" ? "Verify your phone number"
+              : "What is your email verification code?";
+
+  return <Modal title="Welcome to TruckShare EAC" eyebrow={required ? "Set up your account" : "Account access"} onClose={onClose} closable={!required}>
+    <div className="mb-5 flex items-center gap-2">{(["method", "profile", "roles"] as const).map((item, index) => <span key={item} className={`h-1.5 flex-1 rounded-full ${step === item || (step === "email" && index === 0) || (step === "account" && index === 0) || (step === "emailOtp" && index === 2) || (step === "phoneVerify" && index === 2) || (step === "roles" && index <= 2) ? "bg-primary" : "bg-muted"}`} />)}</div>
+    {step !== "method" && step !== "phoneVerify" && <button type="button" onClick={goBack} className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground transition hover:text-foreground"><ArrowLeft size={14} /> Back</button>}
+    <p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-muted-foreground">{step === "method" || step === "email" || step === "account" ? "Question 1 of 3" : step === "profile" ? "Question 2 of 3" : "Question 3 of 3"}</p>
+    <h3 className="mt-2 font-display text-2xl font-semibold tracking-[-.04em]">{question}</h3>
+    {message && <div className="mt-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}</div>}
+    {step === "method" && <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      <button type="button" onClick={continueWithEmail} className={`${secondaryButton} min-h-24 flex-col`}><Send size={22} /><span>Continue with email</span><small className="font-normal text-muted-foreground">Free email verification</small></button>
+      <button type="button" onClick={continueWithGoogle} className={`${secondaryButton} min-h-24 flex-col`}><span className="font-display text-2xl font-bold">G</span><span>Continue with Google</span><small className="font-normal text-muted-foreground">Use your Google account</small></button>
+    </div>}
+    {step === "email" && <form onSubmit={(event) => { event.preventDefault(); void checkEmailAccount(); }} className="mt-6 space-y-4">
+      <Field label="Email address" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
+      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Checking account..." : "Continue"} <ArrowRight size={14} /></button>
+      <p className="text-center text-xs text-muted-foreground">We’ll send a free verification code by email.</p>
+    </form>}
+    {step === "account" && <div className="mt-6 space-y-3">
+      <button type="button" onClick={() => continueAccount("login")} disabled={busy} className={`${secondaryButton} w-full justify-between`}><span>I already have an account</span><ArrowRight size={14} /></button>
+      <button type="button" onClick={() => continueAccount("signup")} disabled={busy} className={`${button} w-full justify-between`}><span>I am new to TruckShare</span><ArrowRight size={14} /></button>
+    </div>}
+    {step === "profile" && <form onSubmit={submitProfile} className="mt-6 space-y-4">
+      <p className="text-sm text-muted-foreground">This is how other people will identify you on trips, loads, and bookings.</p>
+      <Field label="Full name or business name" value={name} onChange={setName} placeholder="Your name or company" />
+      <button type="submit" className={`${button} w-full`}>Continue <ArrowRight size={14} /></button>
+    </form>}
+    {step === "roles" && <form onSubmit={submitRoles} className="mt-6 space-y-4">
+      <p className="text-sm text-muted-foreground">Select one or both. Choosing both gives you a role switcher.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {([["Carrier", "I have trucks or available space.", Truck], ["Shipper", "I need goods moved.", PackageCheck] ] as const).map(([value, detail, Icon]) => <button type="button" key={value} onClick={() => toggleRole(value)} className={`rounded-xl border p-4 text-left transition ${roles.includes(value) ? "border-primary bg-[#e5f1e9] text-primary" : "border-border bg-card"}`}><Icon size={20} /><p className="mt-3 text-sm font-bold">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p><span className="mt-3 block text-[10px] font-bold uppercase tracking-wider">{roles.includes(value) ? "Selected" : "Choose"}</span></button>)}
+      </div>
+      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Continuing..." : "Send email verification code"} <ArrowRight size={14} /></button>
+    </form>}
+    {step === "emailOtp" && <form onSubmit={verifyEmail} className="mt-6 space-y-4">
+      <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{authMode === "login" ? "Login code sent." : "Signup code sent."} Enter the code from your email. It expires in 10 minutes.</div>
+      <Field label="Email verification code" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" />
+      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : authMode === "login" ? "Log in" : "Create account"} <ShieldCheck size={14} /></button>
+      <button type="button" disabled={busy} onClick={() => authMode && void requestEmailOtp(authMode)} className="w-full text-xs font-bold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Resend email code</button>
+    </form>}
+    {step === "phoneVerify" && <div className="mt-6 space-y-4">
+      <p className="text-sm text-muted-foreground">We only ask for this once. You’ll only need to verify again if you change your phone number, and phone changes are limited to once per year.</p>
+      {!phoneChallengeId ? <form onSubmit={requestPhoneOtp} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-[.9fr_1.1fr]"><CountrySelect label="Country" value={phoneCountry} onChange={setPhoneCountry} /><Field label={`Phone number (${dialingCodes[phoneCountry]})`} value={phone} onChange={setPhone} placeholder="700 000 000" /></div>
+        <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Sending code..." : "Verify phone number"} <Phone size={14} /></button>
+      </form> : <form onSubmit={verifyPhone} className="space-y-4">
+        <Field label="Phone verification code" value={phoneOtp} onChange={(value) => setPhoneOtp(value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" />
+        <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Verifying..." : "Confirm phone"} <ShieldCheck size={14} /></button>
+        <button type="button" disabled={busy} onClick={() => { setPhoneChallengeId(""); setMessage(""); }} className="w-full text-xs font-bold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Use a different number</button>
+      </form>}
+    </div>}
   </Modal>;
 }
 

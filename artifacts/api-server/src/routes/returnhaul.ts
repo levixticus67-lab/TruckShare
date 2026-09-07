@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, databaseConfigured, runtimeStateTable } from "@workspace/db";
 import {
@@ -152,7 +152,10 @@ type User = {
   id: string;
   name: string;
   phone?: string;
+  phoneVerifiedAt?: string;
+  phoneChangedAt?: string;
   email?: string;
+  emailVerifiedAt?: string;
   country: CountryCode;
   role: "Carrier" | "Shipper" | "Admin";
   roles?: Array<"Carrier" | "Shipper">;
@@ -228,6 +231,10 @@ function phoneCountry(value: string) {
 
 function normalizePhone(value: string) {
   return value.replace(/\s+/g, "");
+}
+
+function normalizeEmail(value: string) {
+  return text(value).toLowerCase();
 }
 
 function requestedRoles(value: unknown): Array<"Carrier" | "Shipper"> {
@@ -377,6 +384,7 @@ const sessions = new Map<string, User>();
 const otpRequestCooldowns = new Map<string, number>();
 const OTP_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
+const PHONE_CHANGE_COOLDOWN_MS = 365 * 24 * 60 * 60 * 1000;
 const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
@@ -471,12 +479,16 @@ function issueToken(user: User) {
 }
 
 type OtpChallenge = {
-  phone: string;
-  country: CountryCode;
-  mode: "login" | "signup";
+  channel: "email" | "phone";
+  userId?: string;
+  email?: string;
+  phone?: string;
+  country?: CountryCode;
+  mode?: "login" | "signup";
   name?: string;
   role?: "Carrier" | "Shipper" | "Admin";
   roles?: Array<"Carrier" | "Shipper">;
+  otpHash: string;
   exp: number;
 };
 
@@ -504,45 +516,99 @@ function readChallenge(value: string): OtpChallenge | undefined {
   }
 }
 
-function twilioVerifyConfiguration() {
-  const accountSid = text(process.env.TWILIO_ACCOUNT_SID);
-  const authToken = text(process.env.TWILIO_AUTH_TOKEN);
-  const serviceSid = text(process.env.TWILIO_VERIFY_SERVICE_SID);
-  return accountSid && authToken && serviceSid ? { accountSid, authToken, serviceSid } : undefined;
+function hashOtp(value: string) {
+  return createHmac("sha256", process.env.JWT_SECRET || "truckshare-dev-secret").update(value).digest("base64url");
 }
 
-async function sendTwilioVerification(phone: string) {
-  const config = twilioVerifyConfiguration();
+function otpMatches(value: string, expectedHash: string) {
+  const actual = Buffer.from(hashOtp(value));
+  const expected = Buffer.from(expectedHash);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function emailConfiguration() {
+  const apiKey = text(process.env.RESEND_API_KEY);
+  const from = text(process.env.EMAIL_FROM);
+  return apiKey && from ? { apiKey, from } : undefined;
+}
+
+async function sendEmailOtp(email: string, code: string) {
+  const config = emailConfiguration();
   if (!config) return false;
 
-  const endpoint = `https://verify.twilio.com/v2/Services/${encodeURIComponent(config.serviceSid)}/Verifications`;
-  const response = await fetch(endpoint, {
+  const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
     },
-    body: new URLSearchParams({ To: phone, Channel: "sms" }),
+    body: JSON.stringify({
+      from: config.from,
+      to: [email],
+      subject: "Your TruckShare verification code",
+      text: `Your TruckShare verification code is ${code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`,
+      html: `<p>Your TruckShare verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${code}</p><p>This code expires in 10 minutes. If you did not request this, you can ignore this email.</p>`,
+    }),
   });
   return response.ok;
 }
 
-async function checkTwilioVerification(phone: string, code: string) {
-  const config = twilioVerifyConfiguration();
+function esmsConfiguration() {
+  const apiKey = text(process.env.ESMS_API_KEY);
+  const accountId = text(process.env.ESMS_ACCOUNT_ID);
+  const senderId = text(process.env.ESMS_SENDER_ID) || "eSMSAfrica";
+  return apiKey && accountId ? { apiKey, accountId, senderId } : undefined;
+}
+
+async function sendPhoneOtp(phone: string, code: string) {
+  const config = esmsConfiguration();
   if (!config) return false;
 
-  const endpoint = `https://verify.twilio.com/v2/Services/${encodeURIComponent(config.serviceSid)}/VerificationCheck`;
-  const response = await fetch(endpoint, {
+  const response = await fetch("https://api.esmsafrica.io/api/sms/send", {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
+      "X-API-Key": config.apiKey,
+      "X-Account-ID": config.accountId,
     },
-    body: new URLSearchParams({ To: phone, Code: code }),
+    body: JSON.stringify({
+      phoneNumber: phone,
+      text: `TruckShare phone verification code: ${code}. It expires in 10 minutes.`,
+      senderId: config.senderId,
+    }),
   });
   if (!response.ok) return false;
   const body = await response.json() as { status?: unknown };
-  return body.status === "approved";
+  return body.status === "ACK";
+}
+
+function nextOtpRequest(phoneOrEmail: string) {
+  const lastRequestedAt = otpRequestCooldowns.get(phoneOrEmail) || 0;
+  const retryAfterSeconds = Math.ceil((lastRequestedAt + OTP_RESEND_COOLDOWN_MS - Date.now()) / 1000);
+  return retryAfterSeconds > 0 ? retryAfterSeconds : 0;
+}
+
+function verificationCode() {
+  return String(randomInt(100000, 1000000));
+}
+
+function phoneChangeAllowed(user: User, nextPhone: string) {
+  if (!user.phone || normalizePhone(user.phone) === nextPhone) return true;
+  if (!user.phoneChangedAt) return true;
+  return Date.now() - Date.parse(user.phoneChangedAt) >= PHONE_CHANGE_COOLDOWN_MS;
+}
+
+function phoneChangeRetryDays(user: User) {
+  if (!user.phoneChangedAt) return 0;
+  return Math.max(1, Math.ceil((Date.parse(user.phoneChangedAt) + PHONE_CHANGE_COOLDOWN_MS - Date.now()) / (24 * 60 * 60 * 1000)));
+}
+
+async function sendVerificationEmail(email: string, code: string) {
+  return sendEmailOtp(email, code);
+}
+
+async function sendVerificationPhone(phone: string, code: string) {
+  return sendPhoneOtp(phone, code);
 }
 
 function configuredAdminPhones() {
@@ -695,23 +761,32 @@ router.get("/geocode/reverse", async (req, res) => {
   }
 });
 
-router.post("/auth/request-otp", async (req, res) => {
-  const phone = normalizePhone(text(req.body?.phone));
-  const country = phoneCountry(phone);
+router.post("/auth/account-status", (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: "Use a valid email address." });
+    return;
+  }
+  res.json({ exists: users.some((user) => normalizeEmail(user.email || "") === email) });
+});
+
+router.post("/auth/request-email-otp", async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
   const mode = req.body?.mode === "login" ? "login" : "signup";
-  const existingUser = users.find((user) => normalizePhone(user.phone || "") === phone);
-  if (!country || !/^\+\d{8,15}$/.test(phone)) {
-    res.status(400).json({ error: "Use a valid EAC number with a supported country code." });
+  const existingUser = users.find((user) => normalizeEmail(user.email || "") === email);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: "Use a valid email address." });
     return;
   }
   if (mode === "login" && !existingUser) {
-    res.status(404).json({ error: "No account exists for this phone number. Choose Create account first." });
+    res.status(404).json({ error: "No account exists for this email. Choose Create account first." });
     return;
   }
   if (mode === "signup" && existingUser) {
-    res.status(409).json({ error: "An account already exists for this phone number. Choose Log in instead." });
+    res.status(409).json({ error: "An account already exists for this email. Choose Log in instead." });
     return;
   }
+
   const name = text(req.body?.name);
   if (mode === "signup" && !name) {
     res.status(400).json({ error: "Enter your name to create an account." });
@@ -724,87 +799,144 @@ router.post("/auth/request-otp", async (req, res) => {
     return;
   }
 
-  const lastRequestedAt = otpRequestCooldowns.get(phone) || 0;
-  const retryAfterSeconds = Math.ceil((lastRequestedAt + OTP_RESEND_COOLDOWN_MS - Date.now()) / 1000);
+  const retryAfterSeconds = nextOtpRequest(email);
   if (retryAfterSeconds > 0) {
     res.status(429).json({ error: `Please wait ${retryAfterSeconds}s before requesting another code.` });
     return;
   }
-
-  if (!twilioVerifyConfiguration()) {
-    res.status(503).json({ error: "Phone verification is not configured yet. Add the Twilio Verify secrets to the API service." });
+  if (!emailConfiguration()) {
+    res.status(503).json({ error: "Email verification is not configured yet. Add the Resend email secrets to the API service." });
     return;
   }
 
-  const role = isAdminPhone(phone) ? "Admin" : roles.includes("Carrier") ? "Carrier" : "Shipper";
+  const code = verificationCode();
+  const role = roles.includes("Carrier") ? "Carrier" : "Shipper";
   try {
-    const sent = await sendTwilioVerification(phone);
-    if (!sent) {
-      res.status(502).json({ error: "We could not send the verification code. Please try again." });
+    if (!await sendVerificationEmail(email, code)) {
+      res.status(502).json({ error: "We could not send the verification email. Please try again." });
       return;
     }
-    otpRequestCooldowns.set(phone, Date.now());
+    otpRequestCooldowns.set(email, Date.now());
     res.json({
-      challengeId: signChallenge({ phone, country, mode, name: name || undefined, role, roles }),
-      phone,
-      message: "We sent a verification code to your phone. It expires in 10 minutes.",
+      challengeId: signChallenge({ channel: "email", email, mode, name: name || undefined, role, roles, otpHash: hashOtp(code) }),
+      email,
+      message: "We sent a verification code to your email. It expires in 10 minutes.",
     });
   } catch {
-    res.status(502).json({ error: "We could not send the verification code. Please try again." });
+    res.status(502).json({ error: "We could not send the verification email. Please try again." });
   }
 });
 
-router.post("/auth/account-status", (req, res) => {
+router.post("/auth/verify-email-otp", async (req, res) => {
+  const challengeId = text(req.body?.challengeId);
+  const challenge = readChallenge(challengeId);
+  const otp = text(req.body?.otp).replace(/\D/g, "");
+  if (!challenge || challenge.channel !== "email" || !challenge.email || !/^\d{6}$/.test(otp) || !otpMatches(otp, challenge.otpHash)) {
+    res.status(400).json({ error: "That OTP is not valid or has expired." });
+    return;
+  }
+
+  const existingUser = users.find((user) => normalizeEmail(user.email || "") === challenge.email);
+  if (challenge.mode === "login" && !existingUser) {
+    res.status(404).json({ error: "No account exists for this email. Choose Create account first." });
+    return;
+  }
+  const user = existingUser || {
+    id: id("user"),
+    name: challenge.name || "New TruckShare user",
+    email: challenge.email,
+    emailVerifiedAt: new Date().toISOString(),
+    country: "UG",
+    role: challenge.role || "Carrier",
+    roles: challenge.roles,
+    verified: false,
+  };
+  user.email = challenge.email;
+  user.emailVerifiedAt = user.emailVerifiedAt || new Date().toISOString();
+  if (!existingUser) users.push(user);
+  const token = issueToken(user);
+  sessions.set(token, user);
+  await persistDatabaseState();
+  res.json({ token, user, requiresPhoneVerification: !user.phone || !user.phoneVerifiedAt });
+});
+
+router.post("/auth/request-phone-otp", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Sign in with email before verifying a phone number." });
+    return;
+  }
+
   const phone = normalizePhone(text(req.body?.phone));
   const country = phoneCountry(phone);
   if (!country || !/^\+\d{8,15}$/.test(phone)) {
     res.status(400).json({ error: "Use a valid EAC number with a supported country code." });
     return;
   }
-  res.json({ exists: users.some((user) => normalizePhone(user.phone || "") === phone) });
+  if (user.phone && normalizePhone(user.phone) === phone && user.phoneVerifiedAt) {
+    res.json({ alreadyVerified: true, phone, user, message: "This phone number is already verified." });
+    return;
+  }
+  if (!phoneChangeAllowed(user, phone)) {
+    res.status(409).json({ error: `You can change your phone number again in about ${phoneChangeRetryDays(user)} days.` });
+    return;
+  }
+  const phoneOwner = users.find((item) => item.id !== user.id && normalizePhone(item.phone || "") === phone);
+  if (phoneOwner) {
+    res.status(409).json({ error: "That phone number is already linked to another TruckShare account." });
+    return;
+  }
+  const retryAfterSeconds = nextOtpRequest(phone);
+  if (retryAfterSeconds > 0) {
+    res.status(429).json({ error: `Please wait ${retryAfterSeconds}s before requesting another code.` });
+    return;
+  }
+  if (!esmsConfiguration()) {
+    res.status(503).json({ error: "Phone verification is not configured yet. Add the eSMS Africa secrets to the API service." });
+    return;
+  }
+
+  const code = verificationCode();
+  try {
+    if (!await sendVerificationPhone(phone, code)) {
+      res.status(502).json({ error: "We could not send the phone verification code. Please try again." });
+      return;
+    }
+    otpRequestCooldowns.set(phone, Date.now());
+    res.json({
+      challengeId: signChallenge({ channel: "phone", userId: user.id, phone, country, otpHash: hashOtp(code) }),
+      phone,
+      message: "We sent a verification code to your phone. It expires in 10 minutes.",
+    });
+  } catch {
+    res.status(502).json({ error: "We could not send the phone verification code. Please try again." });
+  }
 });
 
-router.post("/auth/verify-otp", async (req, res) => {
-  const challengeId = text(req.body?.challengeId);
-  const challenge = readChallenge(challengeId);
+router.post("/auth/verify-phone-otp", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Your session has expired. Sign in again." });
+    return;
+  }
+
+  const challenge = readChallenge(text(req.body?.challengeId));
   const otp = text(req.body?.otp).replace(/\D/g, "");
-  if (!challenge || !/^\d{4,10}$/.test(otp)) {
+  if (!challenge || challenge.channel !== "phone" || challenge.userId !== user.id || !challenge.phone || !challenge.country || !/^\d{6}$/.test(otp) || !otpMatches(otp, challenge.otpHash)) {
     res.status(400).json({ error: "That OTP is not valid or has expired." });
     return;
   }
-  try {
-    if (!await checkTwilioVerification(challenge.phone, otp)) {
-      res.status(400).json({ error: "That OTP is not valid or has expired." });
-      return;
-    }
-  } catch {
-    res.status(502).json({ error: "We could not verify that code. Please try again." });
+  if (!phoneChangeAllowed(user, challenge.phone)) {
+    res.status(409).json({ error: `You can change your phone number again in about ${phoneChangeRetryDays(user)} days.` });
     return;
   }
 
-  const existingUser = users.find((user) => normalizePhone(user.phone || "") === challenge.phone);
-  if (challenge.mode === "login" && !existingUser) {
-    res.status(404).json({ error: "No account exists for this phone number. Choose Create account first." });
-    return;
-  }
-  const user = existingUser || {
-    id: id("user"),
-    name: challenge.name || "New TruckShare user",
-    phone: challenge.phone,
-    country: challenge.country,
-    role: challenge.role || "Carrier",
-    roles: challenge.roles,
-    verified: false,
-  };
-  if (isAdminPhone(challenge.phone)) {
-    user.role = "Admin";
-    user.roles = undefined;
-  }
-  if (!existingUser) users.push(user);
-  const token = issueToken(user);
-  sessions.set(token, user);
+  user.phone = challenge.phone;
+  user.country = challenge.country;
+  user.phoneVerifiedAt = new Date().toISOString();
+  user.phoneChangedAt = user.phoneVerifiedAt;
   await persistDatabaseState();
-  res.json({ token, user });
+  res.json({ user, phoneVerified: true });
 });
 
 router.post("/auth/google", async (req, res) => {

@@ -12,11 +12,15 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: TWILIO_ACCOUNT_SID
+      - key: RESEND_API_KEY
         sync: false
-      - key: TWILIO_AUTH_TOKEN
+      - key: EMAIL_FROM
         sync: false
-      - key: TWILIO_VERIFY_SERVICE_SID
+      - key: ESMS_API_KEY
+        sync: false
+      - key: ESMS_ACCOUNT_ID
+        sync: false
+      - key: ESMS_SENDER_ID
         sync: false
       - key: NODE_ENV
         value: production
