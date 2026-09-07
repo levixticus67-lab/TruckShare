@@ -513,6 +513,62 @@ router.get("/reference/eac", (_req, res) => {
   res.json({ countries: eacCountries, corridors: eacCorridors });
 });
 
+router.get("/locations/search", async (req, res) => {
+  const query = text(req.query.q).trim();
+  if (query.length < 2) {
+    res.json([]);
+    return;
+  }
+
+  const selectedCountry = optionalCountryCode(req.query.countryCode);
+  const searchUrl = new URL("https://nominatim.openstreetmap.org/search");
+  searchUrl.searchParams.set("q", query);
+  searchUrl.searchParams.set("format", "jsonv2");
+  searchUrl.searchParams.set("addressdetails", "1");
+  searchUrl.searchParams.set("limit", "3");
+  searchUrl.searchParams.set("countrycodes", (selectedCountry ? [selectedCountry] : eacCountries.map((country) => country.code)).join(",").toLowerCase());
+
+  try {
+    const response = await fetch(searchUrl, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "TruckShare/1.0 (location search)",
+      },
+    });
+    if (!response.ok) {
+      res.status(502).json({ error: "Map search is temporarily unavailable." });
+      return;
+    }
+
+    const body = await response.json() as Array<{
+      display_name?: unknown;
+      lat?: unknown;
+      lon?: unknown;
+      address?: Record<string, unknown>;
+    }>;
+    const results = body
+      .map((result) => {
+        const resultCountry = optionalCountryCode(result.address?.country_code);
+        const latitude = Number(result.lat);
+        const longitude = Number(result.lon);
+        const country = eacCountries.find((item) => item.code === resultCountry);
+        if (!resultCountry || !country || !text(result.display_name).trim() || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+        return {
+          city: text(result.display_name).trim(),
+          countryCode: resultCountry,
+          countryName: country.name,
+          latitude,
+          longitude,
+        } satisfies LocationPoint;
+      })
+      .filter((result): result is LocationPoint => Boolean(result));
+
+    res.json(results.slice(0, 3));
+  } catch {
+    res.status(502).json({ error: "Map search is temporarily unavailable." });
+  }
+});
+
 router.post("/auth/request-otp", (req, res) => {
   const phone = normalizePhone(text(req.body?.phone));
   const country = phoneCountry(phone);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Crosshair, MapPinned, Search, X } from "lucide-react";
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { EAC_LOCATIONS, type LocationPoint } from "@/lib/locations";
@@ -10,6 +10,12 @@ type LocationPickerProps = {
   onChange: (location: LocationPoint) => void;
   onLabelChange?: (label: string) => void;
 };
+
+const LOCATION_API_ROOT = (() => {
+  const value = String(import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
+  if (!value) return "";
+  return value.endsWith("/api") ? value : `${value}/api`;
+})();
 
 function distanceSquared(latitude: number, longitude: number, point: LocationPoint) {
   return (latitude - point.latitude) ** 2 + (longitude - point.longitude) ** 2;
@@ -40,15 +46,10 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
   const [open, setOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [gpsState, setGpsState] = useState<"idle" | "loading" | "error">("idle");
-  const options = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (normalized.length < 2) return [];
-    return EAC_LOCATIONS
-      .filter((location) => !countryCode || location.countryCode === countryCode)
-      .filter((location) => !normalized || `${location.city} ${location.countryName}`.toLowerCase().includes(normalized))
-      .slice(0, 3);
-  }, [countryCode, query]);
-  const mapLocation = value || options[0] || nearestLocation(0.3476, 32.5825, countryCode);
+  const [suggestions, setSuggestions] = useState<LocationPoint[]>([]);
+  const [searchState, setSearchState] = useState<"idle" | "loading" | "error">("idle");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const mapLocation = value || suggestions[0] || nearestLocation(0.3476, 32.5825, countryCode);
   const center: [number, number] = [mapLocation.latitude, mapLocation.longitude];
 
   useEffect(() => {
@@ -63,12 +64,56 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
   useEffect(() => {
     setQuery(value?.city || "");
     setOpen(false);
+    setSuggestions([]);
+    inputRef.current?.setCustomValidity("");
   }, [countryCode]);
+
+  useEffect(() => {
+    const normalized = query.trim();
+    if (normalized.length < 2) {
+      setSuggestions([]);
+      setSearchState("idle");
+      return;
+    }
+    if (!LOCATION_API_ROOT) {
+      setSuggestions([]);
+      setSearchState("error");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSearchState("loading");
+      try {
+        const params = new URLSearchParams({ q: normalized });
+        if (countryCode) params.set("countryCode", countryCode);
+        const response = await fetch(`${LOCATION_API_ROOT}/locations/search?${params.toString()}`, { signal: controller.signal });
+        if (!response.ok) throw new Error("Location search failed");
+        const body = await response.json();
+        if (!controller.signal.aborted) {
+          setSuggestions(Array.isArray(body) ? body.slice(0, 3) : []);
+          setSearchState("idle");
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setSuggestions([]);
+          setSearchState("error");
+        }
+      }
+    }, 320);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [countryCode, query]);
 
   const choose = (location: LocationPoint) => {
     setQuery(location.city);
     setOpen(false);
+    setSuggestions([]);
     setGpsState("idle");
+    inputRef.current?.setCustomValidity("");
     onChange(location);
   };
 
@@ -107,26 +152,29 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
         <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 shadow-sm transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
           <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
+            ref={inputRef}
             required
             className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
             value={query}
-            placeholder="Type a city or area"
+            placeholder="Search a location or landmark"
             role="combobox"
             aria-autocomplete="list"
-            aria-expanded={open && options.length > 0}
+            aria-expanded={open && suggestions.length > 0}
             autoComplete="off"
-            onFocus={() => setOpen(query.trim().length >= 2)}
+            onFocus={() => setOpen(query.trim().length >= 2 && suggestions.length > 0)}
             onChange={(event) => {
               const nextQuery = event.target.value;
               setQuery(nextQuery);
+              setSuggestions([]);
               setOpen(nextQuery.trim().length >= 2);
+              event.currentTarget.setCustomValidity(nextQuery.trim() ? "Choose a location from the map results, or use GPS." : "");
               onLabelChange?.(nextQuery.trim());
             }}
             onKeyDown={(event) => {
               if (event.key === "Escape") setOpen(false);
-              if (event.key === "Enter" && open && options[0]) {
+              if (event.key === "Enter" && open && suggestions[0]) {
                 event.preventDefault();
-                choose(options[0]);
+                choose(suggestions[0]);
               }
             }}
           />
@@ -141,10 +189,10 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
             <span className="sm:hidden">Map</span>
           </button>
         </div>
-        {open && options.length > 0 && (
+        {open && suggestions.length > 0 && (
           <div className="absolute inset-x-0 top-[3.35rem] z-[1000] overflow-hidden rounded-xl border border-border bg-card shadow-xl">
-            <div className="border-b border-border px-3 py-2 font-mono-ui text-[9px] uppercase tracking-[.12em] text-muted-foreground">Suggested areas</div>
-            {options.map((location) => (
+            <div className="border-b border-border px-3 py-2 font-mono-ui text-[9px] uppercase tracking-[.12em] text-muted-foreground">Map results · choose one to confirm</div>
+            {suggestions.map((location) => (
               <button
                 key={`${location.countryCode}-${location.city}`}
                 type="button"
@@ -153,18 +201,19 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
                 onClick={() => choose(location)}
               >
                 <span>
-                  <span className="block text-xs font-bold">{location.city}</span>
-                  <span className="block text-[10px] text-muted-foreground">{location.countryName} · use this area name</span>
+                  <span className="block max-w-[calc(100vw-8rem)] truncate text-xs font-bold">{location.city}</span>
+                  <span className="block text-[10px] text-muted-foreground">{location.countryName} · real map location</span>
                 </span>
                 <Check size={14} className="text-primary opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
               </button>
             ))}
+            <div className="border-t border-border px-3 py-1.5 text-[9px] text-muted-foreground">Powered by OpenStreetMap</div>
           </div>
         )}
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-[10px]">
         <span className="min-w-0 truncate text-muted-foreground">
-          {value ? `Coordinates saved · ${value.city}` : query.trim() ? "Location description ready · map is optional" : "Enter a landmark, worksite, warehouse, or area"}
+          {value ? `Location confirmed · coordinates saved` : searchState === "loading" ? "Looking across the map…" : searchState === "error" ? "Map search unavailable · use GPS or try again" : query.trim() ? "Choose a map result to confirm this location" : "Search a real place, landmark, or road area"}
         </span>
         {value && (
           <button type="button" onClick={() => setMapOpen(true)} className="shrink-0 font-bold text-primary hover:underline">
