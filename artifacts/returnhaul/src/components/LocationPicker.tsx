@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Check, Crosshair, MapPinned, Search, X } from "lucide-react";
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { EAC_LOCATIONS, type LocationPoint } from "@/lib/locations";
 
@@ -36,6 +37,8 @@ function MapClick({ onPick }: { onPick: (latitude: number, longitude: number) =>
 export function LocationPicker({ label, value, countryCode, onChange }: LocationPickerProps) {
   const [query, setQuery] = useState(value?.city || "");
   const [open, setOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [gpsState, setGpsState] = useState<"idle" | "loading" | "error">("idle");
   const options = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return EAC_LOCATIONS
@@ -43,18 +46,26 @@ export function LocationPicker({ label, value, countryCode, onChange }: Location
       .filter((location) => !normalized || `${location.city} ${location.countryName}`.toLowerCase().includes(normalized))
       .slice(0, 6);
   }, [countryCode, query]);
-  const center: [number, number] = value ? [value.latitude, value.longitude] : (() => {
-    const fallback = nearestLocation(0.3476, 32.5825, countryCode);
-    return [fallback.latitude, fallback.longitude];
-  })();
+  const mapLocation = value || options[0] || nearestLocation(0.3476, 32.5825, countryCode);
+  const center: [number, number] = [mapLocation.latitude, mapLocation.longitude];
 
   useEffect(() => {
     setQuery(value?.city || "");
   }, [value?.city]);
 
+  useEffect(() => {
+    if (!mapOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMapOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mapOpen]);
+
   const choose = (location: LocationPoint) => {
     setQuery(location.city);
     setOpen(false);
+    setGpsState("idle");
     onChange(location);
   };
 
@@ -69,10 +80,17 @@ export function LocationPicker({ label, value, countryCode, onChange }: Location
   };
 
   const useCurrentLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setGpsState("error");
+      return;
+    }
+    setGpsState("loading");
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => pin(coords.latitude, coords.longitude),
-      () => setOpen(true),
+      ({ coords }) => {
+        setGpsState("idle");
+        pin(coords.latitude, coords.longitude);
+      },
+      () => setGpsState("error"),
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   };
@@ -82,51 +100,124 @@ export function LocationPicker({ label, value, countryCode, onChange }: Location
       <span className="mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground">
         {label} <span className="text-accent-foreground">*</span>
       </span>
-      <div className="relative">
-        <div className="flex gap-2">
+      <div className="relative" onBlur={() => window.setTimeout(() => setOpen(false), 120)}>
+        <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 shadow-sm transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+          <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
             required
-            className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+            className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
             value={query}
-            placeholder="Search a city or pin the exact area"
+            placeholder="Type a city or area"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={open && options.length > 0}
             onFocus={() => setOpen(true)}
             onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setOpen(false);
+              if (event.key === "Enter" && open && options[0]) {
+                event.preventDefault();
+                choose(options[0]);
+              }
+            }}
           />
-          <button type="button" onClick={useCurrentLocation} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 text-[10px] font-bold hover:bg-muted" title="Use this device's location">
-            <span aria-hidden="true">⌖</span> Use GPS
+          {value && <Check size={16} className="shrink-0 text-primary" aria-label="Location selected" />}
+          <button
+            type="button"
+            onClick={() => { setOpen(false); setMapOpen(true); }}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-secondary px-2.5 text-[10px] font-bold text-secondary-foreground transition hover:bg-accent hover:text-accent-foreground"
+          >
+            <MapPinned size={14} aria-hidden="true" />
+            <span className="hidden sm:inline">Open map</span>
+            <span className="sm:hidden">Map</span>
           </button>
         </div>
         {open && options.length > 0 && (
-          <div className="absolute inset-x-0 top-11 z-[1000] overflow-hidden rounded-lg border border-border bg-card shadow-xl">
+          <div className="absolute inset-x-0 top-[3.35rem] z-[1000] overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+            <div className="border-b border-border px-3 py-2 font-mono-ui text-[9px] uppercase tracking-[.12em] text-muted-foreground">Suggested areas</div>
             {options.map((location) => (
               <button
                 key={`${location.countryCode}-${location.city}`}
                 type="button"
-                className="block w-full border-b border-border px-3 py-2.5 text-left last:border-0 hover:bg-muted"
+                className="group flex w-full items-center justify-between gap-3 border-b border-border px-3 py-2.5 text-left last:border-0 hover:bg-muted"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(location)}
               >
-                <span className="block text-xs font-bold">{location.city}</span>
-                <span className="block text-[10px] text-muted-foreground">{location.countryName} · choose the exact area on the map below</span>
+                <span>
+                  <span className="block text-xs font-bold">{location.city}</span>
+                  <span className="block text-[10px] text-muted-foreground">{location.countryName}</span>
+                </span>
+                <Check size={14} className="text-primary opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
               </button>
             ))}
           </div>
         )}
       </div>
-      <div className="mt-2 overflow-hidden rounded-lg border border-border">
-        <MapContainer center={center} zoom={7} scrollWheelZoom className="h-[170px] w-full" zoomControl attributionControl>
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapClick onPick={pin} />
-          <RecenterMap center={center} />
-          {value && <CircleMarker center={[value.latitude, value.longitude]} radius={9} pathOptions={{ color: "#a96824", fillColor: "#d7984e", fillOpacity: 1, weight: 3 }} />}
-        </MapContainer>
+      <div className="mt-2 flex items-center justify-between gap-3 text-[10px]">
+        <span className="min-w-0 truncate text-muted-foreground">
+          {value ? `Exact point saved · ${value.city}` : "City or area is required"}
+        </span>
+        {value && (
+          <button type="button" onClick={() => setMapOpen(true)} className="shrink-0 font-bold text-primary hover:underline">
+            Refine pin
+          </button>
+        )}
       </div>
-      <p className="mt-1.5 text-[10px] text-muted-foreground">
-        {value ? `Pinned at ${value.latitude.toFixed(4)}, ${value.longitude.toFixed(4)} · drag-free map: click a more exact point.` : "Choose a city, then click the map to refine the pickup or delivery area."}
-      </p>
+
+      {mapOpen && (
+        <div className="fixed inset-0 z-[1200] flex items-end justify-center bg-foreground/45 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby={`${label.replace(/\s+/g, "-").toLowerCase()}-map-title`}>
+          <div className="w-full max-w-2xl overflow-hidden rounded-t-[1.5rem] border border-border bg-card shadow-2xl sm:rounded-[1.5rem]">
+            <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
+                  <MapPinned size={19} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">Location precision</p>
+                  <h3 id={`${label.replace(/\s+/g, "-").toLowerCase()}-map-title`} className="mt-1 truncate font-display text-xl font-semibold">Pin the {label.toLowerCase()}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Tap the map or use your phone’s location. We’ll keep the nearest area name for matching.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setMapOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close map">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold">{value?.city || mapLocation.city}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{value ? `${value.latitude.toFixed(4)}, ${value.longitude.toFixed(4)}` : "No exact point selected yet"}</p>
+                </div>
+                <button type="button" onClick={useCurrentLocation} disabled={gpsState === "loading"} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-primary/25 px-3 text-[10px] font-bold text-primary transition hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60">
+                  <Crosshair size={14} aria-hidden="true" />
+                  {gpsState === "loading" ? "Locating…" : "Use my GPS"}
+                </button>
+              </div>
+              <div className="overflow-hidden rounded-xl border border-border shadow-inner">
+                <MapContainer center={center} zoom={7} scrollWheelZoom className="h-[min(52vh,360px)] w-full" zoomControl attributionControl>
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <MapClick onPick={pin} />
+                  <RecenterMap center={center} />
+                  {value && <CircleMarker center={[value.latitude, value.longitude]} radius={9} pathOptions={{ color: "#bc4612", fillColor: "#f26522", fillOpacity: 1, weight: 3 }} />}
+                </MapContainer>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] text-muted-foreground">Click anywhere to move the pin.</p>
+                {gpsState === "error" && <p className="text-right text-[10px] font-semibold text-destructive">GPS unavailable — tap the map instead.</p>}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-border bg-muted/30 px-4 py-3 sm:px-5">
+              <p className="min-w-0 text-[10px] text-muted-foreground">{value ? "This exact point will be saved with your booking." : "Select a point to continue."}</p>
+              <button type="button" onClick={() => setMapOpen(false)} disabled={!value} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-[10px] font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45">
+                <Check size={14} aria-hidden="true" /> Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
