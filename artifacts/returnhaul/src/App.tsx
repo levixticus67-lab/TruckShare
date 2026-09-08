@@ -153,9 +153,33 @@ function Shell({ children }: { children: ReactNode }) {
   const [authRefresh, setAuthRefresh] = useState(0);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [authMessage, setAuthMessage] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   useEffect(() => {
     setAuthLoading(true);
+    const params = new URLSearchParams(window.location.search);
+    const googleCode = params.get("google_code");
+    const googleError = params.get("google_error");
+    if (googleCode) {
+      api<{ token: string; user: AuthUser }>("/auth/google/exchange", {
+        method: "POST",
+        body: JSON.stringify({ code: googleCode }),
+      }).then((result) => {
+        localStorage.setItem("truckshare_token", result.token);
+        setAuthUser(result.user);
+      }).catch(() => {
+        setAuthMessage("Google sign-in could not be completed. Please try again.");
+        setAuthUser(null);
+      }).finally(() => {
+        window.history.replaceState({}, "", window.location.pathname);
+        setAuthLoading(false);
+      });
+      return;
+    }
+    if (googleError) {
+      setAuthMessage(googleError);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     api<{ user: AuthUser | null }>("/auth/me").then((result) => setAuthUser(result.user)).catch(() => setAuthUser(null)).finally(() => setAuthLoading(false));
   }, [authRefresh]);
   const current = nav.find(([href]) => href === location) || nav[0];
@@ -178,11 +202,12 @@ function Shell({ children }: { children: ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const finishAuth = (user: AuthUser) => {
     setAuthUser(user);
+    setAuthMessage("");
     setRole(user.role === "Admin" ? "Admin" : user.roles?.[0] || user.role);
     setAuthOpen(false);
   };
   if (authLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-background"><BrandLoader label="Loading your TruckShare account" /></div>;
-  if (!authUser) return <AuthModal required onComplete={finishAuth} />;
+  if (!authUser) return <AuthModal required initialMessage={authMessage} onComplete={finishAuth} />;
   return <RoleContext.Provider value={role}><div className="noise min-h-[100dvh] bg-background">
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[258px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground shadow-2xl transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="mb-7 flex items-center justify-between px-2"><Logo /><div className="flex items-center gap-1"><ThemeToggle /><button className="rounded-lg p-2 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={18} /></button></div></div>
@@ -196,7 +221,7 @@ function Shell({ children }: { children: ReactNode }) {
        <button type="button" onClick={() => setMobileOpen(true)} className={`mobile-nav-item ${!mobileNavItems.some(([href]) => href === location) && location !== "/" ? "is-active" : ""}`} aria-label="Open more navigation"><Menu size={18} /><span>More</span>{!mobileNavItems.some(([href]) => href === location) && location !== "/" && <i aria-hidden="true" />}</button>
      </nav>
     {mobileOpen && <button className="fixed inset-0 z-30 bg-primary/35 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}
-     <main className="min-h-[100dvh] lg:pl-[258px]"><header className="sticky top-0 z-20 flex h-[64px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button className="rounded-lg border border-border bg-card p-2 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={18} /></button><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">TruckShare EAC</p><h1 className="mt-0.5 font-display text-lg font-semibold tracking-[-.03em]">{current[1]}</h1></div></div><div className="flex items-center gap-2"><div className="relative"><button type="button" onClick={() => setNotificationsOpen((open) => !open)} className="rounded-lg border border-border bg-card p-2 text-muted-foreground" aria-label="Notifications" aria-expanded={notificationsOpen}><Bell size={16} /></button>{notificationsOpen && <div className="absolute right-0 top-11 z-30 w-72 rounded-xl border border-border bg-card p-4 text-left shadow-xl"><p className="font-display text-base font-semibold">Notifications</p><div className="mt-3 space-y-3 text-xs"><div className="border-b border-border pb-3"><p className="font-semibold">New match found</p><p className="mt-1 text-muted-foreground">Kampala → Mbale is 92% compatible.</p></div><div className="border-b border-border pb-3"><p className="font-semibold">Payment protected</p><p className="mt-1 text-muted-foreground">Eastline Hardware booking is secure.</p></div><div><p className="font-semibold">Verification needed</p><p className="mt-1 text-muted-foreground">Thabo Transport is waiting for review.</p></div></div></div>}</div><button onClick={() => setAuthOpen(true)} className={`${secondaryButton} inline-flex whitespace-nowrap`}>Account</button></div></header><div className="mx-auto max-w-[1180px] px-5 py-6 sm:px-8 sm:py-8">{children}</div></main>{authOpen && <AuthModal onClose={() => { setAuthOpen(false); setAuthRefresh((value) => value + 1); }} onComplete={finishAuth} />}</div></RoleContext.Provider>;
+     <main className="min-h-[100dvh] lg:pl-[258px]"><header className="sticky top-0 z-20 flex h-[64px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button className="rounded-lg border border-border bg-card p-2 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={18} /></button><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">TruckShare EAC</p><h1 className="mt-0.5 font-display text-lg font-semibold tracking-[-.03em]">{current[1]}</h1></div></div><div className="flex items-center gap-2"><div className="relative"><button type="button" onClick={() => setNotificationsOpen((open) => !open)} className="rounded-lg border border-border bg-card p-2 text-muted-foreground" aria-label="Notifications" aria-expanded={notificationsOpen}><Bell size={16} /></button>{notificationsOpen && <div className="absolute right-0 top-11 z-30 w-72 rounded-xl border border-border bg-card p-4 text-left shadow-xl"><p className="font-display text-base font-semibold">Notifications</p><div className="mt-3 space-y-3 text-xs"><div className="border-b border-border pb-3"><p className="font-semibold">New match found</p><p className="mt-1 text-muted-foreground">Kampala → Mbale is 92% compatible.</p></div><div className="border-b border-border pb-3"><p className="font-semibold">Payment protected</p><p className="mt-1 text-muted-foreground">Eastline Hardware booking is secure.</p></div><div><p className="font-semibold">Verification needed</p><p className="mt-1 text-muted-foreground">Thabo Transport is waiting for review.</p></div></div></div>}</div><button onClick={() => setAuthOpen(true)} className={`${secondaryButton} inline-flex whitespace-nowrap`}>Account</button></div></header><div className="mx-auto max-w-[1180px] px-5 py-6 sm:px-8 sm:py-8">{children}</div></main>{authOpen && <AuthModal initialMessage={authMessage} onClose={() => { setAuthOpen(false); setAuthRefresh((value) => value + 1); }} onComplete={finishAuth} />}</div></RoleContext.Provider>;
 }
 
 function Header({ eyebrow, title, detail, action }: { eyebrow: string; title: string; detail?: string; action?: ReactNode }) {
@@ -472,21 +497,15 @@ function LegacyEmailAuthModal({ onComplete, onClose = () => {}, required = false
       void finishGoogle("login");
     }
   };
-  const finishGoogle = async (mode: "login" | "signup") => {
-    setBusy(true);
-    setMessage("");
-    try {
-      const result = await api<{ token: string; user: AuthUser }>("/auth/google", {
-        method: "POST",
-        body: JSON.stringify({ mode, ...(mode === "signup" ? { name, roles } : {}) }),
-      });
-      localStorage.setItem("truckshare_token", result.token);
-      onComplete(result.user);
-    } catch (reason: unknown) {
-      setMessage(reason instanceof Error ? reason.message : "Google sign-in could not be completed.");
-    } finally {
-      setBusy(false);
+  const finishGoogle = (mode: "login" | "signup") => {
+    if (!API_ROOT) {
+      setMessage("The API is not configured. Add VITE_API_URL before using Google sign-in.");
+      return;
     }
+    setBusy(true);
+    const params = new URLSearchParams({ mode });
+    if (mode === "signup") params.set("roles", roles.join(","));
+    window.location.assign(`${API_ROOT}/auth/google/start?${params.toString()}`);
   };
   const submitProfile = (event: FormEvent) => {
     event.preventDefault();
@@ -572,7 +591,7 @@ function LegacyEmailAuthModal({ onComplete, onClose = () => {}, required = false
 
 */
 
-function AuthModal({ onComplete, onClose = () => {}, required = false }: { onComplete: (user: AuthUser) => void; onClose?: () => void; required?: boolean }) {
+function AuthModal({ onComplete, onClose = () => {}, required = false, initialMessage = "" }: { onComplete: (user: AuthUser) => void; onClose?: () => void; required?: boolean; initialMessage?: string }) {
   type AccountRole = "Carrier" | "Shipper";
   type Step = "method" | "email" | "account" | "profile" | "roles" | "emailOtp" | "phoneVerify";
   const [method, setMethod] = useState<"email" | "google">();
@@ -587,7 +606,7 @@ function AuthModal({ onComplete, onClose = () => {}, required = false }: { onCom
   const [phoneChallengeId, setPhoneChallengeId] = useState("");
   const [otp, setOtp] = useState("");
   const [phoneOtp, setPhoneOtp] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
   const [busy, setBusy] = useState(false);
 
   const continueWithEmail = () => { setMethod("email"); setStep("email"); setMessage(""); };

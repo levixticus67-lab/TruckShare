@@ -1,5 +1,5 @@
-import { Router, type IRouter, type Request } from "express";
-import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, databaseConfigured, runtimeStateTable } from "@workspace/db";
 import {
@@ -151,6 +151,7 @@ type Verification = {
 type User = {
   id: string;
   name: string;
+  googleId?: string;
   phone?: string;
   phoneVerifiedAt?: string;
   phoneChangedAt?: string;
@@ -382,6 +383,8 @@ const verifications: Verification[] = [
 
 const sessions = new Map<string, User>();
 const otpRequestCooldowns = new Map<string, number>();
+const googleStates = new Map<string, { mode: "login" | "signup"; roles: Array<"Carrier" | "Shipper">; exp: number }>();
+const googleExchangeCodes = new Map<string, { token: string; user: User; exp: number }>();
 const OTP_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
 const PHONE_CHANGE_COOLDOWN_MS = 365 * 24 * 60 * 60 * 1000;
@@ -601,6 +604,27 @@ function phoneChangeAllowed(user: User, nextPhone: string) {
 function phoneChangeRetryDays(user: User) {
   if (!user.phoneChangedAt) return 0;
   return Math.max(1, Math.ceil((Date.parse(user.phoneChangedAt) + PHONE_CHANGE_COOLDOWN_MS - Date.now()) / (24 * 60 * 60 * 1000)));
+}
+
+function googleConfiguration() {
+  const clientId = text(process.env.GOOGLE_CLIENT_ID);
+  const clientSecret = text(process.env.GOOGLE_CLIENT_SECRET);
+  const redirectUri = text(process.env.GOOGLE_REDIRECT_URI);
+  return clientId && clientSecret && redirectUri ? { clientId, clientSecret, redirectUri } : undefined;
+}
+
+function frontendRedirectUrl() {
+  return text(process.env.FRONTEND_URL) || "http://localhost:5173";
+}
+
+function googleResultRedirect(params: Record<string, string>) {
+  const url = new URL(frontendRedirectUrl());
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  return url.toString();
+}
+
+function googleError(res: Response, message: string) {
+  res.redirect(googleResultRedirect({ google_error: message }));
 }
 
 async function sendVerificationEmail(email: string, code: string) {
@@ -939,28 +963,131 @@ router.post("/auth/verify-phone-otp", async (req, res) => {
   res.json({ user, phoneVerified: true });
 });
 
-router.post("/auth/google", async (req, res) => {
-  const mode = req.body?.mode === "login" ? "login" : "signup";
-  const existingUser = users.find((user) => user.email === "demo@truckshare.ug");
-  if (mode === "login" && !existingUser) {
-    res.status(404).json({ error: "No Google account exists yet. Choose Create account first." });
+router.get("/auth/google/start", (req, res) => {
+  const config = googleConfiguration();
+  if (!config) {
+    googleError(res, "Google sign-in is not configured on the API service.");
     return;
   }
-  if (mode === "signup" && existingUser) {
-    res.status(409).json({ error: "A Google account already exists. Choose Log in instead." });
-    return;
-  }
-  const roles = requestedRoles(req.body?.roles);
+
+  const mode = req.query.mode === "login" ? "login" : "signup";
+  const roles = requestedRoles(String(req.query.roles || "").split(","));
   if (mode === "signup" && roles.length === 0) {
-    res.status(400).json({ error: "Choose at least one account role." });
+    googleError(res, "Choose at least one account role before continuing with Google.");
     return;
   }
-  const user = existingUser || { id: id("user"), name: text(req.body?.name) || "Google workspace user", email: "demo@truckshare.ug", country: "UG", role: roles.includes("Carrier") ? "Carrier" : "Shipper", roles, verified: false };
-  if (!existingUser) users.push(user);
-  const token = issueToken(user);
-  sessions.set(token, user);
-  await persistDatabaseState();
-  res.json({ token, user, simulated: true });
+
+  const state = randomBytes(32).toString("base64url");
+  googleStates.set(state, { mode, roles, exp: Date.now() + 10 * 60 * 1000 });
+  const authorizationUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  authorizationUrl.searchParams.set("client_id", config.clientId);
+  authorizationUrl.searchParams.set("redirect_uri", config.redirectUri);
+  authorizationUrl.searchParams.set("response_type", "code");
+  authorizationUrl.searchParams.set("scope", "openid email profile");
+  authorizationUrl.searchParams.set("state", state);
+  authorizationUrl.searchParams.set("access_type", "online");
+  authorizationUrl.searchParams.set("prompt", "select_account");
+  res.redirect(authorizationUrl.toString());
+});
+
+router.get("/auth/google/callback", async (req, res) => {
+  const config = googleConfiguration();
+  const state = text(req.query.state);
+  const pending = googleStates.get(state);
+  googleStates.delete(state);
+  if (!config || !pending || pending.exp < Date.now()) {
+    googleError(res, "That Google sign-in session expired. Please try again.");
+    return;
+  }
+  if (req.query.error || !text(req.query.code)) {
+    googleError(res, "Google sign-in was cancelled.");
+    return;
+  }
+
+  try {
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: text(req.query.code),
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        redirect_uri: config.redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+    if (!tokenResponse.ok) {
+      googleError(res, "Google could not complete sign-in. Please try again.");
+      return;
+    }
+    const tokenBody = await tokenResponse.json() as { access_token?: unknown };
+    const accessToken = text(tokenBody.access_token);
+    if (!accessToken) {
+      googleError(res, "Google did not return an access token.");
+      return;
+    }
+
+    const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!profileResponse.ok) {
+      googleError(res, "Google profile lookup failed. Please try again.");
+      return;
+    }
+    const profile = await profileResponse.json() as { sub?: unknown; email?: unknown; email_verified?: unknown; name?: unknown };
+    const googleId = text(profile.sub);
+    const email = normalizeEmail(text(profile.email));
+    if (!googleId || !email || profile.email_verified !== true) {
+      googleError(res, "Google did not provide a verified email address.");
+      return;
+    }
+
+    const existingUser = users.find((user) => user.googleId === googleId || normalizeEmail(user.email || "") === email);
+    if (pending.mode === "login" && !existingUser) {
+      googleError(res, "No TruckShare account exists for this Google email. Choose Create account first.");
+      return;
+    }
+    if (pending.mode === "signup" && existingUser) {
+      googleError(res, "A TruckShare account already uses this Google email. Choose Log in instead.");
+      return;
+    }
+
+    const user = existingUser || {
+      id: id("user"),
+      name: text(profile.name) || "Google workspace user",
+      googleId,
+      email,
+      emailVerifiedAt: new Date().toISOString(),
+      country: "UG",
+      role: pending.roles.includes("Carrier") ? "Carrier" : "Shipper",
+      roles: pending.roles,
+      verified: false,
+    };
+    user.googleId = googleId;
+    user.email = email;
+    user.emailVerifiedAt = user.emailVerifiedAt || new Date().toISOString();
+    if (!existingUser) users.push(user);
+    const sessionToken = issueToken(user);
+    sessions.set(sessionToken, user);
+    await persistDatabaseState();
+
+    const exchangeCode = randomBytes(32).toString("base64url");
+    googleExchangeCodes.set(exchangeCode, { token: sessionToken, user, exp: Date.now() + 2 * 60 * 1000 });
+    res.redirect(googleResultRedirect({ google_code: exchangeCode }));
+  } catch {
+    googleError(res, "Google sign-in could not be completed. Please try again.");
+  }
+});
+
+router.post("/auth/google/exchange", (req, res) => {
+  const code = text(req.body?.code);
+  const result = googleExchangeCodes.get(code);
+  googleExchangeCodes.delete(code);
+  if (!result || result.exp < Date.now()) {
+    res.status(400).json({ error: "That Google sign-in link is invalid or expired." });
+    return;
+  }
+  res.json({ token: result.token, user: result.user });
 });
 
 router.get("/auth/me", (req, res) => {
