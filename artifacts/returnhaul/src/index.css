@@ -451,6 +451,16 @@
   backdrop-filter: blur(16px);
 }
 
+.logistics-card {
+  position: relative;
+  background: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(216 32% 97%) 100%) !important;
+  border-color: hsl(220 20% 82%) !important;
+  border-top: 3px solid hsl(var(--primary)) !important;
+  box-shadow:
+    0 16px 34px hsl(223 48% 18% / 0.1),
+    0 1px 0 hsl(0 0% 100% / 0.95) inset;
+}
+
 header.sticky {
   background: color-mix(in srgb, hsl(var(--background)) 82%, transparent);
   -webkit-backdrop-filter: blur(18px);

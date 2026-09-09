@@ -330,23 +330,31 @@ function RouteDetailsModal({ open, onClose, origin, originCountry, originLocatio
 function TripCard({ trip }: { trip: Trip }) {
   const [routeOpen, setRouteOpen] = useState(false);
   return <>
-    <Card className="overflow-hidden p-0 transition-shadow hover:shadow-lg">
+    <Card className="logistics-card overflow-hidden p-0 transition-shadow hover:-translate-y-0.5 hover:shadow-xl">
       <div className="p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-muted-foreground">Available capacity · {dateFmt(trip.departureDate)}</p>
-            <div className="mt-3 flex items-center gap-2 font-display text-[1.35rem] font-semibold tracking-[-.035em] sm:text-2xl">
-              <span className="truncate">{trip.origin}</span><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#fff0d9] text-accent-foreground"><ArrowRight size={14} /></span><span className="truncate">{trip.destination}</span>
-            </div>
-            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><Truck size={14} className="text-accent-foreground" />{trip.carrier} · {trip.vehicleType} · {trip.carrierRating} ★</p>
-          </div>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-muted-foreground">Available capacity · {dateFmt(trip.departureDate)}</p>
           <Status value={trip.status} />
         </div>
+        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+          <div className="min-w-0">
+            <p className="font-mono-ui text-[9px] font-bold uppercase tracking-[.16em] text-accent-foreground">From</p>
+            <p className="mt-1 break-words font-display text-[clamp(1.15rem,5vw,1.55rem)] font-semibold leading-[1.05] tracking-[-.045em]">{trip.origin}</p>
+            <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{trip.originCountry || "—"}</p>
+          </div>
+          <span className="mt-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fff0d9] text-accent-foreground"><ArrowRight size={15} /></span>
+          <div className="min-w-0 text-right">
+            <p className="font-mono-ui text-[9px] font-bold uppercase tracking-[.16em] text-accent-foreground">To</p>
+            <p className="mt-1 break-words font-display text-[clamp(1.15rem,5vw,1.55rem)] font-semibold leading-[1.05] tracking-[-.045em]">{trip.destination}</p>
+            <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{trip.destinationCountry || "—"}</p>
+          </div>
+        </div>
+        <p className="mt-4 flex items-center gap-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground"><Truck size={14} className="text-accent-foreground" />{trip.carrier} · {trip.vehicleType} · {trip.carrierRating} ★</p>
       </div>
-      <div className="grid grid-cols-3 divide-x border-y border-border bg-muted/20">
+      <div className="grid grid-cols-2 border-y border-border/80 bg-muted/35 sm:grid-cols-3">
         <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Available</p><p className="mt-1 font-display text-xl font-semibold">{trip.capacityTons}<span className="ml-1 text-sm font-medium text-muted-foreground">t</span></p></div>
-        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Space</p><p className="mt-1 font-display text-xl font-semibold">{trip.capacityM3}<span className="ml-1 text-sm font-medium text-muted-foreground">m³</span></p></div>
-        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Rate</p><p className="mt-1 truncate font-display text-base font-semibold sm:text-lg">{money(trip.price, trip.currency)}</p></div>
+        <div className="border-l border-border/70 px-3 py-4 sm:px-5"><p className={labelClass}>Space</p><p className="mt-1 font-display text-xl font-semibold">{trip.capacityM3}<span className="ml-1 text-sm font-medium text-muted-foreground">m³</span></p></div>
+        <div className="col-span-2 border-t border-border/70 px-3 py-4 sm:col-span-1 sm:border-l sm:border-t-0 sm:px-5"><p className={labelClass}>Rate</p><p className="mt-1 break-words font-display text-xl font-semibold leading-tight">{money(trip.price, trip.currency)}</p></div>
       </div>
       <div className="flex items-center gap-2 p-4 sm:p-5">
         <button type="button" onClick={() => setRouteOpen(true)} className={`${secondaryButton} flex-1`}><MapPin size={14} /> View route</button>
@@ -361,23 +369,31 @@ function TripCard({ trip }: { trip: Trip }) {
 function FreightCard({ load }: { load: Freight }) {
   const [routeOpen, setRouteOpen] = useState(false);
   return <>
-    <Card className="overflow-hidden p-0 transition-shadow hover:shadow-lg">
+    <Card className="logistics-card overflow-hidden p-0 transition-shadow hover:-translate-y-0.5 hover:shadow-xl">
       <div className="p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-muted-foreground">{load.cargoType || "General cargo"} · Pickup {dateFmt(load.pickupDate)}</p>
-            <div className="mt-3 flex items-center gap-2 font-display text-[1.35rem] font-semibold tracking-[-.035em] sm:text-2xl">
-              <span className="truncate">{load.pickup}</span><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#fff0d9] text-accent-foreground"><ArrowRight size={14} /></span><span className="truncate">{load.dropoff}</span>
-            </div>
-            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><PackageCheck size={14} className="text-accent-foreground" />{load.shipper} · {load.description}</p>
-          </div>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-muted-foreground">{load.cargoType || "General cargo"} · Pickup {dateFmt(load.pickupDate)}</p>
           <Status value={load.status} />
         </div>
+        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+          <div className="min-w-0">
+            <p className="font-mono-ui text-[9px] font-bold uppercase tracking-[.16em] text-accent-foreground">From</p>
+            <p className="mt-1 break-words font-display text-[clamp(1.15rem,5vw,1.55rem)] font-semibold leading-[1.05] tracking-[-.045em]">{load.pickup}</p>
+            <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{load.pickupCountry || "—"}</p>
+          </div>
+          <span className="mt-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fff0d9] text-accent-foreground"><ArrowRight size={15} /></span>
+          <div className="min-w-0 text-right">
+            <p className="font-mono-ui text-[9px] font-bold uppercase tracking-[.16em] text-accent-foreground">To</p>
+            <p className="mt-1 break-words font-display text-[clamp(1.15rem,5vw,1.55rem)] font-semibold leading-[1.05] tracking-[-.045em]">{load.dropoff}</p>
+            <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{load.dropoffCountry || "—"}</p>
+          </div>
+        </div>
+        <p className="mt-4 flex items-center gap-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground"><PackageCheck size={14} className="text-accent-foreground" />{load.shipper} · {load.description || "General cargo"}</p>
       </div>
-      <div className="grid grid-cols-3 divide-x border-y border-border bg-muted/20">
+      <div className="grid grid-cols-2 border-y border-border/80 bg-muted/35 sm:grid-cols-3">
         <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Weight</p><p className="mt-1 font-display text-xl font-semibold">{load.weightTons}<span className="ml-1 text-sm font-medium text-muted-foreground">t</span></p></div>
-        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Volume</p><p className="mt-1 font-display text-xl font-semibold">{load.volumeM3 || "—"}<span className="ml-1 text-sm font-medium text-muted-foreground">m³</span></p></div>
-        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Budget</p><p className="mt-1 truncate font-display text-base font-semibold sm:text-lg">{money(load.price, load.currency)}</p></div>
+        <div className="border-l border-border/70 px-3 py-4 sm:px-5"><p className={labelClass}>Volume</p><p className="mt-1 font-display text-xl font-semibold">{load.volumeM3 || "—"}<span className="ml-1 text-sm font-medium text-muted-foreground">m³</span></p></div>
+        <div className="col-span-2 border-t border-border/70 px-3 py-4 sm:col-span-1 sm:border-l sm:border-t-0 sm:px-5"><p className={labelClass}>Budget</p><p className="mt-1 break-words font-display text-xl font-semibold leading-tight">{money(load.price, load.currency)}</p></div>
       </div>
       <div className="flex items-center gap-2 p-4 sm:p-5">
         <button type="button" onClick={() => setRouteOpen(true)} className={`${secondaryButton} flex-1`}><MapPin size={14} /> View route</button>
