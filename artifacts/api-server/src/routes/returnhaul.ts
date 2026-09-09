@@ -161,6 +161,8 @@ type User = {
   role: "Carrier" | "Shipper" | "Admin";
   roles?: Array<"Carrier" | "Shipper">;
   verified: boolean;
+  termsAcceptedAt?: string;
+  termsVersion?: string;
 };
 
 type CountryCode = "BI" | "CD" | "KE" | "RW" | "SO" | "SS" | "TZ" | "UG";
@@ -383,8 +385,9 @@ const verifications: Verification[] = [
 
 const sessions = new Map<string, User>();
 const otpRequestCooldowns = new Map<string, number>();
-const googleStates = new Map<string, { mode: "login" | "signup"; roles: Array<"Carrier" | "Shipper">; exp: number }>();
+const googleStates = new Map<string, { mode: "login" | "signup"; roles: Array<"Carrier" | "Shipper">; termsAccepted: boolean; exp: number }>();
 const googleExchangeCodes = new Map<string, { token: string; user: User; exp: number }>();
+const TERMS_VERSION = "2026-09";
 const OTP_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
 const PHONE_CHANGE_COOLDOWN_MS = 365 * 24 * 60 * 60 * 1000;
@@ -491,6 +494,7 @@ type OtpChallenge = {
   name?: string;
   role?: "Carrier" | "Shipper" | "Admin";
   roles?: Array<"Carrier" | "Shipper">;
+  termsAccepted?: boolean;
   otpHash: string;
   exp: number;
 };
@@ -797,6 +801,7 @@ router.post("/auth/account-status", (req, res) => {
 router.post("/auth/request-email-otp", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const mode = req.body?.mode === "login" ? "login" : "signup";
+  const termsAccepted = req.body?.termsAccepted === true;
   const existingUser = users.find((user) => normalizeEmail(user.email || "") === email);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     res.status(400).json({ error: "Use a valid email address." });
@@ -822,6 +827,10 @@ router.post("/auth/request-email-otp", async (req, res) => {
     res.status(400).json({ error: "Choose at least one account role." });
     return;
   }
+  if (mode === "signup" && !termsAccepted) {
+    res.status(400).json({ error: "Accept the Terms and Conditions and Privacy Policy to create an account." });
+    return;
+  }
 
   const retryAfterSeconds = nextOtpRequest(email);
   if (retryAfterSeconds > 0) {
@@ -842,7 +851,7 @@ router.post("/auth/request-email-otp", async (req, res) => {
     }
     otpRequestCooldowns.set(email, Date.now());
     res.json({
-      challengeId: signChallenge({ channel: "email", email, mode, name: name || undefined, role, roles, otpHash: hashOtp(code) }),
+      challengeId: signChallenge({ channel: "email", email, mode, name: name || undefined, role, roles, termsAccepted, otpHash: hashOtp(code) }),
       email,
       message: "We sent a verification code to your email. It expires in 10 minutes.",
     });
@@ -874,6 +883,8 @@ router.post("/auth/verify-email-otp", async (req, res) => {
     role: challenge.role || "Carrier",
     roles: challenge.roles,
     verified: false,
+    termsAcceptedAt: challenge.termsAccepted ? new Date().toISOString() : undefined,
+    termsVersion: challenge.termsAccepted ? TERMS_VERSION : undefined,
   };
   user.email = challenge.email;
   user.emailVerifiedAt = user.emailVerifiedAt || new Date().toISOString();
@@ -972,13 +983,18 @@ router.get("/auth/google/start", (req, res) => {
 
   const mode = req.query.mode === "login" ? "login" : "signup";
   const roles = requestedRoles(String(req.query.roles || "").split(","));
+  const termsAccepted = req.query.terms === "1";
   if (mode === "signup" && roles.length === 0) {
     googleError(res, "Choose at least one account role before continuing with Google.");
     return;
   }
+  if (mode === "signup" && !termsAccepted) {
+    googleError(res, "Accept the Terms and Conditions and Privacy Policy before continuing with Google.");
+    return;
+  }
 
   const state = randomBytes(32).toString("base64url");
-  googleStates.set(state, { mode, roles, exp: Date.now() + 10 * 60 * 1000 });
+  googleStates.set(state, { mode, roles, termsAccepted, exp: Date.now() + 10 * 60 * 1000 });
   const authorizationUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authorizationUrl.searchParams.set("client_id", config.clientId);
   authorizationUrl.searchParams.set("redirect_uri", config.redirectUri);
@@ -1062,6 +1078,8 @@ router.get("/auth/google/callback", async (req, res) => {
       role: pending.roles.includes("Carrier") ? "Carrier" : "Shipper",
       roles: pending.roles,
       verified: false,
+      termsAcceptedAt: pending.termsAccepted ? new Date().toISOString() : undefined,
+      termsVersion: pending.termsAccepted ? TERMS_VERSION : undefined,
     };
     user.googleId = googleId;
     user.email = email;

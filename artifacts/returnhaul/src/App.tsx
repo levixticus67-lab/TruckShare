@@ -74,6 +74,7 @@ type BorderMilestone = { id: string; bookingId: string; sequence: number; countr
 type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: string; amount: number; currency: string; settlementAmount: number; settlementCurrency: string; exchangeRate: number; fee: number; commissionAmount: number; carrierPayout: number; indicative: boolean; expiresInSeconds: number };
 type WorkspaceRole = "Carrier" | "Shipper" | "Admin";
 type AuthUser = { id: string; name: string; phone?: string; email?: string; country: string; role: WorkspaceRole; roles?: Array<"Carrier" | "Shipper">; verified: boolean };
+type LegalDocument = "terms" | "privacy";
 const RoleContext = createContext<WorkspaceRole>("Carrier");
 const useRole = () => useContext(RoleContext);
 
@@ -260,6 +261,35 @@ function Dashboard() {
 function Modal({ title, eyebrow, onClose, children, closable = true }: { title: string; eyebrow: string; onClose: () => void; children: ReactNode; closable?: boolean }) { return <div className="fixed inset-0 z-50 flex items-end justify-center bg-primary/35 p-0 backdrop-blur-sm sm:items-center sm:p-5"><div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl"><div className="flex items-start justify-between border-b border-border p-5"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">{eyebrow}</p><h2 className="mt-1 font-display text-2xl font-semibold tracking-[-.04em]">{title}</h2></div>{closable && <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="Close"><X size={18} /></button>}</div><div className="p-5">{children}</div></div></div>; }
 function Field({ label, value, onChange, type = "text", placeholder, required = true }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean }) { return <label className="block"><span className={labelClass}>{label}{required && <span className="text-accent-foreground"> *</span>}</span><input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className={input} /></label>; }
 function CountrySelect({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className={labelClass}>{label} *</span><select required className={input} value={value} onChange={(event) => onChange(event.target.value)}>{regionalReference.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label>; }
+
+function LegalDocumentModal({ document, onClose }: { document: LegalDocument | null; onClose: () => void }) {
+  if (!document) return null;
+  const isTerms = document === "terms";
+  return <Modal title={isTerms ? "Terms and Conditions" : "Privacy Policy"} eyebrow="TruckShare EAC" onClose={onClose}>
+    <div className="space-y-5 text-sm leading-6 text-muted-foreground">
+      <p className="rounded-lg bg-muted p-3 text-xs leading-5">Last updated: September 2026. These terms apply to your use of TruckShare EAC, including its carrier, shipper, matching, booking, messaging, verification, payment, and delivery features.</p>
+      {isTerms ? <>
+        <section><h3 className="font-display text-base font-semibold text-foreground">1. Using TruckShare</h3><p>TruckShare helps shippers and carriers discover one another, compare transport details, communicate, and manage logistics workflows. TruckShare is not the carrier, shipper, driver, customs agent, insurer, or owner of goods unless the service expressly says otherwise.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">2. Your account</h3><p>Give us accurate information, keep your sign-in method secure, and use only your own account. You must be legally able to enter into agreements in your jurisdiction. You are responsible for activity performed through your account and for keeping listing, identity, vehicle, cargo, and contact information current.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">3. Listings and bookings</h3><p>Do not post false, unlawful, unsafe, misleading, or discriminatory listings. A match or quote is not a guarantee of capacity, price, transit time, border clearance, or delivery. The parties to a booking remain responsible for agreeing the cargo, route, documents, collection, delivery, and applicable legal requirements.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">4. Payments and delivery</h3><p>Where enabled, payment, escrow, payout, and proof-of-delivery tools reflect the status recorded in the service. Fees, settlement timing, and third-party payment-provider rules may apply. Do not use the service to move prohibited goods or to evade customs, tax, sanctions, licensing, or safety obligations.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">5. Verification and safety</h3><p>Verification badges and document reviews support trust but do not guarantee that a person, vehicle, cargo, document, or service is safe, lawful, or suitable. Check counterparties and cargo independently and report suspicious activity promptly.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">6. Acceptable use</h3><p>Do not interfere with the service, attempt unauthorized access, scrape or copy protected content, upload malicious code, impersonate another person, misuse personal information, or use TruckShare for fraud or harassment. We may suspend access to protect users, the service, or an investigation.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">7. Disclaimers and liability</h3><p>The service is provided on an availability basis and may change or contain errors. To the maximum extent permitted by law, TruckShare is not responsible for indirect loss, lost profits, cargo loss, delay, border events, or disputes between users. Nothing here excludes liability that cannot legally be excluded.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">8. Changes and termination</h3><p>We may update these terms as the service changes. We will show the updated version here and record the version accepted for new accounts. You may stop using the service at any time; provisions that should reasonably survive termination will continue to apply.</p></section>
+      </> : <>
+        <section><h3 className="font-display text-base font-semibold text-foreground">1. Information we collect</h3><p>We collect information you provide, such as your name or business name, email address, phone number, country, roles, listings, bookings, messages, verification documents, delivery details, and support requests. We also collect technical information needed to secure and operate the service, such as session, device, and basic usage data.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">2. How we use information</h3><p>We use information to create and secure accounts, authenticate users, match loads and capacity, coordinate bookings, verify people and vehicles, support payments and delivery workflows, prevent fraud, improve the service, communicate service updates, and meet legal obligations.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">3. Google sign-in</h3><p>If you choose Google sign-in, Google provides us with account information such as your verified email address, name, and Google account identifier. We use it to authenticate you and associate your TruckShare account. We do not receive your Google password.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">4. When information is shared</h3><p>We share only what is needed to operate the requested workflow: relevant profile and listing details with booking counterparts, information with service providers that help host, send messages, process payments, or provide maps, and information when required to protect users or comply with law. We do not sell personal information.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">5. Retention and security</h3><p>We keep information for as long as reasonably needed for the purposes above, dispute handling, safety, accounting, and legal obligations. We use access controls and security measures appropriate to the service, but no online service can guarantee absolute security.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">6. Your choices</h3><p>You may request access to, correction of, or deletion of information subject to applicable law and operational or legal retention needs. You can stop optional communications using the available unsubscribe or account controls. Some information is required to provide account, verification, booking, or safety features.</p></section>
+        <section><h3 className="font-display text-base font-semibold text-foreground">7. Children and changes</h3><p>TruckShare is intended for people who can legally use a commercial logistics service. We may update this policy when our practices change. The current version and its update date will remain available from the account screen.</p></section>
+      </>}
+      <p className="border-t border-border pt-4 text-xs">For privacy, account, or policy questions, use the TruckShare support channel provided with the service.</p>
+    </div>
+  </Modal>;
+}
 function LocationSelect({ label, value, countryCode, onChange }: { label: string; value: string; countryCode?: string; onChange: (value: string) => void }) {
   const options = EAC_LOCATIONS.filter((location) => !countryCode || location.countryCode === countryCode);
   return <label className="block"><span className={labelClass}>{label} *</span><select required className={input} value={value} onChange={(event) => onChange(event.target.value)}>{options.map((location) => <option key={`${location.countryCode}-${location.city}`} value={location.city}>{location.city} · {location.countryName}</option>)}</select></label>;
@@ -608,6 +638,8 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
   const [phoneOtp, setPhoneOtp] = useState("");
   const [message, setMessage] = useState(initialMessage);
   const [busy, setBusy] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null);
 
   const continueWithEmail = () => { setMethod("email"); setStep("email"); setMessage(""); };
   const continueWithGoogle = () => { setMethod("google"); setStep("account"); setMessage(""); };
@@ -618,7 +650,7 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
     try {
       const result = await api<{ challengeId: string; message: string }>("/auth/request-email-otp", {
         method: "POST",
-        body: JSON.stringify({ email: email.trim(), mode, ...(mode === "signup" ? { name, roles } : {}) }),
+        body: JSON.stringify({ email: email.trim(), mode, ...(mode === "signup" ? { name, roles, termsAccepted: acceptedTerms } : {}) }),
       });
       setAuthMode(mode);
       setEmailChallengeId(result.challengeId);
@@ -668,6 +700,7 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
     setBusy(true);
     const params = new URLSearchParams({ mode });
     if (mode === "signup") params.set("roles", roles.join(","));
+    if (mode === "signup" && acceptedTerms) params.set("terms", "1");
     window.location.assign(`${API_ROOT}/auth/google/start?${params.toString()}`);
   };
 
@@ -687,6 +720,10 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
     event.preventDefault();
     if (!roles.length) {
       setMessage("Choose at least one role to continue.");
+      return;
+    }
+    if (!acceptedTerms) {
+      setMessage("Accept the Terms and Conditions and Privacy Policy to create your account.");
       return;
     }
     if (method === "email") void requestEmailOtp("signup");
@@ -767,7 +804,7 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
     else if (step === "emailOtp") setStep(authMode === "signup" ? "roles" : "email");
   };
 
-  const question = step === "method" ? "How would you like to continue?"
+  const question = step === "method" ? "Sign in or create your account"
     : step === "email" ? "What email should we use?"
       : step === "account" ? "Have you used TruckShare before?"
         : step === "profile" ? "First, tell us your name."
@@ -775,15 +812,19 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
             : step === "phoneVerify" ? "Verify your phone number"
               : "What is your email verification code?";
 
-  return <Modal title="Welcome to TruckShare EAC" eyebrow={required ? "Set up your account" : "Account access"} onClose={onClose} closable={!required}>
+  return <>
+    <Modal title="Welcome to TruckShare EAC" eyebrow={required ? "Set up your account" : "Account access"} onClose={onClose} closable={!required}>
     <div className="mb-5 flex items-center gap-2">{(["method", "profile", "roles"] as const).map((item, index) => <span key={item} className={`h-1.5 flex-1 rounded-full ${step === item || (step === "email" && index === 0) || (step === "account" && index === 0) || (step === "emailOtp" && index === 2) || (step === "phoneVerify" && index === 2) || (step === "roles" && index <= 2) ? "bg-primary" : "bg-muted"}`} />)}</div>
     {step !== "method" && step !== "phoneVerify" && <button type="button" onClick={goBack} className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground transition hover:text-foreground"><ArrowLeft size={14} /> Back</button>}
     <p className="font-mono-ui text-[10px] uppercase tracking-[.15em] text-muted-foreground">{step === "method" || step === "email" || step === "account" ? "Question 1 of 3" : step === "profile" ? "Question 2 of 3" : "Question 3 of 3"}</p>
     <h3 className="mt-2 font-display text-2xl font-semibold tracking-[-.04em]">{question}</h3>
     {message && <div className="mt-4 rounded-lg bg-[#fff0d9] p-3 text-xs text-[#8f5d1a]">{message}</div>}
-    {step === "method" && <div className="mt-6 grid gap-3 sm:grid-cols-2">
+    {step === "method" && <div className="mt-6 space-y-4">
+       <p className="text-sm text-muted-foreground">Use one secure entry point. We’ll sign you in if you already have an account, or guide you through setup if you’re new.</p>
+       <div className="grid gap-3 sm:grid-cols-2">
       <button type="button" onClick={continueWithEmail} className={`${secondaryButton} min-h-24 flex-col`}><Send size={22} /><span>Continue with email</span><small className="font-normal text-muted-foreground">Free email verification</small></button>
       <button type="button" onClick={continueWithGoogle} className={`${secondaryButton} min-h-24 flex-col`}><span className="font-display text-2xl font-bold">G</span><span>Continue with Google</span><small className="font-normal text-muted-foreground">Use your Google account</small></button>
+       </div>
     </div>}
     {step === "email" && <form onSubmit={(event) => { event.preventDefault(); void checkEmailAccount(); }} className="mt-6 space-y-4">
       <Field label="Email address" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
@@ -804,7 +845,11 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
       <div className="grid gap-3 sm:grid-cols-2">
         {([["Carrier", "I have trucks or available space.", Truck], ["Shipper", "I need goods moved.", PackageCheck] ] as const).map(([value, detail, Icon]) => <button type="button" key={value} onClick={() => toggleRole(value)} className={`rounded-xl border p-4 text-left transition ${roles.includes(value) ? "border-primary bg-[#e5f1e9] text-primary" : "border-border bg-card"}`}><Icon size={20} /><p className="mt-3 text-sm font-bold">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p><span className="mt-3 block text-[10px] font-bold uppercase tracking-wider">{roles.includes(value) ? "Selected" : "Choose"}</span></button>)}
       </div>
-      <button type="submit" disabled={busy} className={`${button} w-full`}>{busy ? "Continuing..." : "Send email verification code"} <ArrowRight size={14} /></button>
+      <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+        <input id="terms-consent" type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
+        <label htmlFor="terms-consent" className="leading-5">I agree to the <button type="button" onClick={() => setLegalDocument("terms")} className="font-bold text-foreground underline underline-offset-2">Terms and Conditions</button> and acknowledge the <button type="button" onClick={() => setLegalDocument("privacy")} className="font-bold text-foreground underline underline-offset-2">Privacy Policy</button>.</label>
+      </div>
+      <button type="submit" disabled={busy || !acceptedTerms} className={`${button} w-full`}>{busy ? "Continuing..." : "Create account"} <ArrowRight size={14} /></button>
     </form>}
     {step === "emailOtp" && <form onSubmit={verifyEmail} className="mt-6 space-y-4">
       <div className="rounded-lg bg-[#e5f1e9] p-3 text-xs text-[#28765a]">{authMode === "login" ? "Login code sent." : "Signup code sent."} Enter the code from your email. It expires in 10 minutes.</div>
@@ -823,7 +868,12 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
         <button type="button" disabled={busy} onClick={() => { setPhoneChallengeId(""); setMessage(""); }} className="w-full text-xs font-bold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Use a different number</button>
       </form>}
     </div>}
-  </Modal>;
+      <div className="mt-6 border-t border-border pt-4 text-center text-[11px] leading-5 text-muted-foreground">
+        By using TruckShare, you agree to the <button type="button" onClick={() => setLegalDocument("terms")} className="font-bold text-foreground underline underline-offset-2">Terms and Conditions</button> and acknowledge the <button type="button" onClick={() => setLegalDocument("privacy")} className="font-bold text-foreground underline underline-offset-2">Privacy Policy</button>.
+      </div>
+    </Modal>
+    <LegalDocumentModal document={legalDocument} onClose={() => setLegalDocument(null)} />
+  </>;
 }
 
 function TripsPage() {
