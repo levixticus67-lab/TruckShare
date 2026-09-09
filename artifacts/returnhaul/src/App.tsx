@@ -660,21 +660,15 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
     else void finishGoogle("login");
   };
 
-  const finishGoogle = async (mode: "login" | "signup") => {
-    setBusy(true);
-    setMessage("");
-    try {
-      const result = await api<{ token: string; user: AuthUser }>("/auth/google", {
-        method: "POST",
-        body: JSON.stringify({ mode, ...(mode === "signup" ? { name, roles } : {}) }),
-      });
-      localStorage.setItem("truckshare_token", result.token);
-      onComplete(result.user);
-    } catch (reason: unknown) {
-      setMessage(reason instanceof Error ? reason.message : "Google sign-in could not be completed.");
-    } finally {
-      setBusy(false);
+  const finishGoogle = (mode: "login" | "signup") => {
+    if (!API_ROOT) {
+      setMessage("The API is not configured. Add VITE_API_URL before using Google sign-in.");
+      return;
     }
+    setBusy(true);
+    const params = new URLSearchParams({ mode });
+    if (mode === "signup") params.set("roles", roles.join(","));
+    window.location.assign(`${API_ROOT}/auth/google/start?${params.toString()}`);
   };
 
   const submitProfile = (event: FormEvent) => {
