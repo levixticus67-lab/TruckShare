@@ -303,7 +303,7 @@ function LocationSelect({ label, value, countryCode, onChange }: { label: string
   const options = EAC_LOCATIONS.filter((location) => !countryCode || location.countryCode === countryCode);
   return <label className="block"><span className={labelClass}>{label} *</span><select required className={input} value={value} onChange={(event) => onChange(event.target.value)}>{options.map((location) => <option key={`${location.countryCode}-${location.city}`} value={location.city}>{location.city} · {location.countryName}</option>)}</select></label>;
 }
-function RoutePreview({ origin, originCountry, originLocation, destination, destinationCountry, destinationLocation }: { origin: string; originCountry: string; originLocation?: LocationPoint; destination: string; destinationCountry: string; destinationLocation?: LocationPoint }) {
+function RoutePreview({ origin, originCountry, originLocation, destination, destinationCountry, destinationLocation, height = "150px", className = "mt-5" }: { origin: string; originCountry: string; originLocation?: LocationPoint; destination: string; destinationCountry: string; destinationLocation?: LocationPoint; height?: string; className?: string }) {
   const stops: RouteStop[] = originLocation && destinationLocation
     ? [
         { label: "Origin", city: originLocation.city, country: originLocation.countryName, position: [originLocation.latitude, originLocation.longitude], status: "complete" },
@@ -311,7 +311,81 @@ function RoutePreview({ origin, originCountry, originLocation, destination, dest
       ]
     : routeStopsFor(origin, originCountry, destination, destinationCountry);
   if (!stops.length) return null;
-  return <RouteMap stops={stops} height="150px" className="mt-5" />;
+  return <RouteMap stops={stops} height={height} className={className} />;
+}
+
+function RouteDetailsModal({ open, onClose, origin, originCountry, originLocation, destination, destinationCountry, destinationLocation }: { open: boolean; onClose: () => void; origin: string; originCountry: string; originLocation?: LocationPoint; destination: string; destinationCountry: string; destinationLocation?: LocationPoint }) {
+  if (!open) return null;
+  return <Modal title={`${origin} → ${destination}`} eyebrow="Route overview" onClose={onClose}>
+    <div className="overflow-hidden rounded-xl border border-border bg-muted/30">
+      <RoutePreview origin={origin} originCountry={originCountry} originLocation={originLocation} destination={destination} destinationCountry={destinationCountry} destinationLocation={destinationLocation} height="320px" className="!mt-0" />
+    </div>
+    <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="rounded-lg border border-border bg-muted/30 p-3"><p className={labelClass}>Origin</p><p className="font-display text-base font-semibold">{origin}</p><p className="text-xs text-muted-foreground">{originCountry}</p></div>
+      <div className="rounded-lg border border-border bg-muted/30 p-3"><p className={labelClass}>Destination</p><p className="font-display text-base font-semibold">{destination}</p><p className="text-xs text-muted-foreground">{destinationCountry}</p></div>
+    </div>
+  </Modal>;
+}
+
+function TripCard({ trip }: { trip: Trip }) {
+  const [routeOpen, setRouteOpen] = useState(false);
+  return <>
+    <Card className="overflow-hidden p-0 transition-shadow hover:shadow-lg">
+      <div className="p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-muted-foreground">Available capacity · {dateFmt(trip.departureDate)}</p>
+            <div className="mt-3 flex items-center gap-2 font-display text-[1.35rem] font-semibold tracking-[-.035em] sm:text-2xl">
+              <span className="truncate">{trip.origin}</span><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#fff0d9] text-accent-foreground"><ArrowRight size={14} /></span><span className="truncate">{trip.destination}</span>
+            </div>
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><Truck size={14} className="text-accent-foreground" />{trip.carrier} · {trip.vehicleType} · {trip.carrierRating} ★</p>
+          </div>
+          <Status value={trip.status} />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 divide-x border-y border-border bg-muted/20">
+        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Available</p><p className="mt-1 font-display text-xl font-semibold">{trip.capacityTons}<span className="ml-1 text-sm font-medium text-muted-foreground">t</span></p></div>
+        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Space</p><p className="mt-1 font-display text-xl font-semibold">{trip.capacityM3}<span className="ml-1 text-sm font-medium text-muted-foreground">m³</span></p></div>
+        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Rate</p><p className="mt-1 truncate font-display text-base font-semibold sm:text-lg">{money(trip.price, trip.currency)}</p></div>
+      </div>
+      <div className="flex items-center gap-2 p-4 sm:p-5">
+        <button type="button" onClick={() => setRouteOpen(true)} className={`${secondaryButton} flex-1`}><MapPin size={14} /> View route</button>
+        <Link href="/matches" className={`${button} flex-1`}>Find a load <ChevronRight size={14} /></Link>
+        <a href="tel:+256700000000" aria-label="Call carrier" className={`${secondaryButton} h-10 w-10 shrink-0 p-0`}><Phone size={15} /></a>
+      </div>
+    </Card>
+    <RouteDetailsModal open={routeOpen} onClose={() => setRouteOpen(false)} origin={trip.origin} originCountry={trip.originCountry || ""} originLocation={trip.originLocation} destination={trip.destination} destinationCountry={trip.destinationCountry || ""} destinationLocation={trip.destinationLocation} />
+  </>;
+}
+
+function FreightCard({ load }: { load: Freight }) {
+  const [routeOpen, setRouteOpen] = useState(false);
+  return <>
+    <Card className="overflow-hidden p-0 transition-shadow hover:shadow-lg">
+      <div className="p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-muted-foreground">{load.cargoType || "General cargo"} · Pickup {dateFmt(load.pickupDate)}</p>
+            <div className="mt-3 flex items-center gap-2 font-display text-[1.35rem] font-semibold tracking-[-.035em] sm:text-2xl">
+              <span className="truncate">{load.pickup}</span><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#fff0d9] text-accent-foreground"><ArrowRight size={14} /></span><span className="truncate">{load.dropoff}</span>
+            </div>
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><PackageCheck size={14} className="text-accent-foreground" />{load.shipper} · {load.description}</p>
+          </div>
+          <Status value={load.status} />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 divide-x border-y border-border bg-muted/20">
+        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Weight</p><p className="mt-1 font-display text-xl font-semibold">{load.weightTons}<span className="ml-1 text-sm font-medium text-muted-foreground">t</span></p></div>
+        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Volume</p><p className="mt-1 font-display text-xl font-semibold">{load.volumeM3 || "—"}<span className="ml-1 text-sm font-medium text-muted-foreground">m³</span></p></div>
+        <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Budget</p><p className="mt-1 truncate font-display text-base font-semibold sm:text-lg">{money(load.price, load.currency)}</p></div>
+      </div>
+      <div className="flex items-center gap-2 p-4 sm:p-5">
+        <button type="button" onClick={() => setRouteOpen(true)} className={`${secondaryButton} flex-1`}><MapPin size={14} /> View route</button>
+        <Link href="/matches" className={`${button} flex-1`}>Find a truck <Search size={14} /></Link>
+      </div>
+    </Card>
+    <RouteDetailsModal open={routeOpen} onClose={() => setRouteOpen(false)} origin={load.pickup} originCountry={load.pickupCountry || ""} originLocation={load.pickupLocation} destination={load.dropoff} destinationCountry={load.dropoffCountry || ""} destinationLocation={load.dropoffLocation} />
+  </>;
 }
 
 /* Legacy phone-only preview auth components retained for historical reference.
@@ -919,7 +993,7 @@ function TripsPage() {
   return (
     <div className="space-y-6">
       <Header eyebrow="Carrier portal" title="Return trips" detail="Turn an empty leg into paid capacity anywhere across the EAC." action={<button onClick={() => setOpen(true)} className={button}><Plus size={14} /> Post return trip</button>} />
-      {query.loading ? <Loading error={query.error} retry={query.reload} /> : <div className="grid gap-4 lg:grid-cols-2">{query.data.map((trip) => <Card key={trip.id}><div className="flex items-start justify-between gap-3"><div><p className="font-mono-ui text-[10px] uppercase tracking-wider text-muted-foreground">Departure · {dateFmt(trip.departureDate)} {trip.departureTime}</p><h3 className="mt-2 font-display text-xl font-semibold">{trip.origin} <span className="text-xs font-semibold text-muted-foreground">({trip.originCountry})</span> <ArrowRight className="mx-1 inline text-accent-foreground" size={16} /> {trip.destination} <span className="text-xs font-semibold text-muted-foreground">({trip.destinationCountry})</span></h3><p className="mt-1 text-xs text-muted-foreground">{trip.carrier} · {trip.vehicleType} · {trip.carrierRating} ★</p></div><Status value={trip.status} /></div><RoutePreview origin={trip.origin} originCountry={trip.originCountry || ""} originLocation={trip.originLocation} destination={trip.destination} destinationCountry={trip.destinationCountry || ""} destinationLocation={trip.destinationLocation} /><div className="mt-5 grid grid-cols-3 gap-3 border-t border-border pt-4"><div><p className={labelClass}>Available</p><p className="font-display text-lg font-semibold">{trip.capacityTons} t</p></div><div><p className={labelClass}>Space</p><p className="font-display text-lg font-semibold">{trip.capacityM3} m³</p></div><div><p className={labelClass}>Rate</p><p className="font-display text-lg font-semibold">{money(trip.price, trip.currency)}</p></div></div><div className="mt-4 flex gap-2"><Link href="/matches" className={secondaryButton}>Find matching loads <ChevronRight size={14} /></Link><a href="tel:+256700000000" className={secondaryButton}><Phone size={14} /> Call</a></div></Card>)}</div>}
+      {query.loading ? <Loading error={query.error} retry={query.reload} /> : <div className="grid gap-5 lg:grid-cols-2">{query.data.map((trip) => <TripCard key={trip.id} trip={trip} />)}</div>}
       {open && <Modal title="Post a return trip" eyebrow="Carrier portal" onClose={() => setOpen(false)}><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><LocationPicker label="Origin area or landmark" value={form.originLocation} countryCode={form.originCountry} onChange={setOrigin} onLabelChange={setOriginLabel} /><CountrySelect label="Origin country" value={form.originCountry} onChange={setOriginCountry} /><LocationPicker label="Destination area or landmark" value={form.destinationLocation} countryCode={form.destinationCountry} onChange={setDestination} onLabelChange={setDestinationLabel} /><CountrySelect label="Destination country" value={form.destinationCountry} onChange={setDestinationCountry} /><Field label="Departure date" type="date" value={form.departureDate} onChange={(value) => update("departureDate", value)} /><Field label="Departure time" type="time" value={form.departureTime} onChange={(value) => update("departureTime", value)} /><label><span className={labelClass}>Truck type</span><select className={input} value={form.vehicleType} onChange={(event) => update("vehicleType", event.target.value)}>{["Fuso", "Canter", "Trailer", "Flatbed"].map((item) => <option key={item}>{item}</option>)}</select></label><Field label="Available capacity (tons)" type="number" value={form.capacityTons} onChange={(value) => update("capacityTons", value)} /><Field label="Available space (m³)" type="number" value={form.capacityM3} onChange={(value) => update("capacityM3", value)} /><Field label="Trip price" type="number" value={form.price} onChange={(value) => update("price", value)} /><label><span className={labelClass}>Price currency</span><select className={input} value={form.currency} onChange={(event) => update("currency", event.target.value)}>{regionalReference.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency} · {country.name}</option>)}</select></label></div><p className="text-[11px] text-muted-foreground">Type any landmark, worksite, warehouse, or road area. Use the map only when you want to attach exact coordinates.</p><button className={`${button} w-full`}><Plus size={14} /> Publish trip</button></form></Modal>}
     </div>
   );
@@ -969,7 +1043,7 @@ function FreightPage() {
   return (
     <div className="space-y-6">
       <Header eyebrow="Shipper portal" title="Load board" detail="Post cargo once and let verified carriers find the right route, date, and capacity across the EAC." action={<button onClick={() => setOpen(true)} className={button}><Plus size={14} /> Post a load</button>} />
-      {query.loading ? <Loading error={query.error} retry={query.reload} /> : <div className="grid gap-4 lg:grid-cols-2">{query.data.map((load) => <Card key={load.id}><div className="flex items-start justify-between gap-3"><div><p className="font-mono-ui text-[10px] uppercase tracking-wider text-muted-foreground">{load.cargoType || "General cargo"} · Pickup {dateFmt(load.pickupDate)}</p><h3 className="mt-2 font-display text-xl font-semibold">{load.pickup} <span className="text-xs font-semibold text-muted-foreground">({load.pickupCountry})</span> <ArrowRight className="mx-1 inline text-accent-foreground" size={16} /> {load.dropoff} <span className="text-xs font-semibold text-muted-foreground">({load.dropoffCountry})</span></h3><p className="mt-1 text-xs text-muted-foreground">{load.shipper} · {load.description}</p></div><Status value={load.status} /></div><RoutePreview origin={load.pickup} originCountry={load.pickupCountry || ""} originLocation={load.pickupLocation} destination={load.dropoff} destinationCountry={load.dropoffCountry || ""} destinationLocation={load.dropoffLocation} /><div className="mt-5 grid grid-cols-3 gap-3 border-t border-border pt-4"><div><p className={labelClass}>Weight</p><p className="font-display text-lg font-semibold">{load.weightTons} t</p></div><div><p className={labelClass}>Volume</p><p className="font-display text-lg font-semibold">{load.volumeM3 || "—"} m³</p></div><div><p className={labelClass}>Budget</p><p className="font-display text-lg font-semibold">{money(load.price, load.currency)}</p></div></div><Link href="/matches" className={`${secondaryButton} mt-4`}>Search matching trucks <Search size={14} /></Link></Card>)}</div>}
+      {query.loading ? <Loading error={query.error} retry={query.reload} /> : <div className="grid gap-5 lg:grid-cols-2">{query.data.map((load) => <FreightCard key={load.id} load={load} />)}</div>}
       {open && <Modal title="Post a load" eyebrow="Shipper portal" onClose={() => setOpen(false)}><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><LocationPicker label="Pickup area or landmark" value={form.pickupLocation} countryCode={form.pickupCountry} onChange={setPickup} onLabelChange={setPickupLabel} /><CountrySelect label="Pickup country" value={form.pickupCountry} onChange={setPickupCountry} /><LocationPicker label="Drop-off area or landmark" value={form.dropoffLocation} countryCode={form.dropoffCountry} onChange={setDropoff} onLabelChange={setDropoffLabel} /><CountrySelect label="Drop-off country" value={form.dropoffCountry} onChange={setDropoffCountry} /><Field label="Cargo description" value={form.description} onChange={(value) => update("description", value)} placeholder="Bagged maize, cartons..." /><Field label="Cargo type" value={form.cargoType} onChange={(value) => update("cargoType", value)} /><Field label="Weight (tons)" type="number" value={form.weightTons} onChange={(value) => update("weightTons", value)} /><Field label="Volume (m³)" type="number" value={form.volumeM3} onChange={(value) => update("volumeM3", value)} /><Field label="Pickup date" type="date" value={form.pickupDate} onChange={(value) => update("pickupDate", value)} /><Field label="Budget" type="number" value={form.price} onChange={(value) => update("price", value)} /><label><span className={labelClass}>Budget currency</span><select className={input} value={form.currency} onChange={(event) => update("currency", event.target.value)}>{regionalReference.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency} · {country.name}</option>)}</select></label></div><p className="text-[11px] text-muted-foreground">Type any landmark, worksite, warehouse, or road area. Use the map only when you want to attach exact coordinates.</p><button className={`${button} w-full`}><Plus size={14} /> Publish load</button></form></Modal>}
     </div>
   );
