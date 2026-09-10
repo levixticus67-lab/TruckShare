@@ -340,12 +340,6 @@
     position: relative;
     z-index: 1;
     width: 100%;
-    overflow: hidden;
-    border: 1px solid hsl(var(--border) / 0.85);
-    border-radius: 1rem;
-    background: hsl(0 0% 100% / 0.96);
-    padding: 0.65rem 0.8rem;
-    box-shadow: 0 10px 24px hsl(var(--foreground) / 0.12);
     animation: truckshare-loader-drive 4.5s cubic-bezier(.46, .03, .54, .97) infinite;
   }
 
@@ -355,6 +349,11 @@
     width: 100%;
     height: auto;
     filter: drop-shadow(0 12px 14px hsl(var(--foreground) / 0.12));
+  }
+
+  .dark .brand-loader-image {
+    filter: brightness(1.45) saturate(1.3) contrast(1.12) drop-shadow(0 12px 14px hsl(0 0% 0% / 0.28));
+    mix-blend-mode: screen;
   }
 
   .brand-loader-wind {
