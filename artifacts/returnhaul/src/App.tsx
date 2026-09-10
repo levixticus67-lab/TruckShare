@@ -4,7 +4,7 @@ import {
   Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, ClipboardCheck, Clock3, FileCheck2,
   FilePlus2, FileText, Gauge, LayoutDashboard, LockKeyhole, MapPin, Menu, MessageSquare,
   PackageCheck, Phone, Plus, RefreshCw, Route as RouteIcon, Search, Send, ShieldCheck,
-  Truck, UploadCloud, UserRound, UsersRound, X, Moon, Sun, Globe2,
+  Truck, UploadCloud, UserRound, UsersRound, X, Moon, Sun, Globe2, LogOut, KeyRound, Save,
 } from "lucide-react";
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from "wouter";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -71,14 +71,15 @@ type Verification = { id: string; name: string; phone: string; nin: string; lice
 type DashboardData = { activeTrips: number; availableLoads: number; inTransit: number; delivered: number; totalEscrow: number; matchRate: number; recentActivity: { id: string; label: string; detail: string; time: string; tone: string }[] };
 type EacReference = { countries: { code: string; name: string; currency: string }[]; corridors: { origin: string; originCountry: string; destination: string; destinationCountry: string; border: string }[] };
 type BorderMilestone = { id: string; bookingId: string; sequence: number; country: string; checkpoint: string; status: string; requiredDocuments: string[]; updatedAt: string };
-type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: string; amount: number; currency: string; settlementAmount: number; settlementCurrency: string; exchangeRate: number; fee: number; commissionAmount: number; carrierPayout: number; indicative: boolean; expiresInSeconds: number };
+type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: string; amount: number; payerAmount?: number; currency: string; settlementAmount: number; settlementCurrency: string; exchangeRate: number; fee: number; commissionAmount: number; carrierPayout: number; indicative: boolean; expiresInSeconds: number };
 type WorkspaceRole = "Carrier" | "Shipper" | "Admin";
-type AuthUser = { id: string; name: string; phone?: string; email?: string; country: string; role: WorkspaceRole; roles?: Array<"Carrier" | "Shipper">; verified: boolean };
+type AuthUser = { id: string; name: string; phone?: string; email?: string; country: string; role: WorkspaceRole; roles?: Array<"Carrier" | "Shipper">; verified: boolean; hasPassword?: boolean };
 type LegalDocument = "terms" | "privacy";
 const RoleContext = createContext<WorkspaceRole>("Carrier");
 const useRole = () => useContext(RoleContext);
 
 const money = (value = 0, currency = "UGX") => `${currency} ${new Intl.NumberFormat("en-UG", { maximumFractionDigits: 0 }).format(value)}`;
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "TS";
 const regionalReference: EacReference = {
   countries: [
     { code: "BI", name: "Burundi", currency: "BIF" }, { code: "CD", name: "DRC", currency: "CDF" },
@@ -119,7 +120,8 @@ const mobileLabels: Record<string, string> = {
 const nav = [
   ["/", "Home", LayoutDashboard], ["/trips", "Trips", RouteIcon], ["/freight", "Loads", PackageCheck],
   ["/matches", "Suggested matches", Gauge], ["/bookings", "My bookings", LockKeyhole], ["/tracking", "Track delivery", MapPin],
-  ["/messages", "Messages", MessageSquare], ["/documents", "Documents", FileCheck2], ["/verification", "Verify account", ShieldCheck],
+  ["/messages", "Messages", MessageSquare], ["/account", "My account", UserRound],
+  ["/documents", "Documents", FileCheck2], ["/verification", "Verify account", ShieldCheck],
   ["/admin", "Admin", UsersRound], ["/payments", "Payments", Banknote], ["/regional", "Routes & countries", Globe2],
 ] as const;
 
@@ -192,10 +194,10 @@ function Shell({ children }: { children: ReactNode }) {
     navigate(nextRole === "Carrier" ? "/trips" : nextRole === "Shipper" ? "/freight" : "/admin");
   };
   const visibleNav = nav.filter(([href]) => role === "Carrier"
-    ? ["/", "/trips", "/freight", "/matches", "/bookings", "/tracking", "/messages", "/documents", "/verification", "/payments", "/regional"].includes(href)
+    ? ["/", "/trips", "/freight", "/matches", "/bookings", "/tracking", "/messages", "/account", "/payments", "/regional"].includes(href)
     : role === "Shipper"
-      ? ["/", "/freight", "/trips", "/matches", "/bookings", "/tracking", "/messages", "/documents", "/payments", "/regional"].includes(href)
-      : ["/", "/admin", "/verification", "/documents", "/messages", "/regional"].includes(href));
+      ? ["/", "/freight", "/trips", "/matches", "/bookings", "/tracking", "/messages", "/account", "/payments", "/regional"].includes(href)
+      : ["/", "/admin", "/account", "/messages", "/regional"].includes(href));
   const primaryHrefs = ["/", "/trips", "/freight", "/bookings"];
   const primaryNav = visibleNav.filter(([href]) => primaryHrefs.includes(href));
   const moreNav = visibleNav.filter(([href]) => !primaryHrefs.includes(href));
@@ -207,6 +209,14 @@ function Shell({ children }: { children: ReactNode }) {
     setRole(user.role === "Admin" ? "Admin" : user.roles?.[0] || user.role);
     setAuthOpen(false);
   };
+  const signOut = () => {
+    localStorage.removeItem("truckshare_token");
+    setAuthUser(null);
+    setAuthMessage("");
+    setMobileOpen(false);
+    setMoreOpen(false);
+    navigate("/");
+  };
   if (authLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-background"><BrandLoader label="Loading your TruckShare account" /></div>;
   if (!authUser) return <AuthModal required initialMessage={authMessage} onComplete={finishAuth} />;
   return <RoleContext.Provider value={role}><div className="noise min-h-[100dvh] bg-background">
@@ -214,7 +224,7 @@ function Shell({ children }: { children: ReactNode }) {
       <div className="mb-7 flex items-center justify-between px-2"><Logo /><div className="flex items-center gap-1"><ThemeToggle /><button className="rounded-lg p-2 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={18} /></button></div></div>
       <div className="mb-6 px-2"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/40">I am using TruckShare as a</p><div className="mt-2 flex rounded-lg border border-sidebar-border bg-sidebar-accent/50 p-1">{availableRoles.map((item) => <button type="button" key={item} onClick={() => changeRole(item)} className={`flex-1 rounded-md px-1.5 py-1.5 text-[11px] font-semibold ${role === item ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/55"}`}>{item}</button>)}</div></div>
       <nav className="space-y-1"><p className="mb-2 px-3 font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/35">Main</p>{primaryNav.map(([href, label, Icon]) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium ${location === href ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}><Icon size={17} /><span>{label}</span></Link>)}<button type="button" onClick={() => setMoreOpen((open) => !open)} className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"><span className="flex items-center gap-3"><Menu size={17} />More</span><ChevronDown size={15} className={`transition-transform ${moreOpen ? "rotate-180" : ""}`} /></button>{moreOpen && <div className="space-y-1 pl-3">{moreNav.map(([href, label, Icon]) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[12px] font-medium ${location === href ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}><Icon size={15} /><span>{label}</span></Link>)}</div>}</nav>
-      <div className="mt-auto space-y-3"><div className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-4"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9a35c] text-xs font-bold text-primary">NS</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">Nadia S.</p><p className="truncate text-[10px] text-sidebar-foreground/45">{role} account</p></div></div></div>
+      <div className="mt-auto space-y-3"><Link href="/account" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-4 text-left hover:text-sidebar-foreground"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9a35c] text-xs font-bold text-primary">{initials(authUser.name)}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{authUser.name}</p><p className="truncate text-[10px] text-sidebar-foreground/45">{role} account</p></div><UserRound size={15} className="shrink-0 text-sidebar-foreground/45" /></Link><button type="button" onClick={signOut} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-xs font-semibold text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground"><LogOut size={15} /> Sign out</button></div>
     </aside>
      <nav className={`mobile-bottom-nav fixed inset-x-3 bottom-3 z-40 flex h-[70px] items-center gap-1 rounded-[22px] border border-border/80 px-2 shadow-xl lg:hidden ${mobileOpen ? "pointer-events-none opacity-0" : ""}`} aria-label="Mobile navigation">
         <Link href="/" onClick={() => setMobileOpen(false)} aria-label="TruckShare home" className={`mobile-nav-brand ${location === "/" ? "is-active" : ""}`}><img className="mobile-nav-brand-logo" src="/branding/truckshare-mark.png" alt="" /></Link>
@@ -1179,9 +1189,9 @@ function RegionalPaymentsPage() {
   };
   const pay = async () => {
     if (!booking) return;
-    try { await api("/payments/simulate", { method: "POST", body: JSON.stringify({ bookingId: booking.id, network, phone, payerCountry, currency: payerCurrency, amount: booking.amount }) }); setMessage("Payment simulated and held in escrow."); bookings.reload(); } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Payment failed."); }
+    try { await api("/payments/simulate", { method: "POST", body: JSON.stringify({ bookingId: booking.id, network, phone, payerCountry, currency: payerCurrency, settlementAmount: booking.amount }) }); setMessage("Payment simulated and held in escrow."); bookings.reload(); } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Payment failed."); }
   };
-  return <div className="mx-auto max-w-5xl space-y-6"><Header eyebrow="Regional settlement" title="Cross-border checkout" detail="Choose the payer market, preview the indicative FX quote and fees, then fund the booking through a supported network." />{message && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{message}</div>}<div className="grid gap-5 lg:grid-cols-[1fr_.85fr]"><Card><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff0d9] text-[#9a641c]"><Globe2 size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a regional booking</h3><p className="text-xs text-muted-foreground">Escrow releases only after paid delivery confirmation.</p></div></div><div className="mt-6 space-y-4"><label><span className={labelClass}>Booking</span><select className={input} value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">Select a booking</option>{bookings.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><label><span className={labelClass}>Payer country</span><select className={input} value={payerCountry} onChange={(event) => { const country = reference.data.countries.find((item) => item.code === event.target.value); setPayerCountry(event.target.value); if (country) setPayerCurrency(country.currency); }} >{reference.data.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label><label><span className={labelClass}>Payer currency</span><select className={input} value={payerCurrency} onChange={(event) => setPayerCurrency(event.target.value)}>{reference.data.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency}</option>)}</select></label></div><label><span className={labelClass}>Payment network</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option><option>Bank Transfer</option></select></label><Field label="EAC phone number" value={phone} onChange={setPhone} /><div className="flex flex-col gap-2 sm:flex-row"><button onClick={getQuote} className={`${secondaryButton} flex-1`}><RefreshCw size={14} /> Preview FX quote</button><button onClick={pay} disabled={!booking} className={`${button} flex-1`}><LockKeyhole size={14} /> Simulate and hold</button></div></div></Card><Card className="border-primary/15 bg-[#e5eee9] text-primary"><p className={labelClass}>Settlement preview</p>{quote ? <div className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><span className="text-primary/65">Payer amount</span><strong>{money(quote.amount, quote.currency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">FX rate</span><strong>1 {quote.currency} = {quote.exchangeRate} {quote.settlementCurrency}</strong></div><div className="flex justify-between"><span className="text-primary/65">Settlement amount</span><strong>{money(quote.settlementAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">Fees + commission</span><strong>{money(quote.fee + quote.commissionAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between border-t border-primary/15 pt-4"><span className="font-bold">Carrier payout</span><strong className="font-display text-2xl">{money(quote.carrierPayout, quote.settlementCurrency)}</strong></div><p className="text-[11px] text-primary/60">Indicative quote · expires in {quote.expiresInSeconds}s.</p></div> : <div className="mt-5 space-y-3 text-sm text-primary/70"><p>Select a booking and payer market to calculate settlement before collecting payment.</p><p>Supported networks: MTN MoMo, Airtel Money, and bank transfer.</p></div>}</Card></div></div>;
+  return <div className="mx-auto max-w-5xl space-y-6"><Header eyebrow="Regional settlement" title="Cross-border checkout" detail="Choose the payer market, preview the indicative FX quote and fees, then fund the booking through a supported network." />{message && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{message}</div>}<div className="grid gap-5 lg:grid-cols-[1fr_.85fr]"><Card><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff0d9] text-[#9a641c]"><Globe2 size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a regional booking</h3><p className="text-xs text-muted-foreground">The booking value stays fixed in the carrier’s currency; only the payer amount changes with FX.</p></div></div><div className="mt-6 space-y-4"><label><span className={labelClass}>Booking</span><select className={input} value={selected} onChange={(event) => { setSelected(event.target.value); setQuote(undefined); }}><option value="">Select a booking</option>{bookings.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><label><span className={labelClass}>Payer country</span><select className={input} value={payerCountry} onChange={(event) => { const country = reference.data.countries.find((item) => item.code === event.target.value); setPayerCountry(event.target.value); if (country) setPayerCurrency(country.currency); setQuote(undefined); }} >{reference.data.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label><label><span className={labelClass}>Payer currency</span><select className={input} value={payerCurrency} onChange={(event) => { setPayerCurrency(event.target.value); setQuote(undefined); }}>{reference.data.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency}</option>)}</select></label></div><label><span className={labelClass}>Payment network</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option><option>Bank Transfer</option></select></label><Field label="EAC phone number" value={phone} onChange={setPhone} /><div className="flex flex-col gap-2 sm:flex-row"><button onClick={getQuote} className={`${secondaryButton} flex-1`}><RefreshCw size={14} /> Preview FX quote</button><button onClick={pay} disabled={!booking} className={`${button} flex-1`}><LockKeyhole size={14} /> Simulate and hold</button></div></div></Card><Card className="border-primary/15 bg-[#e5eee9] text-primary"><p className={labelClass}>Settlement preview</p>{quote ? <div className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><span className="text-primary/65">Payer pays</span><strong>{money(quote.payerAmount ?? quote.amount, quote.currency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">FX rate</span><strong>1 {quote.currency} = {quote.exchangeRate} {quote.settlementCurrency}</strong></div><div className="flex justify-between"><span className="text-primary/65">Booking value (fixed)</span><strong>{money(quote.settlementAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">Fees + commission</span><strong>{money(quote.fee + quote.commissionAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between border-t border-primary/15 pt-4"><span className="font-bold">Carrier payout</span><strong className="font-display text-2xl">{money(quote.carrierPayout, quote.settlementCurrency)}</strong></div><p className="text-[11px] leading-5 text-primary/60">The UGX booking amount is not replaced by the foreign currency amount. This is an indicative quote · expires in {quote.expiresInSeconds}s.</p></div> : <div className="mt-5 space-y-3 text-sm text-primary/70"><p>Select a booking and payer market to calculate the payer amount before collecting payment.</p><p>Supported networks: MTN MoMo, Airtel Money, and bank transfer.</p></div>}</Card></div></div>;
 }
 
 function EacNetworkPage() {
@@ -1200,5 +1210,96 @@ function HomePage() {
   return <div className="mx-auto max-w-4xl space-y-6"><div className="home-heading"><Header eyebrow="Home" title="What do you need today?" detail="Choose one thing to get started. You can always come back here." /></div><div className="home-action-grid grid gap-3 sm:grid-cols-3"><Link href={firstAction.href} className="rounded-xl border border-accent/40 bg-[#fff5e3] p-5 transition hover:-translate-y-0.5"><firstAction.icon size={20} className="text-[#9a641c]" /><p className="mt-5 text-base font-bold">{firstAction.title}</p><p className="mt-1 text-xs text-muted-foreground">{firstAction.detail}</p></Link><Link href={role === "Carrier" ? "/freight" : "/trips"} className="rounded-xl border border-border bg-card p-5 transition hover:-translate-y-0.5"><RouteIcon size={20} className="text-primary" /><p className="mt-5 text-base font-bold">{role === "Carrier" ? "Find a load" : "Find a trip"}</p><p className="mt-1 text-xs text-muted-foreground">{role === "Carrier" ? "Use space you already have." : "Find a route that works for you."}</p></Link><Link href="/bookings" className="rounded-xl border border-border bg-card p-5 transition hover:-translate-y-0.5"><LockKeyhole size={20} className="text-primary" /><p className="mt-5 text-base font-bold">My bookings</p><p className="mt-1 text-xs text-muted-foreground">See what needs your attention.</p></Link></div><Card><div className="flex items-center justify-between gap-4"><div><p className={labelClass}>Your next step</p><h3 className="mt-1 font-display text-xl font-semibold">{activeBooking ? activeBooking.corridor : "Nothing booked yet"}</h3>{activeBooking ? <p className="mt-1 text-sm text-muted-foreground">Your booking is {activeBooking.status.toLowerCase()}.</p> : <p className="mt-1 text-sm text-muted-foreground">Start by posting a trip or finding a truck.</p>}</div>{activeBooking ? <Link href="/tracking" className={secondaryButton}>Track delivery <ArrowRight size={14} /></Link> : <Link href={firstAction.href} className={button}>Get started <ArrowRight size={14} /></Link>}</div></Card></div>;
 }
 
-function Router() { return <ErrorBoundary resetKey={useLocation()[0]}><Shell><Switch><Route path="/" component={HomePage} /><Route path="/trips" component={TripsPage} /><Route path="/freight" component={FreightPage} /><Route path="/matches" component={MatchesPage} /><Route path="/bookings" component={BookingsPage} /><Route path="/tracking" component={TrackingPage} /><Route path="/messages" component={MessagesPage} /><Route path="/documents" component={DocumentsPage} /><Route path="/verification" component={VerificationPage} /><Route path="/admin" component={AdminPage} /><Route path="/payments" component={RegionalPaymentsPage} /><Route path="/regional" component={EacNetworkPage} /><Route component={NotFound} /></Switch></Shell></ErrorBoundary>; }
+function AccountPage() {
+  const auth = useApi<{ user: AuthUser | null }>("/auth/me", { user: null });
+  const [name, setName] = useState("");
+  const [country, setCountry] = useState("UG");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    if (!auth.data.user) return;
+    setName(auth.data.user.name);
+    setCountry(auth.data.user.country);
+  }, [auth.data.user?.id]);
+
+  const user = auth.data.user;
+  const saveProfile = async (event: FormEvent) => {
+    event.preventDefault();
+    setSavingProfile(true);
+    setFeedback("");
+    try {
+      const result = await api<{ user: AuthUser; message: string }>("/auth/profile", { method: "PATCH", body: JSON.stringify({ name, country }) });
+      auth.setData({ user: result.user });
+      setFeedback(result.message);
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "Your profile could not be updated.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const changePassword = async (event: FormEvent) => {
+    event.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setFeedback("The new passwords do not match.");
+      return;
+    }
+    setSavingPassword(true);
+    setFeedback("");
+    try {
+      const result = await api<{ user: AuthUser; message: string }>("/auth/password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
+      auth.setData({ user: result.user });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setFeedback(result.message);
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "Your password could not be updated.");
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  if (auth.loading) return <div className="mx-auto max-w-4xl"><Loading error={auth.error} retry={auth.reload} /></div>;
+  if (!user) return <div className="mx-auto max-w-4xl"><Loading error="Your account could not be loaded." retry={auth.reload} /></div>;
+  return <div className="mx-auto max-w-4xl space-y-6">
+    <Header eyebrow="Account" title="My account" detail="Keep your contact details, sign-in security, and account documents in one place." />
+    {feedback && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{feedback}</div>}
+    <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
+      <Card>
+        <div className="mb-5 flex items-center gap-3 border-b border-border pb-5"><div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#d9a35c] text-sm font-bold text-primary">{initials(user.name)}</div><div><h3 className="font-display text-xl font-semibold">{user.name}</h3><p className="text-xs text-muted-foreground">{user.role} account · {user.verified ? "Verified account" : "Verification pending"}</p></div></div>
+        <form onSubmit={saveProfile} className="space-y-4">
+          <Field label="Name or business name" value={name} onChange={setName} />
+          <label><span className={labelClass}>Country</span><select className={input} value={country} onChange={(event) => setCountry(event.target.value)}>{regionalReference.countries.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>
+          <div className="grid gap-4 sm:grid-cols-2"><div><span className={labelClass}>Email</span><p className="mt-2 text-sm">{user.email || "Not added"}</p></div><div><span className={labelClass}>Phone</span><p className="mt-2 text-sm">{user.phone || "Not verified"}</p></div></div>
+          <div><span className={labelClass}>Roles</span><p className="mt-2 text-sm">{user.roles?.join(" · ") || user.role}</p></div>
+          <button type="submit" disabled={savingProfile} className={button}><Save size={14} /> {savingProfile ? "Saving..." : "Save profile"}</button>
+        </form>
+      </Card>
+      <Card>
+        <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-primary"><KeyRound size={18} /></span><div><h3 className="font-display text-xl font-semibold">{user.hasPassword ? "Change password" : "Set a password"}</h3><p className="text-xs text-muted-foreground">{user.hasPassword ? "Use your current password to choose a new one." : "Add a password as another way to secure your account."}</p></div></div>
+        <form onSubmit={changePassword} className="mt-5 space-y-4">
+          {user.hasPassword && <Field label="Current password" type="password" value={currentPassword} onChange={setCurrentPassword} />}
+          <Field label="New password" type="password" value={newPassword} onChange={setNewPassword} placeholder="At least 8 characters" />
+          <Field label="Confirm new password" type="password" value={confirmPassword} onChange={setConfirmPassword} />
+          <button type="submit" disabled={savingPassword} className={`${button} w-full`}>{savingPassword ? "Updating..." : user.hasPassword ? "Change password" : "Set password"} <KeyRound size={14} /></button>
+        </form>
+      </Card>
+    </div>
+    <Card>
+      <div className="mb-4"><p className={labelClass}>Account checklist</p><h3 className="mt-1 font-display text-xl font-semibold">Documents and verification</h3><p className="mt-1 text-sm text-muted-foreground">These used to be separate menu items. They now live here with the rest of your account.</p></div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link href="/documents" className="flex items-center justify-between rounded-xl border border-border p-4 transition hover:border-primary/40 hover:bg-muted/40"><span className="flex items-center gap-3"><FileCheck2 size={19} className="text-primary" /><span><span className="block text-sm font-bold">Documents</span><span className="mt-1 block text-xs text-muted-foreground">Upload consignment, customs, and delivery records.</span></span></span><ChevronRight size={16} /></Link>
+        <Link href="/verification" className="flex items-center justify-between rounded-xl border border-border p-4 transition hover:border-primary/40 hover:bg-muted/40"><span className="flex items-center gap-3"><ShieldCheck size={19} className="text-primary" /><span><span className="block text-sm font-bold">Verify account</span><span className="mt-1 block text-xs text-muted-foreground">Submit identity, license, and vehicle details.</span></span></span><ChevronRight size={16} /></Link>
+      </div>
+    </Card>
+  </div>;
+}
+
+function Router() { return <ErrorBoundary resetKey={useLocation()[0]}><Shell><Switch><Route path="/" component={HomePage} /><Route path="/trips" component={TripsPage} /><Route path="/freight" component={FreightPage} /><Route path="/matches" component={MatchesPage} /><Route path="/bookings" component={BookingsPage} /><Route path="/tracking" component={TrackingPage} /><Route path="/messages" component={MessagesPage} /><Route path="/account" component={AccountPage} /><Route path="/documents" component={DocumentsPage} /><Route path="/verification" component={VerificationPage} /><Route path="/admin" component={AdminPage} /><Route path="/payments" component={RegionalPaymentsPage} /><Route path="/regional" component={EacNetworkPage} /><Route component={NotFound} /></Switch></Shell></ErrorBoundary>; }
 export default function App() { return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /></WouterRouter>; }

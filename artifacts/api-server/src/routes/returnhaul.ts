@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, databaseConfigured, runtimeStateTable } from "@workspace/db";
 import {
@@ -161,6 +161,7 @@ type User = {
   role: "Carrier" | "Shipper" | "Admin";
   roles?: Array<"Carrier" | "Shipper">;
   verified: boolean;
+  passwordHash?: string;
   termsAcceptedAt?: string;
   termsVersion?: string;
 };
@@ -652,6 +653,25 @@ function authenticatedUser(req: Request) {
   return sessions.get(token);
 }
 
+function publicUser(user: User | null) {
+  if (!user) return null;
+  const { passwordHash: _passwordHash, ...safeUser } = user;
+  return { ...safeUser, hasPassword: Boolean(user.passwordHash) };
+}
+
+function passwordHash(password: string, salt = randomBytes(16).toString("hex")) {
+  return `${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
+}
+
+function passwordMatches(password: string, storedHash: string) {
+  const [salt, expected] = storedHash.split(":");
+  if (!salt || !expected) return false;
+  const actual = scryptSync(password, salt, 64).toString("hex");
+  const actualBuffer = Buffer.from(actual, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
 const router: IRouter = Router();
 
 router.use(async (_req, _res, next) => {
@@ -892,7 +912,7 @@ router.post("/auth/verify-email-otp", async (req, res) => {
   const token = issueToken(user);
   sessions.set(token, user);
   await persistDatabaseState();
-  res.json({ token, user, requiresPhoneVerification: !user.phone || !user.phoneVerifiedAt });
+  res.json({ token, user: publicUser(user), requiresPhoneVerification: !user.phone || !user.phoneVerifiedAt });
 });
 
 router.post("/auth/request-phone-otp", async (req, res) => {
@@ -909,7 +929,7 @@ router.post("/auth/request-phone-otp", async (req, res) => {
     return;
   }
   if (user.phone && normalizePhone(user.phone) === phone && user.phoneVerifiedAt) {
-    res.json({ alreadyVerified: true, phone, user, message: "This phone number is already verified." });
+    res.json({ alreadyVerified: true, phone, user: publicUser(user), message: "This phone number is already verified." });
     return;
   }
   if (!phoneChangeAllowed(user, phone)) {
@@ -971,7 +991,7 @@ router.post("/auth/verify-phone-otp", async (req, res) => {
   user.phoneVerifiedAt = new Date().toISOString();
   user.phoneChangedAt = user.phoneVerifiedAt;
   await persistDatabaseState();
-  res.json({ user, phoneVerified: true });
+  res.json({ user: publicUser(user), phoneVerified: true });
 });
 
 router.get("/auth/google/start", (req, res) => {
@@ -1105,11 +1125,51 @@ router.post("/auth/google/exchange", (req, res) => {
     res.status(400).json({ error: "That Google sign-in link is invalid or expired." });
     return;
   }
-  res.json({ token: result.token, user: result.user });
+  res.json({ token: result.token, user: publicUser(result.user) });
 });
 
 router.get("/auth/me", (req, res) => {
-  res.json({ user: authenticatedUser(req) || null });
+  res.json({ user: publicUser(authenticatedUser(req) || null) });
+});
+
+router.patch("/auth/profile", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Your session has expired. Sign in again." });
+    return;
+  }
+  const name = text(req.body?.name).trim();
+  const country = optionalCountryCode(req.body?.country);
+  if (name.length < 2) {
+    res.status(400).json({ error: "Enter a name or business name with at least 2 characters." });
+    return;
+  }
+  user.name = name;
+  if (country) user.country = country;
+  await persistDatabaseState();
+  res.json({ user: publicUser(user), message: "Your profile has been updated." });
+});
+
+router.post("/auth/password", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Your session has expired. Sign in again." });
+    return;
+  }
+  const currentPassword = text(req.body?.currentPassword);
+  const newPassword = text(req.body?.newPassword);
+  const hadPassword = Boolean(user.passwordHash);
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "Your new password must be at least 8 characters." });
+    return;
+  }
+  if (user.passwordHash && !passwordMatches(currentPassword, user.passwordHash)) {
+    res.status(400).json({ error: "Your current password is not correct." });
+    return;
+  }
+  user.passwordHash = passwordHash(newPassword);
+  await persistDatabaseState();
+  res.json({ user: publicUser(user), message: hadPassword ? "Your password has been changed." : "Your password has been set." });
 });
 
 router.get("/trips", (req, res) => {
@@ -1349,19 +1409,20 @@ router.get("/payments", (_req, res) => {
 });
 
 router.get("/payments/quote", (req, res) => {
-  const amount = number(req.query.amount);
-  if (!Number.isFinite(amount) || amount <= 0) { res.status(400).json({ error: "A positive amount is required." }); return; }
+  const settlementAmount = number(req.query.amount);
+  if (!Number.isFinite(settlementAmount) || settlementAmount <= 0) { res.status(400).json({ error: "A positive settlement amount is required." }); return; }
   const fromCurrency = currencyCode(req.query.fromCurrency || req.query.currency);
   const toCurrency = currencyCode(req.query.toCurrency);
   const rate = exchangeRate(fromCurrency, toCurrency);
-  const settlementAmount = convertedAmount(amount, fromCurrency, toCurrency);
+  const payerAmount = convertedAmount(settlementAmount, toCurrency, fromCurrency);
   const fee = Math.round(settlementAmount * 0.015);
   const commissionAmount = Math.round(settlementAmount * 0.12);
   res.json({
     quoteId: id("quote"),
     payerCountry: countryCode(req.query.payerCountry),
     payeeCountry: countryCode(req.query.payeeCountry),
-    amount,
+    amount: payerAmount,
+    payerAmount,
     currency: fromCurrency,
     settlementAmount,
     settlementCurrency: toCurrency,
@@ -1397,8 +1458,8 @@ router.post("/payments/simulate", async (req, res) => {
   }
   const payerCurrency = currencyCode(req.body?.currency || booking.currency);
   const settlementCurrency = booking.currency;
-  const amount = number(req.body?.amount) > 0 ? number(req.body?.amount) : booking.amount;
-  const settlementAmount = convertedAmount(amount, payerCurrency, settlementCurrency);
+  const settlementAmount = number(req.body?.settlementAmount) > 0 ? number(req.body?.settlementAmount) : booking.amount;
+  const amount = convertedAmount(settlementAmount, settlementCurrency, payerCurrency);
   const fee = Math.round(settlementAmount * 0.015);
   const commissionAmount = Math.round(settlementAmount * 0.12);
   const payment: Payment = {
