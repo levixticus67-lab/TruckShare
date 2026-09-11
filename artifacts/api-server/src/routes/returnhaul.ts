@@ -386,7 +386,7 @@ const verifications: Verification[] = [
 
 const sessions = new Map<string, User>();
 const otpRequestCooldowns = new Map<string, number>();
-const googleStates = new Map<string, { mode: "login" | "signup"; roles: Array<"Carrier" | "Shipper">; termsAccepted: boolean; exp: number }>();
+const googleStates = new Map<string, { mode: "login" | "signup"; roles: Array<"Carrier" | "Shipper">; termsAccepted: boolean; returnTo?: string; exp: number }>();
 const googleExchangeCodes = new Map<string, { token: string; user: User; exp: number }>();
 const TERMS_VERSION = "2026-09";
 const OTP_CHALLENGE_TTL_MS = 10 * 60 * 1000;
@@ -622,14 +622,28 @@ function frontendRedirectUrl() {
   return text(process.env.FRONTEND_URL) || "http://localhost:5173";
 }
 
-function googleResultRedirect(params: Record<string, string>) {
-  const url = new URL(frontendRedirectUrl());
+function safeFrontendRedirect(value?: string) {
+  const fallback = new URL(frontendRedirectUrl());
+  if (!value) return fallback.toString();
+  try {
+    const requested = new URL(value);
+    if (requested.origin !== fallback.origin) return fallback.toString();
+    requested.search = "";
+    requested.hash = "";
+    return requested.toString();
+  } catch {
+    return fallback.toString();
+  }
+}
+
+function googleResultRedirect(params: Record<string, string>, returnTo?: string) {
+  const url = new URL(safeFrontendRedirect(returnTo));
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return url.toString();
 }
 
-function googleError(res: Response, message: string) {
-  res.redirect(googleResultRedirect({ google_error: message }));
+function googleError(res: Response, message: string, returnTo?: string) {
+  res.redirect(googleResultRedirect({ google_error: message }, returnTo));
 }
 
 async function sendVerificationEmail(email: string, code: string) {
@@ -996,8 +1010,9 @@ router.post("/auth/verify-phone-otp", async (req, res) => {
 
 router.get("/auth/google/start", (req, res) => {
   const config = googleConfiguration();
+  const returnTo = text(req.query.return_to);
   if (!config) {
-    googleError(res, "Google sign-in is not configured on the API service.");
+    googleError(res, "Google sign-in is not configured on the API service.", returnTo);
     return;
   }
 
@@ -1005,16 +1020,16 @@ router.get("/auth/google/start", (req, res) => {
   const roles = requestedRoles(String(req.query.roles || "").split(","));
   const termsAccepted = req.query.terms === "1";
   if (mode === "signup" && roles.length === 0) {
-    googleError(res, "Choose at least one account role before continuing with Google.");
+    googleError(res, "Choose at least one account role before continuing with Google.", returnTo);
     return;
   }
   if (mode === "signup" && !termsAccepted) {
-    googleError(res, "Accept the Terms and Conditions and Privacy Policy before continuing with Google.");
+    googleError(res, "Accept the Terms and Conditions and Privacy Policy before continuing with Google.", returnTo);
     return;
   }
 
   const state = randomBytes(32).toString("base64url");
-  googleStates.set(state, { mode, roles, termsAccepted, exp: Date.now() + 10 * 60 * 1000 });
+  googleStates.set(state, { mode, roles, termsAccepted, returnTo, exp: Date.now() + 10 * 60 * 1000 });
   const authorizationUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authorizationUrl.searchParams.set("client_id", config.clientId);
   authorizationUrl.searchParams.set("redirect_uri", config.redirectUri);
@@ -1032,11 +1047,11 @@ router.get("/auth/google/callback", async (req, res) => {
   const pending = googleStates.get(state);
   googleStates.delete(state);
   if (!config || !pending || pending.exp < Date.now()) {
-    googleError(res, "That Google sign-in session expired. Please try again.");
+    googleError(res, "That Google sign-in session expired. Please try again.", pending?.returnTo);
     return;
   }
   if (req.query.error || !text(req.query.code)) {
-    googleError(res, "Google sign-in was cancelled.");
+    googleError(res, "Google sign-in was cancelled.", pending.returnTo);
     return;
   }
 
@@ -1053,13 +1068,13 @@ router.get("/auth/google/callback", async (req, res) => {
       }),
     });
     if (!tokenResponse.ok) {
-      googleError(res, "Google could not complete sign-in. Please try again.");
+      googleError(res, "Google could not complete sign-in. Please try again.", pending.returnTo);
       return;
     }
     const tokenBody = await tokenResponse.json() as { access_token?: unknown };
     const accessToken = text(tokenBody.access_token);
     if (!accessToken) {
-      googleError(res, "Google did not return an access token.");
+      googleError(res, "Google did not return an access token.", pending.returnTo);
       return;
     }
 
@@ -1067,24 +1082,24 @@ router.get("/auth/google/callback", async (req, res) => {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!profileResponse.ok) {
-      googleError(res, "Google profile lookup failed. Please try again.");
+      googleError(res, "Google profile lookup failed. Please try again.", pending.returnTo);
       return;
     }
     const profile = await profileResponse.json() as { sub?: unknown; email?: unknown; email_verified?: unknown; name?: unknown };
     const googleId = text(profile.sub);
     const email = normalizeEmail(text(profile.email));
     if (!googleId || !email || profile.email_verified !== true) {
-      googleError(res, "Google did not provide a verified email address.");
+      googleError(res, "Google did not provide a verified email address.", pending.returnTo);
       return;
     }
 
     const existingUser = users.find((user) => user.googleId === googleId || normalizeEmail(user.email || "") === email);
     if (pending.mode === "login" && !existingUser) {
-      googleError(res, "No TruckShare account exists for this Google email. Choose Create account first.");
+      googleError(res, "No TruckShare account exists for this Google email. Choose Create account first.", pending.returnTo);
       return;
     }
     if (pending.mode === "signup" && existingUser) {
-      googleError(res, "A TruckShare account already uses this Google email. Choose Log in instead.");
+      googleError(res, "A TruckShare account already uses this Google email. Choose Log in instead.", pending.returnTo);
       return;
     }
 
@@ -1111,9 +1126,9 @@ router.get("/auth/google/callback", async (req, res) => {
 
     const exchangeCode = randomBytes(32).toString("base64url");
     googleExchangeCodes.set(exchangeCode, { token: sessionToken, user, exp: Date.now() + 2 * 60 * 1000 });
-    res.redirect(googleResultRedirect({ google_code: exchangeCode }));
+    res.redirect(googleResultRedirect({ google_code: exchangeCode }, pending.returnTo));
   } catch {
-    googleError(res, "Google sign-in could not be completed. Please try again.");
+    googleError(res, "Google sign-in could not be completed. Please try again.", pending.returnTo);
   }
 });
 

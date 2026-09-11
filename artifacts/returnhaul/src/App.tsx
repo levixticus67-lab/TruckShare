@@ -905,6 +905,7 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
     const params = new URLSearchParams({ mode });
     if (mode === "signup") params.set("roles", roles.join(","));
     if (mode === "signup" && acceptedTerms) params.set("terms", "1");
+    params.set("return_to", `${window.location.origin}${window.location.pathname}`);
     window.location.assign(`${API_ROOT}/auth/google/start?${params.toString()}`);
   };
 
