@@ -1,4 +1,4 @@
-const VERSION = 'truckshare-v1';
+const VERSION = 'truckshare-v2';
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 
