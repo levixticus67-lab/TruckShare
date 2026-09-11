@@ -4,7 +4,7 @@ import {
   Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, ClipboardCheck, Clock3, FileCheck2,
   FilePlus2, FileText, Gauge, LayoutDashboard, LockKeyhole, MapPin, Menu, MessageSquare,
   PackageCheck, Phone, Plus, RefreshCw, Route as RouteIcon, Search, Send, ShieldCheck,
-  Truck, UploadCloud, UserRound, UsersRound, X, Moon, Sun, Globe2, LogOut, KeyRound, Save,
+  Truck, UploadCloud, UserRound, UsersRound, X, Moon, Sun, Globe2, LogOut, KeyRound, Save, Download,
 } from "lucide-react";
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from "wouter";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -75,6 +75,10 @@ type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: strin
 type WorkspaceRole = "Carrier" | "Shipper" | "Admin";
 type AuthUser = { id: string; name: string; phone?: string; email?: string; country: string; role: WorkspaceRole; roles?: Array<"Carrier" | "Shipper">; verified: boolean; hasPassword?: boolean };
 type LegalDocument = "terms" | "privacy";
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
 const RoleContext = createContext<WorkspaceRole>("Carrier");
 const useRole = () => useContext(RoleContext);
 
@@ -283,6 +287,72 @@ function BrandLoader({ label = "Loading TruckShare" }: { label?: string }) {
     </div>
     <span className="sr-only">{label}</span>
   </div>;
+}
+function InstallPrompt() {
+  const [deferredPrompt, setDeferredPrompt] = useState<InstallPromptEvent | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [ios, setIos] = useState(false);
+  useEffect(() => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+    const isIosDevice = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    setInstalled(standalone);
+    setIos(isIosDevice);
+    if (standalone || sessionStorage.getItem("truckshare_install_dismissed") === "1") return;
+
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredPrompt(event as InstallPromptEvent);
+      setVisible(true);
+    };
+    const onAppInstalled = () => {
+      setInstalled(true);
+      setDeferredPrompt(null);
+      setVisible(false);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+    const fallbackTimer = window.setTimeout(() => setVisible(true), 1800);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+      window.clearTimeout(fallbackTimer);
+    };
+  }, []);
+
+  const dismiss = () => {
+    sessionStorage.setItem("truckshare_install_dismissed", "1");
+    setVisible(false);
+  };
+  const install = async () => {
+    if (!deferredPrompt) return;
+    await deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+    if (choice.outcome === "accepted") setVisible(false);
+  };
+  if (installed || !visible) return null;
+
+  return <aside className="pwa-install-prompt" role="dialog" aria-label="Install TruckShare">
+    <div className="flex items-start gap-3">
+      <img className="pwa-install-icon" src="/branding/truckshare-app-icon-192.png" alt="" />
+      <div className="min-w-0 flex-1">
+        <p className="font-display text-base font-semibold">Install TruckShare</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          {deferredPrompt
+            ? "Keep your freight workspace one tap away."
+            : ios
+              ? "Tap Share, then Add to Home Screen."
+              : "Open your browser menu and choose Install app or Add to Home Screen."}
+        </p>
+      </div>
+      <button type="button" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={dismiss} aria-label="Dismiss install prompt"><X size={16} /></button>
+    </div>
+    {deferredPrompt
+      ? <button type="button" className={`${button} mt-4 w-full`} onClick={install}><Download size={15} /> Install app</button>
+      : <button type="button" className={`${secondaryButton} mt-4 w-full`} onClick={dismiss}>Got it</button>}
+  </aside>;
 }
 function Loading({ error, retry }: { error: string; retry: () => void }) { if (error) return <div className="rounded-xl border border-[#e4b4a9] bg-[#fbefeb] p-6 text-center text-sm text-[#ad4339]"><CircleAlert className="mx-auto mb-2" size={20} />{error}<button onClick={retry} className={`${secondaryButton} mt-4`}>Retry</button></div>; return <div className="flex h-32 items-center justify-center rounded-xl border border-border bg-card/70"><BrandLoader label="Loading TruckShare data" /></div>; }
 function Stat({ label, value, note, icon: Icon, accent = false }: { label: string; value: string | number; note: string; icon: typeof Activity; accent?: boolean }) { return <Card className={accent ? "border-accent/40 bg-[#fff5e3]" : ""}><div className="flex min-w-0 items-start justify-between gap-2"><div className="min-w-0 flex-1 pr-1"><p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">{label}</p><p className="mt-3 break-words font-display text-3xl font-semibold leading-[1.05] tracking-[-.05em]">{value}</p><p className="mt-1 break-words text-[11px] text-muted-foreground">{note}</p></div><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-primary"><Icon size={17} /></span></div></Card>; }
@@ -1333,4 +1403,4 @@ function AccountPage() {
 }
 
 function Router() { return <ErrorBoundary resetKey={useLocation()[0]}><Shell><Switch><Route path="/" component={HomePage} /><Route path="/trips" component={TripsPage} /><Route path="/freight" component={FreightPage} /><Route path="/matches" component={MatchesPage} /><Route path="/bookings" component={BookingsPage} /><Route path="/tracking" component={TrackingPage} /><Route path="/messages" component={MessagesPage} /><Route path="/account" component={AccountPage} /><Route path="/documents" component={DocumentsPage} /><Route path="/verification" component={VerificationPage} /><Route path="/admin" component={AdminPage} /><Route path="/payments" component={RegionalPaymentsPage} /><Route path="/regional" component={EacNetworkPage} /><Route component={NotFound} /></Switch></Shell></ErrorBoundary>; }
-export default function App() { return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /></WouterRouter>; }
+export default function App() { return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /><InstallPrompt /></WouterRouter>; }
