@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { latLngBounds, type LatLngExpression } from "leaflet";
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { LocateFixed, Maximize2, X } from "lucide-react";
 
 export type RouteStop = {
   label: string;
@@ -17,29 +18,62 @@ type RouteMapProps = {
   routing?: boolean;
 };
 
+type MapPoint = [number, number];
+
+const countryCenters: Record<string, MapPoint> = {
+  BI: [-3.3731, 29.9189],
+  CD: [-1.68, 29.23],
+  KE: [-1.2921, 36.8219],
+  RW: [-1.9441, 30.0619],
+  SO: [2.0469, 45.3182],
+  SS: [4.8594, 31.5713],
+  TZ: [-6.7924, 39.2083],
+  UG: [0.3476, 32.5825],
+};
+
+const countryNames: Record<string, string> = {
+  BI: "Burundi",
+  CD: "DRC",
+  KE: "Kenya",
+  RW: "Rwanda",
+  SO: "Somalia",
+  SS: "South Sudan",
+  TZ: "Tanzania",
+  UG: "Uganda",
+};
+
 const stopStyles: Record<RouteStop["status"], { fillColor: string; color: string }> = {
   complete: { fillColor: "#304a7a", color: "#1b2d55" },
   active: { fillColor: "#f26522", color: "#bc4612" },
   upcoming: { fillColor: "#9aa4b5", color: "#68738a" },
 };
 
-function FitRoute({ positions }: { positions: LatLngExpression[] }) {
+function FitRoute({ positions, focusPoint }: { positions: MapPoint[]; focusPoint?: MapPoint }) {
   const map = useMap();
   const bounds = useMemo(() => latLngBounds(positions), [positions]);
 
   useEffect(() => {
-    if (positions.length > 1) {
+    if (focusPoint) {
+      const nearby = [...positions]
+        .sort((first, second) => {
+          const firstDistance = Math.abs(Number(first[0]) - focusPoint[0]) + Math.abs(Number(first[1]) - focusPoint[1]);
+          const secondDistance = Math.abs(Number(second[0]) - focusPoint[0]) + Math.abs(Number(second[1]) - focusPoint[1]);
+          return firstDistance - secondDistance;
+        })
+        .slice(0, 5);
+      map.fitBounds(latLngBounds([focusPoint, ...nearby]), { padding: [34, 34], maxZoom: 7 });
+    } else if (positions.length > 1) {
       map.fitBounds(bounds, { padding: [28, 28] });
     } else if (positions.length === 1) {
       map.setView(positions[0], 8);
     }
-  }, [bounds, map, positions]);
+  }, [bounds, focusPoint, map, positions]);
 
   return null;
 }
 
 export function RouteMap({ stops, className = "", height = "360px", routing = false }: RouteMapProps) {
-  const positions = useMemo<LatLngExpression[]>(() => stops.map((stop) => stop.position), [stops]);
+  const positions = useMemo<MapPoint[]>(() => stops.map((stop) => stop.position), [stops]);
   const [routePath, setRoutePath] = useState<LatLngExpression[]>(positions);
 
   useEffect(() => {
@@ -130,13 +164,62 @@ const networkRoutes: [number, number][][] = [
   [networkStops[0].position, networkStops[8].position],
 ];
 
-export function EacNetworkMap({ height = "390px" }: { height?: string }) {
-  const positions = useMemo<LatLngExpression[]>(() => networkStops.map((stop) => stop.position), []);
-  const bounds = useMemo(() => latLngBounds(positions), [positions]);
+function browserCountry() {
+  if (typeof navigator === "undefined") return "UG";
+  const localeCountry = navigator.language.split("-")[1]?.toUpperCase();
+  return localeCountry && countryCenters[localeCountry] ? localeCountry : "UG";
+}
+
+export function EacNetworkMap({ height = "clamp(320px, 52dvh, 440px)" }: { height?: string }) {
+  const positions = useMemo<MapPoint[]>(() => networkStops.map((stop) => stop.position), []);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [userPosition, setUserPosition] = useState<MapPoint | null>(null);
+  const [focusPoint, setFocusPoint] = useState<MapPoint>(() => countryCenters[browserCountry()]);
+  const [focusLabel, setFocusLabel] = useState(() => `Near ${countryNames[browserCountry()]}`);
+
+  const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const point: MapPoint = [coords.latitude, coords.longitude];
+        setUserPosition(point);
+        setFocusPoint(point);
+        setFocusLabel("Near you");
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+    );
+  }, []);
+
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
+
+  useEffect(() => {
+    document.body.style.overflow = fullscreen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [fullscreen]);
+
+  const openFullscreen = (event: MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button, .leaflet-control, a")) return;
+    setFullscreen(true);
+  };
 
   return (
-    <div className="route-map overflow-hidden rounded-lg border border-border" style={{ height }}>
-      <MapContainer center={[0.3476, 32.5825]} zoom={5} scrollWheelZoom className="h-full w-full" attributionControl>
+    <div className={`network-map-shell ${fullscreen ? "is-fullscreen" : ""}`} style={{ height }} onClick={openFullscreen}>
+      <div className="network-map-toolbar">
+        <div className="network-map-location"><LocateFixed size={13} /> {focusLabel}</div>
+        <div className="network-map-actions">
+          <button type="button" onClick={requestLocation} disabled={locating} aria-label="Center map near my location" title="Center near me"><LocateFixed size={15} className={locating ? "animate-pulse" : ""} /></button>
+          {fullscreen && <button type="button" onClick={() => setFullscreen(false)} aria-label="Close full-screen map" title="Close map"><X size={17} /></button>}
+        </div>
+      </div>
+      <MapContainer center={focusPoint} zoom={5} scrollWheelZoom className="route-map h-full w-full" attributionControl>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -154,8 +237,10 @@ export function EacNetworkMap({ height = "390px" }: { height?: string }) {
             <Tooltip direction="top" offset={[0, -6]}>{stop.label}</Tooltip>
           </CircleMarker>
         ))}
-        <FitRoute positions={positions} />
+        {userPosition && <CircleMarker center={userPosition} radius={7} pathOptions={{ color: "#ffffff", fillColor: "#1683d8", fillOpacity: 1, weight: 3 }}><Tooltip direction="top" offset={[0, -6]}>Your location</Tooltip></CircleMarker>}
+        <FitRoute positions={positions} focusPoint={focusPoint} />
       </MapContainer>
+      {!fullscreen && <div className="network-map-expand-hint"><Maximize2 size={13} /> Tap map to expand</div>}
     </div>
   );
 }

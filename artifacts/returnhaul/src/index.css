@@ -292,6 +292,107 @@
     background-image: linear-gradient(hsl(var(--border) / .25) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / .25) 1px, transparent 1px);
     background-size: 24px 24px;
   }
+  .network-map-shell {
+    position: relative;
+    overflow: hidden;
+    min-height: 320px;
+    border: 1px solid hsl(var(--border) / .9);
+    border-radius: 1rem;
+    background: hsl(var(--muted));
+    isolation: isolate;
+    transition: box-shadow 180ms ease, border-radius 180ms ease;
+  }
+  .network-map-shell:not(.is-fullscreen) {
+    cursor: zoom-in;
+  }
+  .network-map-shell.is-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    height: 100dvh !important;
+    min-height: 100dvh;
+    border-radius: 0;
+    border-color: transparent;
+    background: hsl(var(--background));
+    cursor: default;
+  }
+  .network-map-shell .route-map {
+    border: 0;
+    border-radius: 0;
+  }
+  .network-map-toolbar {
+    position: absolute;
+    top: .75rem;
+    right: .75rem;
+    left: .75rem;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    pointer-events: none;
+  }
+  .network-map-location,
+  .network-map-actions button,
+  .network-map-expand-hint {
+    border: 1px solid hsl(var(--border) / .9);
+    background: color-mix(in srgb, hsl(var(--card)) 92%, transparent);
+    color: hsl(var(--foreground));
+    box-shadow: 0 7px 20px hsl(var(--foreground) / .13);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  .network-map-location {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    min-width: 0;
+    padding: .45rem .65rem;
+    border-radius: 999px;
+    font: 700 9px var(--app-font-mono);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .network-map-actions {
+    display: flex;
+    gap: .4rem;
+    pointer-events: auto;
+  }
+  .network-map-actions button {
+    display: flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: .75rem;
+    cursor: pointer;
+    transition: background-color 160ms ease, transform 160ms ease;
+  }
+  .network-map-actions button:hover {
+    background: hsl(var(--card));
+    transform: translateY(-1px);
+  }
+  .network-map-actions button:disabled {
+    cursor: wait;
+    opacity: .6;
+  }
+  .network-map-expand-hint {
+    position: absolute;
+    right: .75rem;
+    bottom: .75rem;
+    z-index: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .45rem .6rem;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    pointer-events: none;
+  }
+  .network-map-shell.is-fullscreen .leaflet-control-attribution {
+    margin-bottom: .35rem;
+  }
   .noise::after {
     content: '';
     pointer-events: none;
