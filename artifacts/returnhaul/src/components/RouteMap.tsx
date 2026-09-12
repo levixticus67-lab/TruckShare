@@ -118,6 +118,24 @@ export function MapShell({ children, height = "360px", className = "", label = "
 export function RouteMap({ stops, className = "", height = "360px", routing = false }: RouteMapProps) {
   const positions = useMemo<MapPoint[]>(() => stops.map((stop) => stop.position), [stops]);
   const [routePath, setRoutePath] = useState<LatLngExpression[]>(positions);
+  const [locating, setLocating] = useState(false);
+  const [userPosition, setUserPosition] = useState<MapPoint | null>(null);
+  const [focusPoint, setFocusPoint] = useState<MapPoint | undefined>();
+
+  const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const point: MapPoint = [coords.latitude, coords.longitude];
+        setUserPosition(point);
+        setFocusPoint(point);
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+    );
+  }, []);
 
   useEffect(() => {
     setRoutePath(positions);
@@ -137,7 +155,7 @@ export function RouteMap({ stops, className = "", height = "360px", routing = fa
   }, [positions, routing, stops]);
 
   return (
-    <MapShell height={height} className={className} label="Route map">
+    <MapShell height={height} className={className} label="Route map" onLocate={requestLocation} locating={locating}>
       <MapContainer
         center={positions[0] || [0.3476, 32.5825]}
         zoom={7}
@@ -178,7 +196,8 @@ export function RouteMap({ stops, className = "", height = "360px", routing = fa
             </CircleMarker>
           );
         })}
-        <FitRoute positions={positions} />
+        {userPosition && <CircleMarker center={userPosition} radius={7} pathOptions={{ color: "#ffffff", fillColor: "#1683d8", fillOpacity: 1, weight: 3 }}><Tooltip direction="top" offset={[0, -6]}>Your location</Tooltip></CircleMarker>}
+        <FitRoute positions={positions} focusPoint={focusPoint} />
       </MapContainer>
     </MapShell>
   );
