@@ -292,7 +292,7 @@
     background-image: linear-gradient(hsl(var(--border) / .25) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / .25) 1px, transparent 1px);
     background-size: 24px 24px;
   }
-  .network-map-shell {
+  .map-shell {
     position: relative;
     overflow: hidden;
     min-height: 320px;
@@ -302,13 +302,13 @@
     isolation: isolate;
     transition: box-shadow 180ms ease, border-radius 180ms ease;
   }
-  .network-map-shell:not(.is-fullscreen) {
+  .map-shell:not(.is-fullscreen) {
     cursor: zoom-in;
   }
-  .network-map-shell.is-fullscreen {
+  .map-shell.is-fullscreen {
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: 4000;
     height: 100dvh !important;
     min-height: 100dvh;
     border-radius: 0;
@@ -316,11 +316,38 @@
     background: hsl(var(--background));
     cursor: default;
   }
-  .network-map-shell .route-map {
+  .map-shell .route-map {
     border: 0;
     border-radius: 0;
   }
-  .network-map-toolbar {
+  .map-shell .leaflet-container {
+    background: hsl(var(--muted));
+    font-family: var(--app-font-sans);
+  }
+  .map-shell .leaflet-tile {
+    filter: saturate(.78) contrast(.96);
+  }
+  .map-shell .leaflet-control-zoom {
+    overflow: hidden;
+    border: 1px solid hsl(var(--border) / .9) !important;
+    border-radius: .8rem;
+    box-shadow: 0 7px 20px hsl(var(--foreground) / .16);
+  }
+  .map-shell .leaflet-control-zoom a {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 0;
+    background: color-mix(in srgb, hsl(var(--card)) 92%, transparent);
+    color: hsl(var(--foreground));
+    font-size: 1.25rem;
+    line-height: 2.1rem;
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  .map-shell .leaflet-control-zoom a:hover {
+    background: hsl(var(--card));
+  }
+  .map-shell-toolbar {
     position: absolute;
     top: .75rem;
     right: .75rem;
@@ -332,9 +359,9 @@
     gap: .75rem;
     pointer-events: none;
   }
-  .network-map-location,
-  .network-map-actions button,
-  .network-map-expand-hint {
+  .map-shell-label,
+  .map-shell-actions button,
+  .map-shell-expand-hint {
     border: 1px solid hsl(var(--border) / .9);
     background: color-mix(in srgb, hsl(var(--card)) 92%, transparent);
     color: hsl(var(--foreground));
@@ -342,7 +369,7 @@
     -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
   }
-  .network-map-location {
+  .map-shell-label {
     display: inline-flex;
     align-items: center;
     gap: .4rem;
@@ -353,12 +380,12 @@
     letter-spacing: .08em;
     text-transform: uppercase;
   }
-  .network-map-actions {
+  .map-shell-actions {
     display: flex;
     gap: .4rem;
     pointer-events: auto;
   }
-  .network-map-actions button {
+  .map-shell-actions button {
     display: flex;
     width: 2.25rem;
     height: 2.25rem;
@@ -368,15 +395,15 @@
     cursor: pointer;
     transition: background-color 160ms ease, transform 160ms ease;
   }
-  .network-map-actions button:hover {
+  .map-shell-actions button:hover {
     background: hsl(var(--card));
     transform: translateY(-1px);
   }
-  .network-map-actions button:disabled {
+  .map-shell-actions button:disabled {
     cursor: wait;
     opacity: .6;
   }
-  .network-map-expand-hint {
+  .map-shell-expand-hint {
     position: absolute;
     right: .75rem;
     bottom: .75rem;
@@ -390,7 +417,7 @@
     font-weight: 700;
     pointer-events: none;
   }
-  .network-map-shell.is-fullscreen .leaflet-control-attribution {
+  .map-shell.is-fullscreen .leaflet-control-attribution {
     margin-bottom: .35rem;
   }
   .noise::after {

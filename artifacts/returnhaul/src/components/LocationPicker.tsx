@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Crosshair, MapPinned, Search, X } from "lucide-react";
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { EAC_LOCATIONS, type LocationPoint } from "@/lib/locations";
+import { MapShell } from "@/components/RouteMap";
 
 type LocationPickerProps = {
   label: string;
@@ -271,8 +272,8 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
                   {locationState === "loading" ? "Locating…" : "Use my GPS"}
                 </button>
               </div>
-              <div className="overflow-hidden rounded-xl border border-border shadow-inner">
-                <MapContainer center={center} zoom={7} scrollWheelZoom className="h-[min(52vh,360px)] w-full" zoomControl attributionControl>
+              <MapShell height="min(52vh, 360px)" label="Pin location">
+                <MapContainer center={center} zoom={7} scrollWheelZoom className="route-map h-full w-full" zoomControl attributionControl>
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -281,7 +282,7 @@ export function LocationPicker({ label, value, countryCode, onChange, onLabelCha
                   <RecenterMap center={center} />
                   {value && <CircleMarker center={[value.latitude, value.longitude]} radius={9} pathOptions={{ color: "#bc4612", fillColor: "#f26522", fillOpacity: 1, weight: 3 }} />}
                 </MapContainer>
-              </div>
+              </MapShell>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[10px] text-muted-foreground">{locationState === "loading" ? "Resolving this point on the map…" : "Click anywhere to move the pin."}</p>
                 {locationError && <p className="text-right text-[10px] font-semibold text-destructive">{locationError}</p>}

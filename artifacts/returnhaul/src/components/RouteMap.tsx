@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { latLngBounds, type LatLngExpression } from "leaflet";
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
-import { LocateFixed, Maximize2, X } from "lucide-react";
+import { LocateFixed, X } from "lucide-react";
 
 export type RouteStop = {
   label: string;
@@ -72,6 +73,48 @@ function FitRoute({ positions, focusPoint }: { positions: MapPoint[]; focusPoint
   return null;
 }
 
+type MapShellProps = {
+  children: ReactNode;
+  height?: string;
+  className?: string;
+  label?: string;
+  onLocate?: () => void;
+  locating?: boolean;
+};
+
+export function MapShell({ children, height = "360px", className = "", label = "Interactive map", onLocate, locating = false }: MapShellProps) {
+  const [fullscreen, setFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [fullscreen]);
+
+  const openFullscreen = (event: MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button, .leaflet-control, a")) return;
+    setFullscreen(true);
+  };
+
+  const shell = (
+    <div className={`map-shell ${fullscreen ? "is-fullscreen" : ""} ${className}`} style={{ height }} onClick={openFullscreen}>
+      <div className="map-shell-toolbar">
+        <div className="map-shell-label">{label}</div>
+        <div className="map-shell-actions">
+          {onLocate && <button type="button" onClick={onLocate} disabled={locating} aria-label="Center map near my location" title="Center near me"><LocateFixed size={15} className={locating ? "animate-pulse" : ""} /></button>}
+          {fullscreen && <button type="button" onClick={() => setFullscreen(false)} aria-label="Close full-screen map" title="Close map"><X size={17} /></button>}
+        </div>
+      </div>
+      {children}
+      {!fullscreen && <div className="map-shell-expand-hint">Tap map to expand</div>}
+    </div>
+  );
+
+  return fullscreen && typeof document !== "undefined" ? createPortal(shell, document.body) : shell;
+}
+
 export function RouteMap({ stops, className = "", height = "360px", routing = false }: RouteMapProps) {
   const positions = useMemo<MapPoint[]>(() => stops.map((stop) => stop.position), [stops]);
   const [routePath, setRoutePath] = useState<LatLngExpression[]>(positions);
@@ -94,12 +137,12 @@ export function RouteMap({ stops, className = "", height = "360px", routing = fa
   }, [positions, routing, stops]);
 
   return (
-    <div className={`route-map overflow-hidden rounded-lg border border-border ${className}`} style={{ height }}>
+    <MapShell height={height} className={className} label="Route map">
       <MapContainer
         center={positions[0] || [0.3476, 32.5825]}
         zoom={7}
         scrollWheelZoom
-        className="h-full w-full"
+        className="route-map h-full w-full"
         zoomControl
         attributionControl
       >
@@ -137,7 +180,7 @@ export function RouteMap({ stops, className = "", height = "360px", routing = fa
         })}
         <FitRoute positions={positions} />
       </MapContainer>
-    </div>
+    </MapShell>
   );
 }
 
@@ -172,7 +215,6 @@ function browserCountry() {
 
 export function EacNetworkMap({ height = "clamp(320px, 52dvh, 440px)" }: { height?: string }) {
   const positions = useMemo<MapPoint[]>(() => networkStops.map((stop) => stop.position), []);
-  const [fullscreen, setFullscreen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [userPosition, setUserPosition] = useState<MapPoint | null>(null);
   const [focusPoint, setFocusPoint] = useState<MapPoint>(() => countryCenters[browserCountry()]);
@@ -198,27 +240,8 @@ export function EacNetworkMap({ height = "clamp(320px, 52dvh, 440px)" }: { heigh
     requestLocation();
   }, [requestLocation]);
 
-  useEffect(() => {
-    document.body.style.overflow = fullscreen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [fullscreen]);
-
-  const openFullscreen = (event: MouseEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("button, .leaflet-control, a")) return;
-    setFullscreen(true);
-  };
-
   return (
-    <div className={`network-map-shell ${fullscreen ? "is-fullscreen" : ""}`} style={{ height }} onClick={openFullscreen}>
-      <div className="network-map-toolbar">
-        <div className="network-map-location"><LocateFixed size={13} /> {focusLabel}</div>
-        <div className="network-map-actions">
-          <button type="button" onClick={requestLocation} disabled={locating} aria-label="Center map near my location" title="Center near me"><LocateFixed size={15} className={locating ? "animate-pulse" : ""} /></button>
-          {fullscreen && <button type="button" onClick={() => setFullscreen(false)} aria-label="Close full-screen map" title="Close map"><X size={17} /></button>}
-        </div>
-      </div>
+    <MapShell height={height} label={`Near ${focusLabel.replace(/^Near /, "")}`} onLocate={requestLocation} locating={locating}>
       <MapContainer center={focusPoint} zoom={5} scrollWheelZoom className="route-map h-full w-full" attributionControl>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -240,7 +263,6 @@ export function EacNetworkMap({ height = "clamp(320px, 52dvh, 440px)" }: { heigh
         {userPosition && <CircleMarker center={userPosition} radius={7} pathOptions={{ color: "#ffffff", fillColor: "#1683d8", fillOpacity: 1, weight: 3 }}><Tooltip direction="top" offset={[0, -6]}>Your location</Tooltip></CircleMarker>}
         <FitRoute positions={positions} focusPoint={focusPoint} />
       </MapContainer>
-      {!fullscreen && <div className="network-map-expand-hint"><Maximize2 size={13} /> Tap map to expand</div>}
-    </div>
+    </MapShell>
   );
 }
