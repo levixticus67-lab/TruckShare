@@ -657,12 +657,13 @@ header.sticky button[aria-label="Notifications"] + div {
 }
 
 .mobile-bottom-nav {
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
   background: color-mix(in srgb, hsl(var(--card)) 78%, transparent);
   -webkit-backdrop-filter: blur(22px);
   backdrop-filter: blur(22px);
 }
 
-.mobile-nav-brand,
 .mobile-nav-item {
   position: relative;
   display: flex;
@@ -671,29 +672,6 @@ header.sticky button[aria-label="Notifications"] + div {
   justify-content: center;
   color: hsl(var(--muted-foreground));
   transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-}
-
-.mobile-nav-brand {
-  height: 46px;
-  width: 46px;
-  flex: 0 0 46px;
-  border-radius: 50%;
-  border: 1px solid hsl(var(--primary) / 0.28);
-  background: hsl(0 0% 100% / 0.96);
-  color: hsl(var(--foreground));
-}
-
-  .mobile-nav-brand-logo {
-    display: block;
-    width: 2.1rem;
-    height: 2.1rem;
-    object-fit: contain;
-  }
-
-.mobile-nav-brand.is-active {
-  background: hsl(0 0% 100% / 0.96);
-  color: hsl(var(--foreground));
-  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.82), 0 5px 14px hsl(var(--primary) / 0.24);
 }
 
 .mobile-nav-item {
@@ -754,6 +732,11 @@ header.sticky button[aria-label="Notifications"] + div {
 
 /* Small-screen layout guardrails. Desktop layout remains unchanged. */
 @media (max-width: 767px) {
+  .page-header-action,
+  .page-header-action > * {
+    width: 100%;
+  }
+
   header.sticky {
     min-height: 72px;
     height: auto;
