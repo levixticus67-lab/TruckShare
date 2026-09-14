@@ -657,13 +657,12 @@ header.sticky button[aria-label="Notifications"] + div {
 }
 
 .mobile-bottom-nav {
-  bottom: max(0.75rem, env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
   background: color-mix(in srgb, hsl(var(--card)) 78%, transparent);
   -webkit-backdrop-filter: blur(22px);
   backdrop-filter: blur(22px);
 }
 
+.mobile-nav-brand,
 .mobile-nav-item {
   position: relative;
   display: flex;
@@ -672,6 +671,29 @@ header.sticky button[aria-label="Notifications"] + div {
   justify-content: center;
   color: hsl(var(--muted-foreground));
   transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.mobile-nav-brand {
+  height: 46px;
+  width: 46px;
+  flex: 0 0 46px;
+  border-radius: 50%;
+  border: 1px solid hsl(var(--primary) / 0.28);
+  background: hsl(0 0% 100% / 0.96);
+  color: hsl(var(--foreground));
+}
+
+  .mobile-nav-brand-logo {
+    display: block;
+    width: 2.1rem;
+    height: 2.1rem;
+    object-fit: contain;
+  }
+
+.mobile-nav-brand.is-active {
+  background: hsl(0 0% 100% / 0.96);
+  color: hsl(var(--foreground));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.82), 0 5px 14px hsl(var(--primary) / 0.24);
 }
 
 .mobile-nav-item {
@@ -732,9 +754,93 @@ header.sticky button[aria-label="Notifications"] + div {
 
 /* Small-screen layout guardrails. Desktop layout remains unchanged. */
 @media (max-width: 767px) {
+  body {
+    background:
+      radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.08), transparent 28rem),
+      hsl(var(--background));
+  }
+
+  main > .mx-auto {
+    padding-top: 1rem !important;
+    padding-right: 0.875rem !important;
+    padding-left: 0.875rem !important;
+    scroll-padding-bottom: 7rem;
+  }
+
+  .page-header {
+    gap: 0.75rem;
+  }
+
+  .page-header h2 {
+    max-width: 19rem;
+    font-size: 2rem;
+    line-height: 1.02;
+  }
+
+  .page-header > div:first-child > p:first-child {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.5rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid hsl(var(--primary) / 0.2);
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.08);
+  }
+
   .page-header-action,
   .page-header-action > * {
     width: 100%;
+  }
+
+  .context-image {
+    min-height: 132px;
+    border-radius: 1.25rem;
+    box-shadow: 0 14px 28px hsl(var(--foreground) / 0.12);
+  }
+
+  .context-image-copy {
+    padding: 1rem !important;
+  }
+
+  .context-image-copy > p:last-child {
+    max-width: 18rem;
+    font-size: 1.1rem;
+    line-height: 1.08;
+  }
+
+  .glass-surface {
+    border-radius: 1.25rem;
+    box-shadow: 0 10px 24px hsl(var(--foreground) / 0.08);
+  }
+
+  .logistics-card {
+    border-top-width: 4px !important;
+  }
+
+  .logistics-card > div:first-child {
+    padding: 1rem;
+  }
+
+  .logistics-card > div:last-child {
+    padding: 0.75rem;
+  }
+
+  .home-action-grid > a {
+    min-height: 6.5rem;
+    border-radius: 1.25rem;
+    padding: 1rem;
+  }
+
+  .map-shell {
+    min-height: 260px;
+    border-radius: 1.25rem;
+  }
+
+  .mobile-bottom-nav {
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 1.5rem;
+    box-shadow: 0 18px 38px hsl(var(--foreground) / 0.2);
   }
 
   header.sticky {
