@@ -19,6 +19,7 @@ const API_ROOT = (() => {
   if (!value) return "";
   return value.endsWith("/api") ? value : `${value}/api`;
 })();
+const DEV_ADMIN_UI_ENABLED = import.meta.env.DEV || import.meta.env.VITE_DEV_ADMIN_ACCESS === "true";
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (!API_ROOT) {
@@ -848,6 +849,20 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
   const continueWithEmail = () => { setMethod("email"); setStep("email"); setMessage(""); };
   const continueWithGoogle = () => { setMethod("google"); setStep("account"); setMessage(""); };
 
+  const continueWithDevAdmin = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api<{ token: string; user: AuthUser }>("/auth/dev-admin", { method: "POST", body: "{}" });
+      localStorage.setItem("truckshare_token", result.token);
+      onComplete(result.user);
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Development admin access is unavailable.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const requestEmailOtp = async (mode: "login" | "signup") => {
     setBusy(true);
     setMessage("");
@@ -1029,6 +1044,10 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
        <button type="button" onClick={continueWithEmail} className={`${secondaryButton} min-h-20 flex-col`}><Send size={22} /><span>Continue with email</span></button>
        <button type="button" onClick={continueWithGoogle} className={`${secondaryButton} min-h-20 flex-col`}><span className="font-display text-2xl font-bold">G</span><span>Continue with Google</span></button>
        </div>
+        {DEV_ADMIN_UI_ENABLED && <div className="rounded-xl border border-dashed border-accent/50 bg-accent/10 p-3">
+          <p className="font-mono-ui text-[9px] font-bold uppercase tracking-[.14em] text-accent-foreground">Development only</p>
+          <button type="button" onClick={() => void continueWithDevAdmin()} disabled={busy} className={`${secondaryButton} mt-2 w-full justify-between`}><span>Open admin panel</span><ShieldCheck size={15} /></button>
+        </div>}
     </div>}
     {step === "email" && <form onSubmit={(event) => { event.preventDefault(); void checkEmailAccount(); }} className="mt-6 space-y-4">
       <Field label="Email address" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />

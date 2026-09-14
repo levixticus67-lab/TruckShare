@@ -13,6 +13,8 @@ Cross-border and regional freight matching that turns carrier backhaul capacity 
 - `FRONTEND_URL` — allowed browser origin for the API
 - `JWT_SECRET` — signing secret for API sessions
 - `VITE_API_URL` — API base URL for Netlify builds
+- `DEV_ADMIN_ACCESS=true` — enables the development-only admin session when the API is not running with `NODE_ENV=production`; never enable this on a public production API
+- `VITE_DEV_ADMIN_ACCESS=true` — shows the development admin button in a non-Vite-dev frontend build
 
 ## Stack
 

@@ -662,6 +662,26 @@ function isAdminPhone(phone: string) {
   return configuredAdminPhones().includes(phone);
 }
 
+function developmentAdminAccessEnabled() {
+  const flag = text(process.env.DEV_ADMIN_ACCESS).toLowerCase();
+  return process.env.NODE_ENV !== "production" && ["1", "true", "yes"].includes(flag);
+}
+
+function developmentAdminUser() {
+  const existing = users.find((user) => user.id === "dev-admin");
+  if (existing) return existing;
+  const user: User = {
+    id: "dev-admin",
+    name: "Development Admin",
+    email: "dev-admin@localhost",
+    country: "UG",
+    role: "Admin",
+    verified: true,
+  };
+  users.unshift(user);
+  return user;
+}
+
 function authenticatedUser(req: Request) {
   const token = text(req.headers.authorization).replace(/^Bearer\s+/i, "");
   return sessions.get(token);
@@ -830,6 +850,17 @@ router.post("/auth/account-status", (req, res) => {
     return;
   }
   res.json({ exists: users.some((user) => normalizeEmail(user.email || "") === email) });
+});
+
+router.post("/auth/dev-admin", (req, res) => {
+  if (!developmentAdminAccessEnabled()) {
+    res.status(404).json({ error: "Development admin access is disabled." });
+    return;
+  }
+  const user = developmentAdminUser();
+  const token = issueToken(user);
+  sessions.set(token, user);
+  res.json({ token, user: publicUser(user), developmentOnly: true });
 });
 
 router.post("/auth/request-email-otp", async (req, res) => {
