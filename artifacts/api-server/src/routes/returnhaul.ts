@@ -1531,6 +1531,59 @@ router.get("/matches", (req, res) => {
   res.json(ListMatchesResponse.parse(result));
 });
 
+router.get("/requests", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in to view your broker requests." });
+    return;
+  }
+  const visible = brokerRequests
+    .filter((request) => user.role === "Admin" || request.ownerUserId === user.id)
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .map((request) => ({
+      id: request.id,
+      kind: request.kind,
+      title: request.title,
+      counterpart: request.counterpart,
+      corridor: request.corridor,
+      date: request.date,
+      priority: request.priority,
+      status: request.status,
+      bookingId: request.bookingId,
+      proposedMatchId: request.proposedMatchId,
+      notes: request.notes,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+    }));
+  res.json(visible);
+});
+
+router.post("/requests/:id/confirm", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in before confirming an offer." });
+    return;
+  }
+  const request = brokerRequests.find((item) => item.id === text(req.params.id));
+  if (!request) {
+    res.status(404).json({ error: "Broker request not found." });
+    return;
+  }
+  if (user.role !== "Admin" && request.ownerUserId !== user.id) {
+    res.status(403).json({ error: "You can only confirm your own broker request." });
+    return;
+  }
+  if (request.status !== "Offer sent") {
+    res.status(409).json({ error: "Only an active offer can be confirmed." });
+    return;
+  }
+  request.status = "Confirmed";
+  request.updatedAt = new Date().toISOString();
+  recordAdminActivity(request, "Counterpart confirmed", `${request.counterpart} confirmed the proposed arrangement.`, user.name);
+  await persistDatabaseState();
+  res.json(request);
+});
+
 router.get("/bookings", (req, res) => {
   const user = authenticatedUser(req);
   if (!user) {
