@@ -163,6 +163,7 @@ type BrokerRequest = {
   status: BrokerRequestStatus;
   assignedTo?: string;
   proposedMatchId?: string;
+  bookingId?: string;
   notes: string[];
   createdAt: string;
   updatedAt: string;
@@ -1843,6 +1844,78 @@ router.post("/admin/requests/:id/offer", async (req, res) => {
   recordAdminActivity(request, "Offer sent", `${suggestion.title} proposed to ${request.counterpart}.`, user.name);
   await persistDatabaseState();
   res.json({ request, suggestion });
+});
+
+router.post("/admin/requests/:id/assign", async (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  const request = brokerRequests.find((item) => item.id === text(req.params.id));
+  if (!request) {
+    res.status(404).json({ error: "Broker request not found." });
+    return;
+  }
+  const matchId = text(req.body?.matchId) || request.proposedMatchId;
+  if (!matchId) {
+    res.status(400).json({ error: "Send an offer before creating an assignment." });
+    return;
+  }
+  const suggestion = brokerMatchSuggestions(request).find((item) => item.id === matchId);
+  if (!suggestion) {
+    res.status(400).json({ error: "That match is no longer available for this request." });
+    return;
+  }
+  const tripId = request.kind === "Load" ? matchId : request.entityId;
+  const freightId = request.kind === "Load" ? request.entityId : matchId;
+  const trip = trips.find((item) => item.id === tripId);
+  const load = freight.find((item) => item.id === freightId);
+  if (!trip || !load) {
+    res.status(400).json({ error: "The selected trip or load is no longer available." });
+    return;
+  }
+  const existingBooking = bookings.find((booking) => booking.tripId === trip.id || booking.freightId === load.id);
+  if (existingBooking) {
+    res.status(409).json({ error: "This trip or load is already assigned to a booking.", booking: existingBooking });
+    return;
+  }
+  const amount = number(req.body?.amount) > 0 ? number(req.body.amount) : load.price || trip.price;
+  const booking: Booking = {
+    id: id("booking"),
+    tripId: trip.id,
+    freightId: load.id,
+    corridor: load.corridor,
+    originCountry: trip.originCountry,
+    destinationCountry: load.dropoffCountry,
+    amount,
+    currency: currencyCode(req.body?.currency || load.currency || trip.currency),
+    commissionAmount: Math.round(amount * 0.12),
+    carrierPayout: Math.round(amount * 0.88),
+    paymentStatus: "Unpaid",
+    escrowStatus: "Pending",
+    status: "En Route to Pickup",
+    bookedAt: nowDate(),
+    podStatus: "Not requested",
+    podOtp: "4312",
+  };
+  bookings.unshift(booking);
+  const counterpartRequest = brokerRequests.find((item) =>
+    item.entityId === (request.kind === "Load" ? trip.id : load.id) &&
+    item.kind !== request.kind,
+  );
+  for (const item of [request, counterpartRequest]) {
+    if (!item) continue;
+    item.status = "Assigned";
+    item.proposedMatchId = item.kind === "Load" ? trip.id : load.id;
+    item.bookingId = booking.id;
+    item.updatedAt = new Date().toISOString();
+  }
+  trip.status = "Booked";
+  load.status = "Matched";
+  recordAdminActivity(request, "Booking confirmed", `${load.description} assigned to ${trip.carrier} by ${user.name}.`, user.name);
+  if (counterpartRequest) {
+    recordAdminActivity(counterpartRequest, "Booking confirmed", `${trip.vehicleType} assigned to ${load.shipper} by ${user.name}.`, user.name);
+  }
+  await persistDatabaseState();
+  res.status(201).json({ booking, request, counterpartRequest });
 });
 
 router.get("/admin/summary", (req, res) => {
