@@ -148,6 +148,34 @@ type Verification = {
   submittedAt: string;
 };
 
+type BrokerRequestKind = "Load" | "Trip";
+type BrokerRequestStatus = "New" | "Needs information" | "Approved" | "Matching" | "Offer sent" | "Confirmed" | "Assigned" | "In progress" | "On hold" | "Closed" | "Rejected";
+type BrokerPriority = "Low" | "Normal" | "High" | "Urgent";
+type BrokerRequest = {
+  id: string;
+  kind: BrokerRequestKind;
+  entityId: string;
+  title: string;
+  counterpart: string;
+  corridor: string;
+  date: string;
+  priority: BrokerPriority;
+  status: BrokerRequestStatus;
+  assignedTo?: string;
+  proposedMatchId?: string;
+  notes: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+type AdminActivity = {
+  id: string;
+  requestId?: string;
+  label: string;
+  detail: string;
+  actor: string;
+  createdAt: string;
+};
+
 type User = {
   id: string;
   name: string;
@@ -384,6 +412,23 @@ const verifications: Verification[] = [
   { id: "verification-1", userId: "user-3", name: "Thabo Transport", phone: "+256 781 333 444", nin: "CM9000••••", licenseNumber: "DL-UG-20481", logbookNumber: "LB-77821", logbookPhotoName: "thabo-logbook.jpg", status: "Pending", submittedAt: "2026-08-26" },
 ];
 
+const brokerRequests: BrokerRequest[] = [
+  { id: "request-load-1", kind: "Load", entityId: "load-1", title: "Bagged grain and packaged food", counterpart: "Kampala Grain Co.", corridor: "Kampala → Mbale", date: "2026-08-28", priority: "High", status: "New", notes: ["Confirm loading window and final pallet count."], createdAt: "2026-08-26T08:42:00.000Z", updatedAt: "2026-08-26T08:42:00.000Z" },
+  { id: "request-trip-1", kind: "Trip", entityId: "trip-1", title: "Fuso · 8 tons available", counterpart: "Moses K.", corridor: "Kampala → Mbale", date: "2026-08-28", priority: "Normal", status: "Matching", notes: ["Return capacity needs a compatible load."], createdAt: "2026-08-25T14:10:00.000Z", updatedAt: "2026-08-26T09:12:00.000Z" },
+  { id: "request-load-2", kind: "Load", entityId: "load-2", title: "Temperature-sensitive pharmaceuticals", counterpart: "Mara Pharma", corridor: "Kampala → Mbarara", date: "2026-08-30", priority: "Urgent", status: "Offer sent", proposedMatchId: "trip-2", notes: ["Carrier must confirm cold-chain handling before assignment."], createdAt: "2026-08-25T11:30:00.000Z", updatedAt: "2026-08-26T10:04:00.000Z" },
+  { id: "request-trip-2", kind: "Trip", entityId: "trip-2", title: "Canter · 6 tons available", counterpart: "Amina Logistics", corridor: "Kampala → Mbarara", date: "2026-08-30", priority: "High", status: "Offer sent", proposedMatchId: "load-2", notes: ["Awaiting carrier confirmation on temperature controls."], createdAt: "2026-08-25T12:05:00.000Z", updatedAt: "2026-08-26T10:04:00.000Z" },
+  { id: "request-load-3", kind: "Load", entityId: "load-3", title: "Hardware and steel components", counterpart: "Eastline Hardware", corridor: "Malaba → Kampala", date: "2026-09-02", priority: "Normal", status: "In progress", notes: ["Border documents are being checked at Malaba."], createdAt: "2026-08-22T07:25:00.000Z", updatedAt: "2026-08-26T08:20:00.000Z" },
+  { id: "request-trip-3", kind: "Trip", entityId: "trip-3", title: "Trailer · 18 tons available", counterpart: "Thabo Transport", corridor: "Malaba → Kampala", date: "2026-09-02", priority: "Normal", status: "Assigned", proposedMatchId: "load-3", notes: ["Assigned to Eastline Hardware booking."], createdAt: "2026-08-22T07:40:00.000Z", updatedAt: "2026-08-22T09:00:00.000Z" },
+  { id: "request-load-4", kind: "Load", entityId: "load-4", title: "Fresh produce and cold-chain cartons", counterpart: "Northern Fresh", corridor: "Kampala → Gulu", date: "2026-09-04", priority: "High", status: "New", notes: ["Confirm cold-chain equipment and pickup window."], createdAt: "2026-08-26T07:05:00.000Z", updatedAt: "2026-08-26T07:05:00.000Z" },
+  { id: "request-trip-4", kind: "Trip", entityId: "trip-4", title: "Flatbed · 14 tons available", counterpart: "Gulu North Haulage", corridor: "Kampala → Gulu", date: "2026-09-04", priority: "Normal", status: "Matching", notes: ["Available for a suitable northbound load."], createdAt: "2026-08-26T07:30:00.000Z", updatedAt: "2026-08-26T07:30:00.000Z" },
+];
+
+const adminActivities: AdminActivity[] = [
+  { id: "activity-1", requestId: "request-load-2", label: "Offer sent", detail: "Mara Pharma load proposed to Amina Logistics.", actor: "Admin desk", createdAt: "2026-08-26T10:04:00.000Z" },
+  { id: "activity-2", requestId: "request-load-3", label: "Border note added", detail: "Customs documents are being checked at Malaba.", actor: "Admin desk", createdAt: "2026-08-26T08:20:00.000Z" },
+  { id: "activity-3", requestId: "request-load-1", label: "New submission", detail: "Kampala Grain Co. submitted a load request.", actor: "System", createdAt: "2026-08-26T08:42:00.000Z" },
+];
+
 const sessions = new Map<string, User>();
 const otpRequestCooldowns = new Map<string, number>();
 const googleStates = new Map<string, { mode: "login" | "signup"; roles: Array<"Carrier" | "Shipper">; termsAccepted: boolean; returnTo?: string; exp: number }>();
@@ -396,12 +441,12 @@ const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
-const stateKeys = ["trips", "freight", "bookings", "payments", "borderMilestones", "messages", "documents", "users", "verifications"] as const;
+const stateKeys = ["trips", "freight", "bookings", "payments", "borderMilestones", "messages", "documents", "users", "verifications", "brokerRequests", "adminActivities"] as const;
 type StateKey = (typeof stateKeys)[number];
 let stateReady: Promise<void> | undefined;
 
 function stateValue(key: StateKey) {
-  return JSON.stringify({ trips, freight, bookings, payments, borderMilestones, messages, documents, users, verifications }[key]);
+  return JSON.stringify({ trips, freight, bookings, payments, borderMilestones, messages, documents, users, verifications, brokerRequests, adminActivities }[key]);
 }
 
 function applyState(key: string, value: string) {
@@ -445,6 +490,8 @@ function applyState(key: string, value: string) {
     country: countryCode(item.country),
   })) as User[]);
   if (key === "verifications") verifications.splice(0, verifications.length, ...parsed as Verification[]);
+  if (key === "brokerRequests") brokerRequests.splice(0, brokerRequests.length, ...parsed as BrokerRequest[]);
+  if (key === "adminActivities") adminActivities.splice(0, adminActivities.length, ...parsed as AdminActivity[]);
 }
 
 async function ensureDatabaseState() {
@@ -691,6 +738,85 @@ function publicUser(user: User | null) {
   if (!user) return null;
   const { passwordHash: _passwordHash, ...safeUser } = user;
   return { ...safeUser, hasPassword: Boolean(user.passwordHash) };
+}
+
+function adminUser(req: Request, res: Response) {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in with an admin account to view this area." });
+    return undefined;
+  }
+  if (user.role !== "Admin") {
+    res.status(403).json({ error: "This area is restricted to admins." });
+    return undefined;
+  }
+  return user;
+}
+
+function brokerRequestForEntity(kind: BrokerRequestKind, entityId: string) {
+  return brokerRequests.find((request) => request.kind === kind && request.entityId === entityId);
+}
+
+function recordAdminActivity(request: BrokerRequest | undefined, label: string, detail: string, actor: string) {
+  adminActivities.unshift({
+    id: id("activity"),
+    requestId: request?.id,
+    label,
+    detail,
+    actor,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+function createBrokerRequest(input: Omit<BrokerRequest, "id" | "createdAt" | "updatedAt" | "notes"> & { notes?: string[] }) {
+  const createdAt = new Date().toISOString();
+  const request: BrokerRequest = {
+    ...input,
+    id: id("request"),
+    notes: input.notes || [],
+    createdAt,
+    updatedAt: createdAt,
+  };
+  brokerRequests.unshift(request);
+  recordAdminActivity(request, "New submission", `${request.counterpart} submitted a ${request.kind.toLowerCase()} request.`, "System");
+  return request;
+}
+
+function brokerMatchSuggestions(request: BrokerRequest) {
+  if (request.kind === "Load") {
+    const load = freight.find((item) => item.id === request.entityId);
+    if (!load) return [];
+    return trips
+      .filter((trip) => trip.status === "Available" && trip.capacityTons >= load.weightTons && trip.capacityM3 >= load.volumeM3)
+      .map((trip) => ({
+        id: trip.id,
+        kind: "Trip" as const,
+        title: `${trip.vehicleType} · ${trip.capacityTons} tons available`,
+        counterpart: trip.carrier,
+        corridor: trip.corridor,
+        date: trip.departureDate,
+        price: trip.price,
+        compatibility: trip.corridor === load.corridor ? 96 : 72,
+      }))
+      .sort((a, b) => b.compatibility - a.compatibility)
+      .slice(0, 5);
+  }
+  const trip = trips.find((item) => item.id === request.entityId);
+  if (!trip) return [];
+  return freight
+    .filter((load) => ["Pending", "Matched"].includes(load.status) && load.weightTons <= trip.capacityTons && load.volumeM3 <= trip.capacityM3)
+    .map((load) => ({
+      id: load.id,
+      kind: "Load" as const,
+      title: load.description,
+      counterpart: load.shipper,
+      corridor: load.corridor,
+      date: load.pickupDate,
+      price: load.price,
+      compatibility: trip.corridor === load.corridor ? 96 : 72,
+    }))
+    .sort((a, b) => b.compatibility - a.compatibility)
+    .slice(0, 5);
 }
 
 function passwordHash(password: string, salt = randomBytes(16).toString("hex")) {
@@ -1253,6 +1379,16 @@ router.post("/trips", async (req, res) => {
     status: "Available",
   };
   trips.unshift(trip);
+  createBrokerRequest({
+    kind: "Trip",
+    entityId: trip.id,
+    title: `${trip.vehicleType} · ${trip.capacityTons} tons available`,
+    counterpart: authenticatedUser(req)?.name || trip.carrier,
+    corridor: trip.corridor,
+    date: trip.departureDate,
+    priority: "Normal",
+    status: "New",
+  });
   await persistDatabaseState();
   res.status(201).json(tripWithLocations(trip));
 });
@@ -1301,6 +1437,16 @@ router.post("/freight", async (req, res) => {
     status: "Pending",
   };
   freight.unshift(load);
+  createBrokerRequest({
+    kind: "Load",
+    entityId: load.id,
+    title: load.description,
+    counterpart: authenticatedUser(req)?.name || load.shipper,
+    corridor: load.corridor,
+    date: load.pickupDate,
+    priority: "Normal",
+    status: "New",
+  });
   await persistDatabaseState();
   res.status(201).json(freightWithLocations(load));
 });
@@ -1585,16 +1731,121 @@ router.patch("/verification/:id/review", async (req, res) => {
   res.json(verification);
 });
 
+const brokerRequestStatuses: BrokerRequestStatus[] = ["New", "Needs information", "Approved", "Matching", "Offer sent", "Confirmed", "Assigned", "In progress", "On hold", "Closed", "Rejected"];
+const brokerPriorities: BrokerPriority[] = ["Low", "Normal", "High", "Urgent"];
+
+router.get("/admin/operations", (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  const requests = [...brokerRequests]
+    .sort((a, b) => {
+      const priorityOrder: Record<BrokerPriority, number> = { Urgent: 0, High: 1, Normal: 2, Low: 3 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority] || Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+    })
+    .map((request) => ({
+      ...request,
+      suggestions: brokerMatchSuggestions(request),
+      entity: request.kind === "Load"
+        ? freightWithLocations(freight.find((item) => item.id === request.entityId) || freight[0])
+        : tripWithLocations(trips.find((item) => item.id === request.entityId) || trips[0]),
+    }));
+  const openStatuses: BrokerRequestStatus[] = ["New", "Needs information", "Approved", "Matching", "Offer sent", "Confirmed", "Assigned", "In progress", "On hold"];
+  res.json({
+    requests,
+    activities: adminActivities.slice(0, 30),
+    verifications,
+    metrics: {
+      totalOpen: brokerRequests.filter((request) => openStatuses.includes(request.status)).length,
+      newSubmissions: brokerRequests.filter((request) => request.status === "New").length,
+      needsAttention: brokerRequests.filter((request) => ["Needs information", "On hold"].includes(request.status)).length,
+      matching: brokerRequests.filter((request) => ["Approved", "Matching", "Offer sent"].includes(request.status)).length,
+      activeOperations: brokerRequests.filter((request) => ["Confirmed", "Assigned", "In progress"].includes(request.status)).length,
+      pendingVerifications: verifications.filter((item) => item.status === "Pending").length,
+      activeBookings: bookings.filter((booking) => booking.status !== "Delivered").length,
+    },
+    actor: publicUser(user),
+  });
+});
+
+router.patch("/admin/requests/:id", async (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  const request = brokerRequests.find((item) => item.id === text(req.params.id));
+  if (!request) {
+    res.status(404).json({ error: "Broker request not found." });
+    return;
+  }
+  const requestedStatus = text(req.body?.status) as BrokerRequestStatus;
+  const requestedPriority = text(req.body?.priority) as BrokerPriority;
+  const note = text(req.body?.note);
+  const assignedTo = text(req.body?.assignedTo);
+  if (requestedStatus && !brokerRequestStatuses.includes(requestedStatus)) {
+    res.status(400).json({ error: "Invalid broker request status." });
+    return;
+  }
+  if (requestedPriority && !brokerPriorities.includes(requestedPriority)) {
+    res.status(400).json({ error: "Invalid broker request priority." });
+    return;
+  }
+  if (requestedStatus) request.status = requestedStatus;
+  if (requestedPriority) request.priority = requestedPriority;
+  if (assignedTo) request.assignedTo = assignedTo;
+  if (note) request.notes.unshift(note);
+  request.updatedAt = new Date().toISOString();
+  const label = requestedStatus ? `Status changed to ${requestedStatus}` : note ? "Note added" : "Request updated";
+  recordAdminActivity(request, label, note || `${request.title} was updated by the admin desk.`, user.name);
+
+  const entity = request.kind === "Load"
+    ? freight.find((item) => item.id === request.entityId)
+    : trips.find((item) => item.id === request.entityId);
+  if (entity) {
+    if (request.kind === "Load") {
+      const statusMap: Partial<Record<BrokerRequestStatus, Freight["status"]>> = {
+        "Confirmed": "Matched",
+        "Assigned": "Matched",
+        "In progress": "In-Transit",
+        "Closed": "Delivered",
+      };
+      if (requestedStatus && statusMap[requestedStatus]) (entity as Freight).status = statusMap[requestedStatus] as Freight["status"];
+    } else {
+      const statusMap: Partial<Record<BrokerRequestStatus, string>> = {
+        "Confirmed": "Booked",
+        "Assigned": "Booked",
+        "In progress": "En Route",
+        "Closed": "Completed",
+      };
+      if (requestedStatus && statusMap[requestedStatus]) (entity as Trip).status = statusMap[requestedStatus] || entity.status;
+    }
+  }
+  await persistDatabaseState();
+  res.json(request);
+});
+
+router.post("/admin/requests/:id/offer", async (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  const request = brokerRequests.find((item) => item.id === text(req.params.id));
+  const matchId = text(req.body?.matchId);
+  if (!request || !matchId) {
+    res.status(400).json({ error: "Choose a broker request and a suggested match." });
+    return;
+  }
+  const suggestion = brokerMatchSuggestions(request).find((item) => item.id === matchId);
+  if (!suggestion) {
+    res.status(400).json({ error: "That match is no longer available for this request." });
+    return;
+  }
+  request.proposedMatchId = matchId;
+  request.status = "Offer sent";
+  request.updatedAt = new Date().toISOString();
+  recordAdminActivity(request, "Offer sent", `${suggestion.title} proposed to ${request.counterpart}.`, user.name);
+  await persistDatabaseState();
+  res.json({ request, suggestion });
+});
+
 router.get("/admin/summary", (req, res) => {
-  const user = authenticatedUser(req);
-  if (!user) {
-    res.status(401).json({ error: "Log in with an admin account to view this area." });
-    return;
-  }
-  if (user.role !== "Admin") {
-    res.status(403).json({ error: "This area is restricted to admins." });
-    return;
-  }
+  const user = adminUser(req, res);
+  if (!user) return;
   const gross = bookings.reduce((sum, booking) => sum + booking.amount, 0);
   res.json({
     users,
