@@ -1808,6 +1808,19 @@ router.patch("/verification/:id/review", async (req, res) => {
 
 const brokerRequestStatuses: BrokerRequestStatus[] = ["New", "Needs information", "Approved", "Matching", "Offer sent", "Confirmed", "Assigned", "In progress", "On hold", "Closed", "Rejected"];
 const brokerPriorities: BrokerPriority[] = ["Low", "Normal", "High", "Urgent"];
+const brokerRequestTransitions: Record<BrokerRequestStatus, BrokerRequestStatus[]> = {
+  New: ["Needs information", "Approved", "On hold", "Rejected"],
+  "Needs information": ["New", "Approved", "On hold", "Rejected"],
+  Approved: ["Matching", "On hold", "Rejected"],
+  Matching: ["Offer sent", "On hold", "Rejected"],
+  "Offer sent": ["Confirmed", "Matching", "On hold", "Rejected"],
+  Confirmed: ["Assigned", "Offer sent", "On hold", "Rejected"],
+  Assigned: ["In progress", "On hold", "Closed"],
+  "In progress": ["Closed", "On hold"],
+  "On hold": ["New", "Needs information", "Approved", "Matching", "Rejected"],
+  Closed: [],
+  Rejected: [],
+};
 
 router.get("/admin/operations", (req, res) => {
   const user = adminUser(req, res);
@@ -1820,6 +1833,7 @@ router.get("/admin/operations", (req, res) => {
     .map((request) => ({
       ...request,
       suggestions: brokerMatchSuggestions(request),
+      activities: adminActivities.filter((activity) => activity.requestId === request.id).slice(0, 20),
       entity: request.kind === "Load"
         ? freightWithLocations(freight.find((item) => item.id === request.entityId) || freight[0])
         : tripWithLocations(trips.find((item) => item.id === request.entityId) || trips[0]),
@@ -1856,6 +1870,10 @@ router.patch("/admin/requests/:id", async (req, res) => {
   const assignedTo = text(req.body?.assignedTo);
   if (requestedStatus && !brokerRequestStatuses.includes(requestedStatus)) {
     res.status(400).json({ error: "Invalid broker request status." });
+    return;
+  }
+  if (requestedStatus && requestedStatus !== request.status && !brokerRequestTransitions[request.status].includes(requestedStatus)) {
+    res.status(409).json({ error: `A ${request.status} request cannot move directly to ${requestedStatus}.` });
     return;
   }
   if (requestedPriority && !brokerPriorities.includes(requestedPriority)) {
@@ -1905,6 +1923,10 @@ router.post("/admin/requests/:id/offer", async (req, res) => {
     res.status(400).json({ error: "Choose a broker request and a suggested match." });
     return;
   }
+  if (!["Approved", "Matching", "Offer sent"].includes(request.status)) {
+    res.status(409).json({ error: `Move this request to matching before sending an offer.` });
+    return;
+  }
   const suggestion = brokerMatchSuggestions(request).find((item) => item.id === matchId);
   if (!suggestion) {
     res.status(400).json({ error: "That match is no longer available for this request." });
@@ -1924,6 +1946,10 @@ router.post("/admin/requests/:id/assign", async (req, res) => {
   const request = brokerRequests.find((item) => item.id === text(req.params.id));
   if (!request) {
     res.status(404).json({ error: "Broker request not found." });
+    return;
+  }
+  if (!["Offer sent", "Confirmed"].includes(request.status)) {
+    res.status(409).json({ error: "The request must have an active offer before it can be assigned." });
     return;
   }
   const matchId = text(req.body?.matchId) || request.proposedMatchId;
