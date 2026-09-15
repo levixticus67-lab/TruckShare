@@ -19,7 +19,7 @@ const API_ROOT = (() => {
   if (!value) return "";
   return value.endsWith("/api") ? value : `${value}/api`;
 })();
-const DEV_ADMIN_UI_ENABLED = import.meta.env.DEV || import.meta.env.VITE_DEV_ADMIN_ACCESS === "true";
+const ADMIN_PREVIEW_STORAGE_KEY = "truckshare_admin_preview";
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (!API_ROOT) {
@@ -177,6 +177,13 @@ function Shell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setAuthLoading(true);
     const params = new URLSearchParams(window.location.search);
+    const adminPreview = params.get("admin_preview") === "1" && localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1";
+    if (adminPreview) {
+      setRole("Admin");
+      setAuthUser({ id: "admin-preview", name: "Admin Preview", email: "admin-preview@localhost", country: "UG", role: "Admin", verified: true });
+      setAuthLoading(false);
+      return;
+    }
     const googleCode = params.get("google_code");
     const googleError = params.get("google_error");
     if (googleCode) {
@@ -231,6 +238,7 @@ function Shell({ children }: { children: ReactNode }) {
   };
   const signOut = () => {
     localStorage.removeItem("truckshare_token");
+    localStorage.removeItem(ADMIN_PREVIEW_STORAGE_KEY);
     setAuthUser(null);
     setAuthMessage("");
     setMobileOpen(false);
@@ -849,18 +857,9 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
   const continueWithEmail = () => { setMethod("email"); setStep("email"); setMessage(""); };
   const continueWithGoogle = () => { setMethod("google"); setStep("account"); setMessage(""); };
 
-  const continueWithDevAdmin = async () => {
-    setBusy(true);
-    setMessage("");
-    try {
-      const result = await api<{ token: string; user: AuthUser }>("/auth/dev-admin", { method: "POST", body: "{}" });
-      localStorage.setItem("truckshare_token", result.token);
-      onComplete(result.user);
-    } catch (reason: unknown) {
-      setMessage(reason instanceof Error ? reason.message : "Development admin access is unavailable.");
-    } finally {
-      setBusy(false);
-    }
+  const openAdminPreview = () => {
+    localStorage.setItem(ADMIN_PREVIEW_STORAGE_KEY, "1");
+    window.location.assign("/admin?admin_preview=1");
   };
 
   const requestEmailOtp = async (mode: "login" | "signup") => {
@@ -1044,10 +1043,10 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
        <button type="button" onClick={continueWithEmail} className={`${secondaryButton} min-h-20 flex-col`}><Send size={22} /><span>Continue with email</span></button>
        <button type="button" onClick={continueWithGoogle} className={`${secondaryButton} min-h-20 flex-col`}><span className="font-display text-2xl font-bold">G</span><span>Continue with Google</span></button>
        </div>
-        {DEV_ADMIN_UI_ENABLED && <div className="rounded-xl border border-dashed border-accent/50 bg-accent/10 p-3">
-          <p className="font-mono-ui text-[9px] font-bold uppercase tracking-[.14em] text-accent-foreground">Development only</p>
-          <button type="button" onClick={() => void continueWithDevAdmin()} disabled={busy} className={`${secondaryButton} mt-2 w-full justify-between`}><span>Open admin panel</span><ShieldCheck size={15} /></button>
-        </div>}
+        <div className="rounded-xl border border-dashed border-accent/50 bg-accent/10 p-3">
+          <p className="font-mono-ui text-[9px] font-bold uppercase tracking-[.14em] text-accent-foreground">Temporary development shortcut</p>
+          <button type="button" onClick={openAdminPreview} className={`${secondaryButton} mt-2 w-full justify-between`}><span>Open admin panel</span><ShieldCheck size={15} /></button>
+        </div>
     </div>}
     {step === "email" && <form onSubmit={(event) => { event.preventDefault(); void checkEmailAccount(); }} className="mt-6 space-y-4">
       <Field label="Email address" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
@@ -1270,12 +1269,32 @@ function VerificationPage() {
 }
 
 function AdminPage() {
-  const auth = useApi<{ user: AuthUser | null }>("/auth/me", { user: null });
-  const query = useApi<{ users: { id: string; name: string; role: string; verified: boolean }[]; verifications: Verification[]; revenue: number; grossVolume: number; activeBookings: number }>("/admin/summary", { users: [], verifications: [], revenue: 0, grossVolume: 0, activeBookings: 0 });
-  const review = async (item: Verification, status: string) => { await api(`/verification/${item.id}/review`, { method: "PATCH", body: JSON.stringify({ status }) }); query.reload(); };
-  if (auth.loading) return <div className="mx-auto max-w-4xl"><Loading error="" retry={auth.reload} /></div>;
-  if (auth.data.user?.role !== "Admin") return <div className="mx-auto max-w-xl py-12"><Card><ShieldCheck className="text-muted-foreground" size={24} /><h2 className="mt-4 font-display text-2xl font-semibold">Admin area</h2><p className="mt-2 text-sm text-muted-foreground">This area is only available to verified admin accounts.</p><Link href="/" className={`${secondaryButton} mt-5`}>Return home <ArrowRight size={14} /></Link></Card></div>;
-  return <div className="space-y-6"><Header eyebrow="Platform operations" title="Admin control" detail="Review driver trust signals, manage users, and watch the 12% commission stream." /><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="Gross booking volume" value={money(query.data.grossVolume)} note="All time in preview" icon={BarChart3} /><Stat label="Platform revenue" value={money(query.data.revenue)} note="12% commission" icon={Banknote} accent /><Stat label="Active users" value={query.data.users.length} note="Drivers + shippers" icon={UsersRound} /><Stat label="Active bookings" value={query.data.activeBookings} note="Needs attention" icon={ClipboardCheck} /></div><Card><div className="mb-4 flex items-center justify-between"><div><p className={labelClass}>Trust queue</p><h3 className="font-display text-xl font-semibold">Driver verification review</h3></div><ShieldCheck className="text-accent-foreground" /></div><div className="space-y-3">{query.data.verifications.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{item.name} <span className="ml-2 text-[11px] font-normal text-muted-foreground">{item.phone}</span></p><p className="mt-1 text-[11px] text-muted-foreground">NIN {item.nin} · License {item.licenseNumber} · Logbook {item.logbookNumber}</p></div><div className="flex gap-2"><Status value={item.status} />{item.status === "Pending" && <><button onClick={() => review(item, "Verified")} className={button}><Check size={14} /> Verify</button><button onClick={() => review(item, "Rejected")} className={secondaryButton}>Reject</button></>}</div></div>)}</div></Card><Card><h3 className="font-display text-xl font-semibold">Registered users</h3><div className="mt-4 divide-y divide-border">{query.data.users.map((user) => <div key={user.id} className="flex items-center justify-between py-3"><div className="flex items-center gap-3"><UserRound size={16} className="text-muted-foreground" /><span className="text-xs font-bold">{user.name}</span><span className="text-[10px] text-muted-foreground">{user.role}</span></div>{user.verified && <Status value="Verified" />}</div>)}</div></Card></div>;
+  const adminPreview = typeof window !== "undefined" && localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1";
+  const previewUser: AuthUser = { id: "admin-preview", name: "Admin Preview", email: "admin-preview@localhost", country: "UG", role: "Admin", verified: true };
+  const previewSummary = {
+    users: [
+      { id: "preview-user-1", name: "Moses K.", role: "Carrier", verified: true },
+      { id: "preview-user-2", name: "Kampala Grain Co.", role: "Shipper", verified: true },
+      { id: "preview-user-3", name: "Thabo Transport", role: "Carrier", verified: false },
+    ],
+    verifications: [
+      { id: "preview-verification-1", name: "Thabo Transport", phone: "+256 781 333 444", nin: "CM9000••••", licenseNumber: "DL-UG-20481", logbookNumber: "LB-77821", status: "Pending", submittedAt: "2026-08-26" },
+    ],
+    revenue: 158400,
+    grossVolume: 1320000,
+    activeBookings: 2,
+  };
+  const auth = useApi<{ user: AuthUser | null }>("/auth/me", { user: adminPreview ? previewUser : null });
+  const query = useApi<typeof previewSummary>("/admin/summary", previewSummary);
+  const review = async (item: Verification, status: string) => {
+    if (adminPreview) return;
+    await api(`/verification/${item.id}/review`, { method: "PATCH", body: JSON.stringify({ status }) });
+    query.reload();
+  };
+  const currentUser = adminPreview ? previewUser : auth.data.user;
+  if (!adminPreview && auth.loading) return <div className="mx-auto max-w-4xl"><Loading error="" retry={auth.reload} /></div>;
+  if (currentUser?.role !== "Admin") return <div className="mx-auto max-w-xl py-12"><Card><ShieldCheck className="text-muted-foreground" size={24} /><h2 className="mt-4 font-display text-2xl font-semibold">Admin area</h2><p className="mt-2 text-sm text-muted-foreground">This area is only available to verified admin accounts.</p><Link href="/" className={`${secondaryButton} mt-5`}>Return home <ArrowRight size={14} /></Link></Card></div>;
+  return <div className="space-y-6">{adminPreview && <div className="rounded-xl border border-dashed border-accent/50 bg-accent/10 p-4 text-sm"><p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.14em] text-accent-foreground">Temporary admin preview</p><p className="mt-1 text-muted-foreground">This is a frontend-only preview. Review actions are disabled until a real admin account is connected.</p></div>}<Header eyebrow="Platform operations" title="Admin control" detail="Review driver trust signals, manage users, and watch the 12% commission stream." /><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="Gross booking volume" value={money(query.data.grossVolume)} note="All time in preview" icon={BarChart3} /><Stat label="Platform revenue" value={money(query.data.revenue)} note="12% commission" icon={Banknote} accent /><Stat label="Active users" value={query.data.users.length} note="Drivers + shippers" icon={UsersRound} /><Stat label="Active bookings" value={query.data.activeBookings} note="Needs attention" icon={ClipboardCheck} /></div><Card><div className="mb-4 flex items-center justify-between"><div><p className={labelClass}>Trust queue</p><h3 className="font-display text-xl font-semibold">Driver verification review</h3></div><ShieldCheck className="text-accent-foreground" /></div><div className="space-y-3">{query.data.verifications.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{item.name} <span className="ml-2 text-[11px] font-normal text-muted-foreground">{item.phone}</span></p><p className="mt-1 text-[11px] text-muted-foreground">NIN {item.nin} · License {item.licenseNumber} · Logbook {item.logbookNumber}</p></div><div className="flex gap-2"><Status value={item.status} />{item.status === "Pending" && <><button onClick={() => review(item, "Verified")} disabled={adminPreview} className={button}><Check size={14} /> Verify</button><button onClick={() => review(item, "Rejected")} disabled={adminPreview} className={secondaryButton}>Reject</button></>}</div></div>)}</div></Card><Card><h3 className="font-display text-xl font-semibold">Registered users</h3><div className="mt-4 divide-y divide-border">{query.data.users.map((user) => <div key={user.id} className="flex items-center justify-between py-3"><div className="flex items-center gap-3"><UserRound size={16} className="text-muted-foreground" /><span className="text-xs font-bold">{user.name}</span><span className="text-[10px] text-muted-foreground">{user.role}</span></div>{user.verified && <Status value="Verified" />}</div>)}</div></Card></div>;
 }
 
 function PaymentsPage() {
