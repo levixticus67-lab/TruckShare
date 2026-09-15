@@ -30,6 +30,7 @@ import {
 
 type Trip = {
   id: string;
+  ownerUserId?: string;
   carrier: string;
   carrierRating: number;
   origin: string;
@@ -60,6 +61,7 @@ type LocationPoint = {
 
 type Freight = {
   id: string;
+  ownerUserId?: string;
   shipper: string;
   pickup: string;
   pickupCountry: CountryCode;
@@ -153,6 +155,7 @@ type BrokerRequestStatus = "New" | "Needs information" | "Approved" | "Matching"
 type BrokerPriority = "Low" | "Normal" | "High" | "Urgent";
 type BrokerRequest = {
   id: string;
+  ownerUserId?: string;
   kind: BrokerRequestKind;
   entityId: string;
   title: string;
@@ -1346,8 +1349,14 @@ router.post("/auth/password", async (req, res) => {
 });
 
 router.get("/trips", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in to view your trip submissions." });
+    return;
+  }
   const query = ListTripsQueryParams.parse(req.query);
   const filtered = trips.filter((trip) =>
+    (user.role === "Admin" || trip.ownerUserId === user.id) &&
     (!query.corridor || trip.corridor.toLowerCase().includes(query.corridor.toLowerCase())) &&
     (!query.date || trip.departureDate === query.date) &&
     (!query.vehicleType || trip.vehicleType === query.vehicleType),
@@ -1356,6 +1365,11 @@ router.get("/trips", (req, res) => {
 });
 
 router.post("/trips", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in before submitting a return trip." });
+    return;
+  }
   const data = CreateTripBody.parse(req.body);
   const originCountry = optionalCountryCode(req.body?.originCountry);
   const destinationCountry = optionalCountryCode(req.body?.destinationCountry);
@@ -1366,7 +1380,8 @@ router.post("/trips", async (req, res) => {
   const trip: Trip = {
     ...data,
     id: id("trip"),
-    carrier: "You",
+    ownerUserId: user.id,
+    carrier: user.name,
     carrierRating: 5,
     originCountry,
     originLocation: submittedLocation(data.originLocation, data.origin, originCountry),
@@ -1384,7 +1399,8 @@ router.post("/trips", async (req, res) => {
     kind: "Trip",
     entityId: trip.id,
     title: `${trip.vehicleType} · ${trip.capacityTons} tons available`,
-    counterpart: authenticatedUser(req)?.name || trip.carrier,
+    counterpart: user.name || trip.carrier,
+    ownerUserId: user.id,
     corridor: trip.corridor,
     date: trip.departureDate,
     priority: "Normal",
@@ -1395,10 +1411,19 @@ router.post("/trips", async (req, res) => {
 });
 
 router.patch("/trips/:id", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in before editing a return trip." });
+    return;
+  }
   const params = UpdateTripParams.parse(req.params);
   const data = UpdateTripBody.parse(req.body);
   const trip = trips.find((item) => item.id === params.id);
   if (!trip) { res.status(404).json({ error: "Trip not found" }); return; }
+  if (user.role !== "Admin" && trip.ownerUserId !== user.id) {
+    res.status(403).json({ error: "You can only edit your own trip submissions." });
+    return;
+  }
   Object.assign(trip, data);
   trip.originLocation = submittedLocation(data.originLocation, trip.origin, trip.originCountry);
   trip.destinationLocation = submittedLocation(data.destinationLocation, trip.destination, trip.destinationCountry);
@@ -1408,14 +1433,25 @@ router.patch("/trips/:id", async (req, res) => {
 });
 
 router.get("/freight", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in to view your freight submissions." });
+    return;
+  }
   const query = ListFreightQueryParams.parse(req.query);
   res.json(ListFreightResponse.parse(freight.filter((load) =>
+    (user.role === "Admin" || load.ownerUserId === user.id) &&
     (!query.corridor || load.corridor.toLowerCase().includes(query.corridor.toLowerCase())) &&
     (!query.date || load.pickupDate === query.date),
   ).map(freightWithLocations)));
 });
 
 router.post("/freight", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in before submitting a load request." });
+    return;
+  }
   const data = CreateFreightBody.parse(req.body);
   const pickupCountry = optionalCountryCode(req.body?.pickupCountry);
   const dropoffCountry = optionalCountryCode(req.body?.dropoffCountry);
@@ -1426,7 +1462,8 @@ router.post("/freight", async (req, res) => {
   const load: Freight = {
     ...data,
     id: id("load"),
-    shipper: "You",
+    ownerUserId: user.id,
+    shipper: user.name,
     pickupCountry,
     pickupLocation: submittedLocation(data.pickupLocation, data.pickup, pickupCountry),
     dropoffCountry,
@@ -1442,7 +1479,8 @@ router.post("/freight", async (req, res) => {
     kind: "Load",
     entityId: load.id,
     title: load.description,
-    counterpart: authenticatedUser(req)?.name || load.shipper,
+    counterpart: user.name || load.shipper,
+    ownerUserId: user.id,
     corridor: load.corridor,
     date: load.pickupDate,
     priority: "Normal",
@@ -1453,10 +1491,19 @@ router.post("/freight", async (req, res) => {
 });
 
 router.patch("/freight/:id", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in before editing a load request." });
+    return;
+  }
   const params = UpdateFreightParams.parse(req.params);
   const data = UpdateFreightBody.parse(req.body);
   const load = freight.find((item) => item.id === params.id);
   if (!load) { res.status(404).json({ error: "Freight request not found" }); return; }
+  if (user.role !== "Admin" && load.ownerUserId !== user.id) {
+    res.status(403).json({ error: "You can only edit your own load submissions." });
+    return;
+  }
   Object.assign(load, data);
   load.pickupLocation = submittedLocation(data.pickupLocation, load.pickup, load.pickupCountry);
   load.dropoffLocation = submittedLocation(data.dropoffLocation, load.dropoff, load.dropoffCountry);
@@ -1466,15 +1513,40 @@ router.patch("/freight/:id", async (req, res) => {
 });
 
 router.get("/matches", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in to view broker-approved matches." });
+    return;
+  }
   const query = ListMatchesQueryParams.parse(req.query);
   const corridor = query.corridor?.toLowerCase();
+  const approvedRequest = (kind: BrokerRequestKind, entityId: string) => {
+    if (user.role === "Admin") return true;
+    const request = brokerRequestForEntity(kind, entityId);
+    return Boolean(request && ["Offer sent", "Confirmed", "Assigned", "In progress"].includes(request.status));
+  };
   const result = query.mode === "carrier"
-    ? freight.filter((load) => !corridor || load.corridor.toLowerCase().includes(corridor)).map((load) => ({ id: load.id, type: "freight", title: load.description, corridor: load.corridor, date: load.pickupDate, capacity: `${load.weightTons} tons · ${load.volumeM3} m³`, price: load.price, compatibility: 87, counterpart: load.shipper }))
-    : trips.filter((trip) => !corridor || trip.corridor.toLowerCase().includes(corridor)).map((trip) => ({ id: trip.id, type: "trip", title: `${trip.vehicleType} · ${trip.capacityTons} tons available`, corridor: trip.corridor, date: trip.departureDate, capacity: `${trip.capacityTons} tons · ${trip.capacityM3} m³`, price: trip.price, compatibility: 92, counterpart: trip.carrier }));
+    ? freight.filter((load) => approvedRequest("Load", load.id) && (!corridor || load.corridor.toLowerCase().includes(corridor))).map((load) => ({ id: load.id, type: "freight", title: load.description, corridor: load.corridor, date: load.pickupDate, capacity: `${load.weightTons} tons · ${load.volumeM3} m³`, price: load.price, compatibility: 87, counterpart: load.shipper }))
+    : trips.filter((trip) => approvedRequest("Trip", trip.id) && (!corridor || trip.corridor.toLowerCase().includes(corridor))).map((trip) => ({ id: trip.id, type: "trip", title: `${trip.vehicleType} · ${trip.capacityTons} tons available`, corridor: trip.corridor, date: trip.departureDate, capacity: `${trip.capacityTons} tons · ${trip.capacityM3} m³`, price: trip.price, compatibility: 92, counterpart: trip.carrier }));
   res.json(ListMatchesResponse.parse(result));
 });
 
-router.get("/bookings", (_req, res) => res.json(bookings));
+router.get("/bookings", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in to view broker-managed bookings." });
+    return;
+  }
+  if (user.role === "Admin") {
+    res.json(bookings);
+    return;
+  }
+  const visible = bookings.filter((booking) =>
+    trips.find((trip) => trip.id === booking.tripId)?.ownerUserId === user.id ||
+    freight.find((load) => load.id === booking.freightId)?.ownerUserId === user.id,
+  );
+  res.json(visible);
+});
 router.post("/bookings", async (req, res) => {
   const user = adminUser(req, res);
   if (!user) return;
