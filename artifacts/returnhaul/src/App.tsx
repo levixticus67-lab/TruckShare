@@ -3,7 +3,7 @@ import {
   Activity, ArrowLeft, ArrowRight, BadgeCheck, Banknote, BarChart3, Bell, Box, CalendarDays,
   Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, ClipboardCheck, Clock3, FileCheck2,
   FilePlus2, FileText, Gauge, LayoutDashboard, LockKeyhole, MapPin, Menu, MessageSquare,
-  PackageCheck, Phone, Plus, RefreshCw, Route as RouteIcon, Search, Send, ShieldCheck,
+  PackageCheck, Phone, Plus, RefreshCw, Route as RouteIcon, Search, Send, ShieldCheck, Inbox, Filter,
   Truck, UploadCloud, UserRound, UsersRound, X, Moon, Sun, Globe2, LogOut, KeyRound, Save, Download,
 } from "lucide-react";
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from "wouter";
@@ -75,6 +75,15 @@ type BorderMilestone = { id: string; bookingId: string; sequence: number; countr
 type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: string; amount: number; payerAmount?: number; currency: string; settlementAmount: number; settlementCurrency: string; exchangeRate: number; fee: number; commissionAmount: number; carrierPayout: number; indicative: boolean; expiresInSeconds: number };
 type WorkspaceRole = "Carrier" | "Shipper" | "Admin";
 type AuthUser = { id: string; name: string; phone?: string; email?: string; country: string; role: WorkspaceRole; roles?: Array<"Carrier" | "Shipper">; verified: boolean; hasPassword?: boolean };
+type BrokerSuggestion = { id: string; kind: "Load" | "Trip"; title: string; counterpart: string; corridor: string; date: string; price: number; compatibility: number };
+type BrokerRequest = { id: string; kind: "Load" | "Trip"; entityId: string; title: string; counterpart: string; corridor: string; date: string; priority: "Low" | "Normal" | "High" | "Urgent"; status: "New" | "Needs information" | "Approved" | "Matching" | "Offer sent" | "Confirmed" | "Assigned" | "In progress" | "On hold" | "Closed" | "Rejected"; assignedTo?: string; proposedMatchId?: string; notes: string[]; createdAt: string; updatedAt: string; suggestions: BrokerSuggestion[] };
+type AdminOperations = {
+  requests: BrokerRequest[];
+  activities: { id: string; requestId?: string; label: string; detail: string; actor: string; createdAt: string }[];
+  verifications: Verification[];
+  metrics: { totalOpen: number; newSubmissions: number; needsAttention: number; matching: number; activeOperations: number; pendingVerifications: number; activeBookings: number };
+  actor?: AuthUser | null;
+};
 type LegalDocument = "terms" | "privacy";
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -1268,33 +1277,93 @@ function VerificationPage() {
   return <div className="mx-auto max-w-4xl space-y-6"><Header eyebrow="Driver trust" title="Get your verified badge" detail="Verified drivers are surfaced first when shippers search a route. Submit NIN, license, and vehicle logbook details for review." />{sent && <div className="rounded-xl border border-[#b8d8c6] bg-[#e5f1e9] p-4 text-sm font-semibold text-[#28765a]"><BadgeCheck className="mr-2 inline" size={17} />Documents submitted. An admin will review your badge request.</div>}<div className="grid gap-5 lg:grid-cols-[1fr_.75fr]"><Card><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Driver / company name" value={form.name} onChange={(value) => update("name", value)} /><Field label="Phone number" value={form.phone} onChange={(value) => update("phone", value)} /><Field label="NIN" value={form.nin} onChange={(value) => update("nin", value)} placeholder="CM..." /><Field label="Driving license number" value={form.licenseNumber} onChange={(value) => update("licenseNumber", value)} placeholder="DL-UG-..." /><Field label="Vehicle logbook number" value={form.logbookNumber} onChange={(value) => update("logbookNumber", value)} /><Field label="Logbook photo" value={form.logbookPhotoName} onChange={(value) => update("logbookPhotoName", value)} placeholder="Select image in production" required={false} /></div><button className={`${button} w-full`}><ShieldCheck size={14} /> Submit for verification</button></form></Card><Card className="bg-[#e5eee9] text-primary"><ShieldCheck size={24} className="text-[#28765a]" /><h3 className="mt-4 font-display text-xl font-semibold">What the badge unlocks</h3><ul className="mt-4 space-y-3 text-sm text-primary/70"><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Higher visibility in smart matching</li><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Trust signal for new shippers</li><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Faster booking acceptance</li></ul></Card></div><Card><div className="mb-4 flex items-center justify-between"><h3 className="font-display text-xl font-semibold">My submissions</h3><RefreshCw size={16} className="text-muted-foreground" /></div>{query.data.length ? <div className="space-y-3">{query.data.map((item) => <div key={item.id} className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{item.name}</p><p className="text-[11px] text-muted-foreground">{item.licenseNumber} · logbook {item.logbookNumber} · submitted {dateFmt(item.submittedAt)}</p></div><Status value={item.status} /></div>)}</div> : <p className="text-sm text-muted-foreground">No verification submissions yet.</p>}</Card></div>;
 }
 
+const previewAdminOperations: AdminOperations = {
+  requests: [
+    { id: "preview-request-load-1", kind: "Load", entityId: "load-1", title: "Bagged grain and packaged food", counterpart: "Kampala Grain Co.", corridor: "Kampala → Mbale", date: "2026-08-28", priority: "High", status: "New", notes: ["Confirm loading window and final pallet count."], createdAt: "2026-08-26T08:42:00.000Z", updatedAt: "2026-08-26T08:42:00.000Z", suggestions: [{ id: "trip-1", kind: "Trip", title: "Fuso · 8 tons available", counterpart: "Moses K.", corridor: "Kampala → Mbale", date: "2026-08-28", price: 680000, compatibility: 96 }] },
+    { id: "preview-request-load-2", kind: "Load", entityId: "load-2", title: "Temperature-sensitive pharmaceuticals", counterpart: "Mara Pharma", corridor: "Kampala → Mbarara", date: "2026-08-30", priority: "Urgent", status: "Offer sent", proposedMatchId: "trip-2", notes: ["Carrier must confirm cold-chain handling before assignment."], createdAt: "2026-08-25T11:30:00.000Z", updatedAt: "2026-08-26T10:04:00.000Z", suggestions: [{ id: "trip-2", kind: "Trip", title: "Canter · 6 tons available", counterpart: "Amina Logistics", corridor: "Kampala → Mbarara", date: "2026-08-30", price: 520000, compatibility: 96 }] },
+    { id: "preview-request-load-3", kind: "Load", entityId: "load-3", title: "Hardware and steel components", counterpart: "Eastline Hardware", corridor: "Malaba → Kampala", date: "2026-09-02", priority: "Normal", status: "In progress", notes: ["Border documents are being checked at Malaba."], createdAt: "2026-08-22T07:25:00.000Z", updatedAt: "2026-08-26T08:20:00.000Z", suggestions: [] },
+    { id: "preview-request-trip-4", kind: "Trip", entityId: "trip-4", title: "Flatbed · 14 tons available", counterpart: "Gulu North Haulage", corridor: "Kampala → Gulu", date: "2026-09-04", priority: "Normal", status: "Matching", notes: ["Available for a suitable northbound load."], createdAt: "2026-08-26T07:30:00.000Z", updatedAt: "2026-08-26T07:30:00.000Z", suggestions: [{ id: "load-4", kind: "Load", title: "Fresh produce and cold-chain cartons", counterpart: "Northern Fresh", corridor: "Kampala → Gulu", date: "2026-09-04", price: 860000, compatibility: 96 }] },
+  ],
+  activities: [
+    { id: "preview-activity-1", requestId: "preview-request-load-2", label: "Offer sent", detail: "Mara Pharma load proposed to Amina Logistics.", actor: "Admin desk", createdAt: "2026-08-26T10:04:00.000Z" },
+    { id: "preview-activity-2", requestId: "preview-request-load-3", label: "Border note added", detail: "Customs documents are being checked at Malaba.", actor: "Admin desk", createdAt: "2026-08-26T08:20:00.000Z" },
+    { id: "preview-activity-3", requestId: "preview-request-load-1", label: "New submission", detail: "Kampala Grain Co. submitted a load request.", actor: "System", createdAt: "2026-08-26T08:42:00.000Z" },
+  ],
+  verifications: [{ id: "preview-verification-1", userId: "user-3", name: "Thabo Transport", phone: "+256 781 333 444", nin: "CM9000••••", licenseNumber: "DL-UG-20481", logbookNumber: "LB-77821", status: "Pending", submittedAt: "2026-08-26" }],
+  metrics: { totalOpen: 7, newSubmissions: 3, needsAttention: 1, matching: 3, activeOperations: 3, pendingVerifications: 1, activeBookings: 1 },
+};
+
 function AdminPage() {
   const adminPreview = typeof window !== "undefined" && localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1";
   const previewUser: AuthUser = { id: "admin-preview", name: "Admin Preview", email: "admin-preview@localhost", country: "UG", role: "Admin", verified: true };
-  const previewSummary = {
-    users: [
-      { id: "preview-user-1", name: "Moses K.", role: "Carrier", verified: true },
-      { id: "preview-user-2", name: "Kampala Grain Co.", role: "Shipper", verified: true },
-      { id: "preview-user-3", name: "Thabo Transport", role: "Carrier", verified: false },
-    ],
-    verifications: [
-      { id: "preview-verification-1", name: "Thabo Transport", phone: "+256 781 333 444", nin: "CM9000••••", licenseNumber: "DL-UG-20481", logbookNumber: "LB-77821", status: "Pending", submittedAt: "2026-08-26" },
-    ],
-    revenue: 158400,
-    grossVolume: 1320000,
-    activeBookings: 2,
-  };
+  const emptyOperations: AdminOperations = { requests: [], activities: [], verifications: [], metrics: { totalOpen: 0, newSubmissions: 0, needsAttention: 0, matching: 0, activeOperations: 0, pendingVerifications: 0, activeBookings: 0 } };
   const auth = useApi<{ user: AuthUser | null }>("/auth/me", { user: adminPreview ? previewUser : null });
-  const query = useApi<typeof previewSummary>("/admin/summary", previewSummary);
-  const review = async (item: Verification, status: string) => {
-    if (adminPreview) return;
-    await api(`/verification/${item.id}/review`, { method: "PATCH", body: JSON.stringify({ status }) });
-    query.reload();
+  const operations = useApi<AdminOperations>("/admin/operations", adminPreview ? previewAdminOperations : emptyOperations);
+  const [selectedId, setSelectedId] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [note, setNote] = useState("");
+  const [feedback, setFeedback] = useState("");
+  useEffect(() => {
+    if (!selectedId && operations.data.requests[0]) setSelectedId(operations.data.requests[0].id);
+    if (selectedId && !operations.data.requests.some((request) => request.id === selectedId)) setSelectedId(operations.data.requests[0]?.id || "");
+  }, [operations.data.requests, selectedId]);
+  const selected = operations.data.requests.find((request) => request.id === selectedId);
+  const visibleRequests = useMemo(() => operations.data.requests.filter((request) => filter === "All" || request.status === filter || (filter === "Attention" && ["New", "Needs information", "On hold"].includes(request.status)) || (filter === "Matching desk" && ["Approved", "Matching", "Offer sent"].includes(request.status))), [filter, operations.data.requests]);
+  const updateRequest = async (payload: { status?: BrokerRequest["status"]; priority?: BrokerRequest["priority"]; note?: string }) => {
+    if (!selected) return;
+    if (adminPreview) {
+      setFeedback("Preview only — this admin action is not connected to production data.");
+      return;
+    }
+    try {
+      await api(`/admin/requests/${selected.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+      setNote("");
+      setFeedback("Request updated.");
+      operations.reload();
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "The request could not be updated.");
+    }
+  };
+  const sendOffer = async (suggestion: BrokerSuggestion) => {
+    if (!selected) return;
+    if (adminPreview) {
+      setFeedback("Preview only — the offer was not sent.");
+      return;
+    }
+    try {
+      await api(`/admin/requests/${selected.id}/offer`, { method: "POST", body: JSON.stringify({ matchId: suggestion.id }) });
+      setFeedback(`Offer sent to ${suggestion.counterpart}.`);
+      operations.reload();
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "The offer could not be sent.");
+    }
   };
   const currentUser = adminPreview ? previewUser : auth.data.user;
   if (!adminPreview && auth.loading) return <div className="mx-auto max-w-4xl"><Loading error="" retry={auth.reload} /></div>;
   if (currentUser?.role !== "Admin") return <div className="mx-auto max-w-xl py-12"><Card><ShieldCheck className="text-muted-foreground" size={24} /><h2 className="mt-4 font-display text-2xl font-semibold">Admin area</h2><p className="mt-2 text-sm text-muted-foreground">This area is only available to verified admin accounts.</p><Link href="/" className={`${secondaryButton} mt-5`}>Return home <ArrowRight size={14} /></Link></Card></div>;
-  return <div className="space-y-6">{adminPreview && <div className="rounded-xl border border-dashed border-accent/50 bg-accent/10 p-4 text-sm"><p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.14em] text-accent-foreground">Temporary admin preview</p><p className="mt-1 text-muted-foreground">This is a frontend-only preview. Review actions are disabled until a real admin account is connected.</p></div>}<Header eyebrow="Platform operations" title="Admin control" detail="Review driver trust signals, manage users, and watch the 12% commission stream." /><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="Gross booking volume" value={money(query.data.grossVolume)} note="All time in preview" icon={BarChart3} /><Stat label="Platform revenue" value={money(query.data.revenue)} note="12% commission" icon={Banknote} accent /><Stat label="Active users" value={query.data.users.length} note="Drivers + shippers" icon={UsersRound} /><Stat label="Active bookings" value={query.data.activeBookings} note="Needs attention" icon={ClipboardCheck} /></div><Card><div className="mb-4 flex items-center justify-between"><div><p className={labelClass}>Trust queue</p><h3 className="font-display text-xl font-semibold">Driver verification review</h3></div><ShieldCheck className="text-accent-foreground" /></div><div className="space-y-3">{query.data.verifications.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{item.name} <span className="ml-2 text-[11px] font-normal text-muted-foreground">{item.phone}</span></p><p className="mt-1 text-[11px] text-muted-foreground">NIN {item.nin} · License {item.licenseNumber} · Logbook {item.logbookNumber}</p></div><div className="flex gap-2"><Status value={item.status} />{item.status === "Pending" && <><button onClick={() => review(item, "Verified")} disabled={adminPreview} className={button}><Check size={14} /> Verify</button><button onClick={() => review(item, "Rejected")} disabled={adminPreview} className={secondaryButton}>Reject</button></>}</div></div>)}</div></Card><Card><h3 className="font-display text-xl font-semibold">Registered users</h3><div className="mt-4 divide-y divide-border">{query.data.users.map((user) => <div key={user.id} className="flex items-center justify-between py-3"><div className="flex items-center gap-3"><UserRound size={16} className="text-muted-foreground" /><span className="text-xs font-bold">{user.name}</span><span className="text-[10px] text-muted-foreground">{user.role}</span></div>{user.verified && <Status value="Verified" />}</div>)}</div></Card></div>;
+  return <div className="space-y-6">
+    {adminPreview && <div className="rounded-xl border border-dashed border-accent/50 bg-accent/10 p-4 text-sm"><p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.14em] text-accent-foreground">Temporary admin preview</p><p className="mt-1 text-muted-foreground">This is a frontend-only preview. Actions are disabled until a real admin account is connected.</p></div>}
+    <Header eyebrow="Broker operations" title="Admin operations desk" detail="Every load and trip comes through this desk for review, matching, assignment, and follow-through." action={<button type="button" onClick={operations.reload} className={secondaryButton}><RefreshCw size={14} /> Refresh queue</button>} />
+    {feedback && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{feedback}</div>}
+    {operations.error && !adminPreview && <div className="rounded-lg border border-[#e4b4a9] bg-[#fbefeb] p-3 text-sm text-[#ad4339]">{operations.error}</div>}
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-5"><Stat label="Open requests" value={operations.data.metrics.totalOpen} note="Needs broker action" icon={Inbox} /><Stat label="New submissions" value={operations.data.metrics.newSubmissions} note="Not reviewed" icon={CircleAlert} accent /><Stat label="Needs attention" value={operations.data.metrics.needsAttention} note="Missing info or on hold" icon={Clock3} /><Stat label="Matching desk" value={operations.data.metrics.matching} note="Finding the right pair" icon={Gauge} /><Stat label="Active operations" value={operations.data.metrics.activeOperations} note="Assigned or moving" icon={RouteIcon} /></div>
+    <div className="grid gap-5 xl:grid-cols-[.92fr_1.35fr]">
+      <Card className="p-0">
+        <div className="border-b border-border p-4"><div className="flex items-center justify-between"><div><p className={labelClass}>Broker queue</p><h2 className="font-display text-xl font-semibold">Requests to work</h2></div><Filter size={17} className="text-muted-foreground" /></div><div className="mt-4 flex flex-wrap gap-2">{["All", "Attention", "Matching desk", "In progress", "Closed"].map((item) => <button type="button" key={item} onClick={() => setFilter(item)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${filter === item ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"}`}>{item}</button>)}</div></div>
+        <div className="max-h-[720px] overflow-y-auto p-3">{operations.loading && !operations.data.requests.length ? <Loading error={operations.error} retry={operations.reload} /> : visibleRequests.length ? <div className="space-y-2">{visibleRequests.map((request) => <button type="button" key={request.id} onClick={() => setSelectedId(request.id)} className={`w-full rounded-xl border p-3 text-left transition ${selectedId === request.id ? "border-primary bg-[#e5eee9] shadow-sm" : "border-border hover:border-primary/40 hover:bg-muted/40"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-mono-ui text-[9px] font-bold uppercase tracking-[.14em] text-muted-foreground">{request.kind} · {request.priority}</span>{request.priority === "Urgent" && <span className="rounded-full bg-[#fbefeb] px-2 py-0.5 text-[9px] font-bold text-[#ad4339]">Urgent</span>}</div><p className="mt-2 truncate text-sm font-bold">{request.title}</p><p className="mt-1 truncate text-[11px] text-muted-foreground">{request.counterpart} · {request.corridor}</p></div><Status value={request.status} /></div><div className="mt-3 flex items-center justify-between border-t border-border/70 pt-2 text-[10px] text-muted-foreground"><span>{dateFmt(request.date)}</span><span>{request.suggestions.length} suggested match{request.suggestions.length === 1 ? "" : "es"}</span></div></button>)}</div> : <div className="p-6 text-center text-sm text-muted-foreground">No requests in this queue.</div>}</div>
+      </Card>
+      <div className="space-y-5">
+        {selected ? <Card>
+          <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-muted px-2.5 py-1 font-mono-ui text-[9px] font-bold uppercase tracking-[.14em]">{selected.kind} intake</span><Status value={selected.status} /></div><h2 className="mt-3 font-display text-2xl font-semibold tracking-[-.04em]">{selected.title}</h2><p className="mt-1 text-sm text-muted-foreground">{selected.counterpart} · {selected.corridor} · {dateFmt(selected.date)}</p></div><p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">Updated {dateFmt(selected.updatedAt)}</p></div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2"><label><span className={labelClass}>Workflow status</span><select className={input} value={selected.status} onChange={(event) => void updateRequest({ status: event.target.value as BrokerRequest["status"] })}>{["New", "Needs information", "Approved", "Matching", "Offer sent", "Confirmed", "Assigned", "In progress", "On hold", "Closed", "Rejected"].map((item) => <option key={item}>{item}</option>)}</select></label><label><span className={labelClass}>Priority</span><select className={input} value={selected.priority} onChange={(event) => void updateRequest({ priority: event.target.value as BrokerRequest["priority"] })}>{["Low", "Normal", "High", "Urgent"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
+          <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => void updateRequest({ status: "Approved" })} className={secondaryButton}><Check size={14} /> Approve intake</button><button type="button" onClick={() => void updateRequest({ status: "Matching" })} className={button}><Gauge size={14} /> Move to matching</button><button type="button" onClick={() => void updateRequest({ status: "Needs information" })} className={secondaryButton}><MessageSquare size={14} /> Request information</button></div>
+          <div className="mt-6"><p className={labelClass}>Admin notes</p><div className="space-y-2">{selected.notes.map((item, index) => <div key={`${item}-${index}`} className="rounded-lg bg-muted/60 p-3 text-xs leading-5">{item}</div>)}</div><div className="mt-3 flex gap-2"><input className={input} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add an internal note..." /><button type="button" disabled={!note.trim()} onClick={() => void updateRequest({ note: note.trim() })} className={button}><Plus size={14} /> Add</button></div></div>
+        </Card> : <Card><div className="py-16 text-center text-sm text-muted-foreground">Select a request from the queue to work it.</div></Card>}
+        {selected && <Card><div className="flex items-start justify-between gap-3"><div><p className={labelClass}>Suggested matches</p><h3 className="font-display text-xl font-semibold">Admin chooses the pairing</h3><p className="mt-1 text-xs text-muted-foreground">Suggestions are ranked by corridor, date, capacity, and fit. Nothing is booked automatically.</p></div><Search size={18} className="text-accent-foreground" /></div><div className="mt-4 space-y-3">{selected.suggestions.length ? selected.suggestions.map((suggestion) => <div key={suggestion.id} className="flex flex-col gap-3 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><span className="rounded-full bg-[#e5f1e9] px-2 py-1 font-mono-ui text-[9px] font-bold text-[#28765a]">{suggestion.compatibility}% fit</span><span className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{suggestion.kind}</span></div><p className="mt-2 text-sm font-bold">{suggestion.title}</p><p className="mt-1 text-[11px] text-muted-foreground">{suggestion.counterpart} · {suggestion.corridor} · {dateFmt(suggestion.date)}</p></div><div className="flex items-center justify-between gap-3 sm:justify-end"><strong className="font-display text-lg">{money(suggestion.price)}</strong><button type="button" onClick={() => void sendOffer(suggestion)} className={button}>Send offer <ArrowRight size={14} /></button></div></div>) : <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">No suitable candidate yet. Keep this request in the matching queue.</div>}</div></Card>}
+        <Card><div className="flex items-center justify-between"><div><p className={labelClass}>Desk activity</p><h3 className="font-display text-xl font-semibold">Recent decisions</h3></div><Activity size={17} className="text-accent-foreground" /></div><div className="mt-4 space-y-3">{operations.data.activities.slice(0, 5).map((activity) => <div key={activity.id} className="flex gap-3 border-t border-border pt-3"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" /><div className="min-w-0"><p className="text-xs font-bold">{activity.label}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{activity.detail}</p><p className="mt-1 font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{activity.actor} · {dateFmt(activity.createdAt)}</p></div></div>)}</div></Card>
+      </div>
+    </div>
+  </div>;
 }
 
 function PaymentsPage() {
