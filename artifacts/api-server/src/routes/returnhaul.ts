@@ -1475,6 +1475,8 @@ router.get("/matches", (req, res) => {
 
 router.get("/bookings", (_req, res) => res.json(bookings));
 router.post("/bookings", async (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
   const data = CreateBookingBody.parse(req.body);
   const amount = number(data.amount);
   const trip = trips.find((item) => item.id === data.tripId);
