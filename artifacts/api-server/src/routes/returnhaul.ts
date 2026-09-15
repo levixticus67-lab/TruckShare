@@ -1851,6 +1851,10 @@ router.get("/admin/operations", (req, res) => {
       activeOperations: brokerRequests.filter((request) => ["Confirmed", "Assigned", "In progress"].includes(request.status)).length,
       pendingVerifications: verifications.filter((item) => item.status === "Pending").length,
       activeBookings: bookings.filter((booking) => booking.status !== "Delivered").length,
+      grossVolume: bookings.reduce((sum, booking) => sum + booking.amount, 0),
+      commissionValue: bookings.reduce((sum, booking) => sum + booking.commissionAmount, 0),
+      unpaidBookings: bookings.filter((booking) => booking.paymentStatus !== "Paid" && booking.status !== "Delivered").length,
+      borderIssues: bookings.filter((booking) => booking.status === "At Border").length,
     },
     actor: publicUser(user),
   });
