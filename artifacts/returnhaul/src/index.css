@@ -325,7 +325,95 @@
     font-family: var(--app-font-sans);
   }
   .map-shell .leaflet-tile {
-    filter: saturate(.78) contrast(.96);
+    filter: saturate(.58) contrast(.9) brightness(1.06);
+  }
+  .route-stop-icon,
+  .route-user-icon {
+    border: 0;
+    background: transparent;
+  }
+  .route-stop-marker {
+    display: flex;
+    width: 2.5rem;
+    height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid hsl(var(--card) / .92);
+    border-radius: 999px;
+    background: color-mix(in srgb, hsl(var(--card)) 82%, transparent);
+    box-shadow: 0 8px 18px hsl(var(--foreground) / .2);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .route-stop-marker-active {
+    width: 3rem;
+    height: 3rem;
+    border-color: hsl(var(--primary) / .55);
+    background: color-mix(in srgb, hsl(var(--primary)) 16%, hsl(var(--card)) 84%);
+  }
+  .route-stop-marker img {
+    width: 2.35rem;
+    height: 2.35rem;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 5px hsl(var(--foreground) / .28));
+  }
+  .route-stop-dot {
+    display: block;
+    width: .7rem;
+    height: .7rem;
+    border: 3px solid hsl(var(--card));
+    border-radius: 999px;
+    background: hsl(var(--muted-foreground));
+    box-shadow: 0 0 0 4px hsl(var(--muted-foreground) / .2);
+  }
+  .route-stop-dot-complete {
+    background: hsl(var(--sidebar));
+    box-shadow: 0 0 0 4px hsl(var(--sidebar) / .18);
+  }
+  .route-user-icon span {
+    display: block;
+    width: 1rem;
+    height: 1rem;
+    border: 3px solid hsl(0 0% 100%);
+    border-radius: 999px;
+    background: #1683d8;
+    box-shadow: 0 0 0 4px #1683d8aa, 0 5px 12px hsl(var(--foreground) / .25);
+  }
+  .trip-card-visual {
+    display: flex;
+    min-height: 7.5rem;
+    align-items: center;
+    gap: 1rem;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border) / .78);
+    border-radius: 1.25rem;
+    padding: .7rem 1rem;
+    background:
+      radial-gradient(circle at 15% 20%, hsl(var(--primary) / .18), transparent 38%),
+      linear-gradient(135deg, hsl(var(--card) / .78), hsl(var(--muted) / .64));
+  }
+  .truck-type-visual {
+    display: inline-flex;
+    width: 8.5rem;
+    height: 6rem;
+    flex: 0 0 8.5rem;
+    align-items: center;
+    justify-content: center;
+  }
+  .truck-type-visual img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 10px hsl(var(--foreground) / .18));
+  }
+  .truck-type-visual-compact {
+    width: 1.65rem;
+    height: 1.4rem;
+    flex-basis: 1.65rem;
+  }
+  .truck-type-visual-compact img {
+    filter: drop-shadow(0 3px 4px hsl(var(--foreground) / .2));
   }
   .map-shell .leaflet-control-zoom {
     overflow: hidden;
@@ -834,6 +922,18 @@ header.sticky button[aria-label="Notifications"] + div {
   .map-shell {
     min-height: 260px;
     border-radius: 1.25rem;
+  }
+
+  .trip-card-visual {
+    min-height: 6.75rem;
+    gap: .65rem;
+    padding: .5rem .7rem;
+  }
+
+  .truck-type-visual {
+    width: 7rem;
+    height: 5.25rem;
+    flex-basis: 7rem;
   }
 
   .mobile-bottom-nav {

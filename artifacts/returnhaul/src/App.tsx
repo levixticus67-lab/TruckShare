@@ -79,6 +79,16 @@ type BrokerSuggestion = { id: string; kind: "Load" | "Trip"; title: string; coun
 type BrokerActivity = { id: string; requestId?: string; label: string; detail: string; actor: string; createdAt: string };
 type BrokerRequest = { id: string; kind: "Load" | "Trip"; entityId: string; title: string; counterpart: string; corridor: string; date: string; priority: "Low" | "Normal" | "High" | "Urgent"; status: "New" | "Needs information" | "Approved" | "Matching" | "Offer sent" | "Confirmed" | "Assigned" | "In progress" | "On hold" | "Closed" | "Rejected"; assignedTo?: string; proposedMatchId?: string; bookingId?: string; notes: string[]; createdAt: string; updatedAt: string; suggestions: BrokerSuggestion[]; activities?: BrokerActivity[] };
 type CustomerRequest = { id: string; kind: "Load" | "Trip"; title: string; counterpart: string; corridor: string; date: string; priority: "Low" | "Normal" | "High" | "Urgent"; status: BrokerRequest["status"]; bookingId?: string; proposedMatchId?: string; notes: string[]; createdAt: string; updatedAt: string };
+const truckAssetPaths: Record<string, string> = {
+  fuso: "/transport/trucks/truck-fuso.png",
+  canter: "/transport/trucks/truck-canter.png",
+  trailer: "/transport/trucks/truck-trailer.png",
+  flatbed: "/transport/trucks/truck-flatbed.png",
+};
+const truckAsset = (vehicleType: string) => truckAssetPaths[vehicleType.toLowerCase().replace(/[^a-z]/g, "")] || truckAssetPaths.flatbed;
+function TruckTypeVisual({ vehicleType, compact = false }: { vehicleType: string; compact?: boolean }) {
+  return <span className={`truck-type-visual ${compact ? "truck-type-visual-compact" : ""}`} aria-label={`${vehicleType} truck`}><img src={truckAsset(vehicleType)} alt="" /></span>;
+}
 type AdminOperations = {
   requests: BrokerRequest[];
   activities: { id: string; requestId?: string; label: string; detail: string; actor: string; createdAt: string }[];
@@ -461,6 +471,7 @@ function TripCard({ trip, role }: { trip: Trip; role: WorkspaceRole }) {
           <p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-muted-foreground">Available capacity · {dateFmt(trip.departureDate)}</p>
           <Status value={trip.status} />
         </div>
+        <div className="trip-card-visual mt-4"><TruckTypeVisual vehicleType={trip.vehicleType} /><div><p className={labelClass}>Truck type</p><p className="font-display text-lg font-semibold">{trip.vehicleType}</p><p className="text-[11px] text-muted-foreground">{trip.capacityTons} tons available · {trip.capacityM3} m³</p></div></div>
         <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
           <div className="min-w-0">
             <p className="font-mono-ui text-[9px] font-bold uppercase tracking-[.16em] text-accent-foreground">From</p>
@@ -474,7 +485,7 @@ function TripCard({ trip, role }: { trip: Trip; role: WorkspaceRole }) {
             <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{trip.destinationCountry || "—"}</p>
           </div>
         </div>
-        <p className="mt-4 flex items-center gap-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground"><Truck size={14} className="text-accent-foreground" />{trip.carrier} · {trip.vehicleType} · {trip.carrierRating} ★</p>
+        <p className="mt-4 flex items-center gap-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground"><TruckTypeVisual vehicleType={trip.vehicleType} compact />{trip.carrier} · {trip.carrierRating} ★</p>
       </div>
       <div className="grid grid-cols-2 border-y border-border/80 bg-muted/35 sm:grid-cols-3">
         <div className="px-3 py-4 sm:px-5"><p className={labelClass}>Available</p><p className="mt-1 font-display text-xl font-semibold">{trip.capacityTons}<span className="ml-1 text-sm font-medium text-muted-foreground">t</span></p></div>

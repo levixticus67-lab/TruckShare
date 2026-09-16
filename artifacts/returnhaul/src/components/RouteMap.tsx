@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
-import { latLngBounds, type LatLngExpression } from "leaflet";
-import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { divIcon, latLngBounds, type LatLngExpression } from "leaflet";
+import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { LocateFixed, X } from "lucide-react";
 
 export type RouteStop = {
@@ -43,11 +43,16 @@ const countryNames: Record<string, string> = {
   UG: "Uganda",
 };
 
-const stopStyles: Record<RouteStop["status"], { fillColor: string; color: string }> = {
-  complete: { fillColor: "#304a7a", color: "#1b2d55" },
-  active: { fillColor: "#f26522", color: "#bc4612" },
-  upcoming: { fillColor: "#9aa4b5", color: "#68738a" },
-};
+function stopIcon(status: RouteStop["status"]) {
+  const image = status === "active" ? '<img src="/transport/trucks/truck-flatbed.png" alt="" />' : `<span class="route-stop-dot route-stop-dot-${status}"></span>`;
+  return divIcon({
+    className: "route-stop-icon",
+    html: `<span class="route-stop-marker route-stop-marker-${status}">${image}</span>`,
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
+    tooltipAnchor: [0, -20],
+  });
+}
 
 function FitRoute({ positions, focusPoint }: { positions: MapPoint[]; focusPoint?: MapPoint }) {
   const map = useMap();
@@ -174,29 +179,16 @@ export function RouteMap({ stops, className = "", height = "360px", routing = fa
             pathOptions={{ color: "#d7984e", weight: 5, opacity: 0.9, dashArray: "10 9" }}
           />
         )}
-        {stops.map((stop) => {
-          const style = stopStyles[stop.status];
-          return (
-            <CircleMarker
-              key={`${stop.label}-${stop.position.join("-")}`}
-              center={stop.position}
-              radius={stop.status === "active" ? 10 : 8}
-              pathOptions={{
-                color: style.color,
-                fillColor: style.fillColor,
-                fillOpacity: 1,
-                weight: 3,
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-                <strong>{stop.label}</strong>
-                <br />
-                {stop.city}, {stop.country}
-              </Tooltip>
-            </CircleMarker>
-          );
-        })}
-        {userPosition && <CircleMarker center={userPosition} radius={7} pathOptions={{ color: "#ffffff", fillColor: "#1683d8", fillOpacity: 1, weight: 3 }}><Tooltip direction="top" offset={[0, -6]}>Your location</Tooltip></CircleMarker>}
+        {stops.map((stop) => (
+          <Marker key={`${stop.label}-${stop.position.join("-")}`} position={stop.position} icon={stopIcon(stop.status)}>
+            <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+              <strong>{stop.label}</strong>
+              <br />
+              {stop.city}, {stop.country}
+            </Tooltip>
+          </Marker>
+        ))}
+        {userPosition && <Marker position={userPosition} icon={divIcon({ className: "route-user-icon", html: '<span></span>', iconSize: [18, 18], iconAnchor: [9, 9] })}><Tooltip direction="top" offset={[0, -6]}>Your location</Tooltip></Marker>}
         <FitRoute positions={positions} focusPoint={focusPoint} />
       </MapContainer>
     </MapShell>
@@ -270,16 +262,11 @@ export function EacNetworkMap({ height = "clamp(320px, 52dvh, 440px)" }: { heigh
           <Polyline key={`network-route-${index}`} positions={route} pathOptions={{ color: "#f26522", weight: 3, opacity: 0.78 }} />
         ))}
         {networkStops.map((stop) => (
-          <CircleMarker
-            key={stop.label}
-            center={stop.position}
-            radius={stop.label === "Kampala" ? 9 : 6}
-            pathOptions={{ color: stop.label === "Kampala" ? "#bc4612" : "#1b2d55", fillColor: stop.label === "Kampala" ? "#f26522" : "#304a7a", fillOpacity: 1, weight: 2 }}
-          >
+          <Marker key={stop.label} position={stop.position} icon={stopIcon(stop.label === "Kampala" ? "active" : "upcoming")}>
             <Tooltip direction="top" offset={[0, -6]}>{stop.label}</Tooltip>
-          </CircleMarker>
+          </Marker>
         ))}
-        {userPosition && <CircleMarker center={userPosition} radius={7} pathOptions={{ color: "#ffffff", fillColor: "#1683d8", fillOpacity: 1, weight: 3 }}><Tooltip direction="top" offset={[0, -6]}>Your location</Tooltip></CircleMarker>}
+        {userPosition && <Marker position={userPosition} icon={divIcon({ className: "route-user-icon", html: '<span></span>', iconSize: [18, 18], iconAnchor: [9, 9] })}><Tooltip direction="top" offset={[0, -6]}>Your location</Tooltip></Marker>}
         <FitRoute positions={positions} focusPoint={focusPoint} />
       </MapContainer>
     </MapShell>
