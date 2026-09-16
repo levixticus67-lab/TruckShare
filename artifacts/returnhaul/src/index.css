@@ -900,6 +900,126 @@ header.sticky button[aria-label="Notifications"] + div {
     min-width: 0;
   }
 
+  .admin-dashboard,
+  .admin-workspace,
+  .admin-queue-card,
+  .admin-detail-card,
+  .admin-matches-card {
+    min-width: 0;
+  }
+
+  .admin-primary-stats > .glass-surface,
+  .admin-finance-stats > .glass-surface {
+    min-width: 0;
+    padding: 0.9rem;
+  }
+
+  .admin-primary-stats .font-display,
+  .admin-finance-stats .font-display {
+    font-size: 1.55rem;
+  }
+
+  .admin-finance-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-queue-card {
+    overflow: hidden;
+  }
+
+  .admin-queue-header {
+    padding: 1rem;
+  }
+
+  .admin-queue-filters {
+    flex-wrap: nowrap;
+    margin-right: -0.25rem;
+    padding-bottom: 0.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .admin-queue-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-queue-filter {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .admin-queue-list {
+    max-height: none;
+    overflow: visible;
+    padding: 0.75rem;
+  }
+
+  .admin-request-card {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0.9rem;
+  }
+
+  .admin-request-card-head {
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  .admin-request-card-copy,
+  .admin-request-title,
+  .admin-request-route {
+    min-width: 0;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .admin-request-status {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+
+  .admin-request-status > span {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .admin-request-footer {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .admin-detail-card,
+  .admin-matches-card {
+    padding: 1rem !important;
+  }
+
+  .admin-detail-actions {
+    flex-direction: column;
+  }
+
+  .admin-detail-actions > button,
+  .admin-detail-actions > span {
+    width: 100%;
+  }
+
+  .admin-note-composer {
+    flex-direction: column;
+  }
+
+  .admin-note-composer button {
+    width: 100%;
+  }
+
+  .admin-suggestion-action {
+    flex-wrap: wrap;
+  }
+
+  .admin-suggestion-action button {
+    width: 100%;
+  }
+
   button,
   a {
     touch-action: manipulation;
