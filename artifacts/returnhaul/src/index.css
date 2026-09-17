@@ -2007,6 +2007,54 @@ header.sticky button[aria-label="Notifications"] + div {
   }
 }
 
+/* Dark-mode contrast fixes for the interactive surfaces shown on mobile. */
+.dark .home-action-grid > a:not(:first-child) {
+  border-color: hsl(0 0% 100% / .18) !important;
+  background:
+    linear-gradient(135deg, hsl(223 42% 25% / .88), hsl(223 45% 17% / .72)) !important;
+  color: hsl(220 35% 96%) !important;
+  box-shadow: 0 18px 36px hsl(0 0% 0% / .2);
+}
+
+.dark .home-action-grid > a:not(:first-child) p {
+  color: hsl(220 35% 96%) !important;
+}
+
+.dark .home-action-grid > a:not(:first-child) p:last-child {
+  color: hsl(220 18% 76%) !important;
+}
+
+.dark .home-action-grid > a:first-child {
+  color: hsl(223 54% 14%) !important;
+}
+
+.dark .home-action-grid > a:first-child p {
+  color: hsl(223 54% 14%) !important;
+}
+
+.dark .home-action-grid > a:first-child p:last-child {
+  color: hsl(223 54% 14% / .76) !important;
+}
+
+.dark button[class*="bg-primary"] {
+  color: hsl(223 54% 14%) !important;
+  background: linear-gradient(135deg, hsl(19 92% 56%), hsl(28 94% 61%)) !important;
+  box-shadow: 0 10px 25px hsl(19 92% 55% / .28);
+}
+
+.dark button[class*="bg-card"],
+.dark a[class*="bg-card"] {
+  border-color: hsl(0 0% 100% / .16);
+  background: hsl(223 39% 23% / .7);
+  color: hsl(220 35% 96%);
+}
+
+.dark .mobile-bottom-nav {
+  border-color: hsl(0 0% 100% / .14);
+  background: linear-gradient(135deg, hsl(223 48% 19% / .94), hsl(224 56% 11% / .95));
+  box-shadow: 0 18px 40px hsl(0 0% 0% / .32);
+}
+
 /* Keep the reference treatment last so utility classes cannot flatten it. */
 .app-shell {
   background:
