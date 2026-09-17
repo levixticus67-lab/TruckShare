@@ -66,6 +66,440 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
+/* Keep the reference treatment last so utility classes cannot flatten it. */
+.app-shell {
+  background:
+    radial-gradient(circle at 80% -10%, hsl(var(--primary) / .17), transparent 27rem),
+    radial-gradient(circle at 8% 18%, hsl(213 72% 62% / .13), transparent 30rem),
+    linear-gradient(135deg, hsl(var(--background)), hsl(220 42% 91%));
+}
+
+.app-sidebar {
+  background:
+    radial-gradient(circle at 0% 0%, hsl(var(--primary) / .23), transparent 22rem),
+    linear-gradient(180deg, hsl(223 58% 16%), hsl(224 59% 10%));
+}
+
+.app-topbar {
+  border-color: hsl(0 0% 100% / .5);
+  background: hsl(220 38% 95% / .55) !important;
+}
+
+.glass-surface {
+  border: 1px solid hsl(0 0% 100% / .76) !important;
+  border-radius: 1.5rem !important;
+  background:
+    linear-gradient(135deg, hsl(0 0% 100% / .77), hsl(220 54% 97% / .48)) !important;
+  box-shadow:
+    0 24px 60px hsl(222 48% 18% / .09),
+    0 2px 0 hsl(0 0% 100% / .82) inset,
+    0 -1px 0 hsl(222 48% 18% / .04) inset !important;
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
+}
+
+.logistics-card {
+  border-top: 0 !important;
+  background:
+    linear-gradient(135deg, hsl(0 0% 100% / .84), hsl(28 100% 97% / .66)) !important;
+}
+
+.page-header h2 {
+  max-width: 44rem;
+  font-size: clamp(2.1rem, 4vw, 3.25rem);
+  line-height: .98;
+}
+
+.page-header > div:first-child > p:first-child {
+  color: hsl(var(--primary));
+  font-weight: 700;
+}
+
+.home-action-grid > a {
+  border: 1px solid hsl(0 0% 100% / .68) !important;
+  border-radius: 1.35rem !important;
+  background: hsl(0 0% 100% / .52) !important;
+  box-shadow: 0 16px 30px hsl(222 48% 18% / .07);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.home-action-grid > a:first-child {
+  background:
+    linear-gradient(135deg, hsl(var(--primary) / .93), hsl(28 94% 60% / .84)) !important;
+  color: hsl(223 54% 14%);
+  box-shadow: 0 18px 34px hsl(var(--primary) / .2);
+}
+
+.context-image {
+  border: 1px solid hsl(0 0% 100% / .65) !important;
+  border-radius: 1.6rem !important;
+  box-shadow: 0 28px 55px hsl(222 48% 18% / .18);
+}
+
+.map-shell {
+  border-color: hsl(0 0% 100% / .66);
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 55px hsl(222 48% 18% / .12);
+}
+
+input,
+select,
+textarea {
+  border-color: hsl(0 0% 100% / .75) !important;
+  background: hsl(0 0% 100% / .46) !important;
+}
+
+.dark .app-topbar {
+  border-color: hsl(0 0% 100% / .08);
+  background: hsl(223 46% 10% / .62) !important;
+}
+
+.dark .glass-surface {
+  border-color: hsl(0 0% 100% / .1) !important;
+  background:
+    linear-gradient(135deg, hsl(223 41% 22% / .82), hsl(223 42% 14% / .68)) !important;
+  box-shadow:
+    0 24px 60px hsl(0 0% 0% / .22),
+    0 2px 0 hsl(0 0% 100% / .08) inset !important;
+}
+
+.dark .logistics-card {
+  background:
+    linear-gradient(135deg, hsl(223 41% 22% / .9), hsl(28 32% 18% / .72)) !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  border-color: hsl(0 0% 100% / .12) !important;
+  background: hsl(223 40% 11% / .46) !important;
+}
+
+@media (max-width: 767px) {
+  .app-topbar {
+    background: hsl(220 38% 95% / .74) !important;
+  }
+
+  .page-header h2 {
+    font-size: 2.45rem;
+  }
+
+  .glass-surface {
+    border-radius: 1.35rem !important;
+    box-shadow:
+      0 18px 34px hsl(222 48% 18% / .1),
+      0 2px 0 hsl(0 0% 100% / .76) inset !important;
+  }
+
+  .dark .app-topbar {
+    background: hsl(223 46% 10% / .78) !important;
+  }
+}
+
+:root {
+  --background: 220 36% 94%;
+  --foreground: 222 49% 14%;
+  --border: 220 25% 84%;
+  --card: 0 0% 100%;
+  --card-border: 0 0% 100%;
+  --muted: 220 30% 90%;
+  --muted-foreground: 220 18% 39%;
+  --secondary: 220 30% 91%;
+  --secondary-foreground: 222 49% 18%;
+  --sidebar: 223 54% 15%;
+  --sidebar-accent: 223 45% 22%;
+  --sidebar-border: 223 35% 31%;
+  --primary: 19 92% 55%;
+  --accent: 19 92% 55%;
+  --accent-foreground: 19 75% 34%;
+  --surface-warm: 28 100% 97%;
+  --radius: 1rem;
+}
+
+.dark {
+  --background: 223 46% 10%;
+  --foreground: 220 35% 96%;
+  --border: 223 30% 25%;
+  --card: 223 40% 17%;
+  --card-border: 223 31% 33%;
+  --muted: 223 33% 21%;
+  --muted-foreground: 220 18% 72%;
+  --secondary: 223 35% 20%;
+  --secondary-foreground: 220 35% 96%;
+  --sidebar: 224 56% 8%;
+  --sidebar-accent: 223 42% 17%;
+  --sidebar-border: 223 32% 27%;
+  --surface-warm: 223 40% 15%;
+}
+
+/* Reference-led visual system: a layered navy canvas, orange actions, and
+   translucent surfaces with enough contrast to feel intentional rather than
+   like white utility cards. */
+:root {
+  --background: 220 36% 94%;
+  --foreground: 222 49% 14%;
+  --border: 220 25% 84%;
+  --card: 0 0% 100%;
+  --card-border: 0 0% 100%;
+  --muted: 220 30% 90%;
+  --muted-foreground: 220 18% 39%;
+  --secondary: 220 30% 91%;
+  --secondary-foreground: 222 49% 18%;
+  --sidebar: 223 54% 15%;
+  --sidebar-accent: 223 45% 22%;
+  --sidebar-border: 223 35% 31%;
+  --primary: 19 92% 55%;
+  --accent: 19 92% 55%;
+  --accent-foreground: 19 75% 34%;
+  --surface-warm: 28 100% 97%;
+  --radius: 1rem;
+}
+
+.dark {
+  --background: 223 46% 10%;
+  --foreground: 220 35% 96%;
+  --border: 223 30% 25%;
+  --card: 223 40% 17%;
+  --card-border: 223 31% 33%;
+  --muted: 223 33% 21%;
+  --muted-foreground: 220 18% 72%;
+  --secondary: 223 35% 20%;
+  --secondary-foreground: 220 35% 96%;
+  --sidebar: 224 56% 8%;
+  --sidebar-accent: 223 42% 17%;
+  --sidebar-border: 223 32% 27%;
+  --surface-warm: 223 40% 15%;
+}
+
+.app-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 80% -10%, hsl(var(--primary) / .17), transparent 27rem),
+    radial-gradient(circle at 8% 18%, hsl(213 72% 62% / .13), transparent 30rem),
+    linear-gradient(135deg, hsl(var(--background)), hsl(220 42% 91%));
+}
+
+.app-shell::before,
+.app-shell::after {
+  position: fixed;
+  z-index: -1;
+  display: block;
+  width: 26rem;
+  height: 26rem;
+  border-radius: 999px;
+  content: "";
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.app-shell::before {
+  top: 18%;
+  right: -13rem;
+  background: hsl(var(--primary) / .11);
+}
+
+.app-shell::after {
+  bottom: -12rem;
+  left: 20%;
+  background: hsl(220 80% 72% / .11);
+}
+
+.app-main {
+  position: relative;
+  z-index: 1;
+}
+
+.app-sidebar {
+  background:
+    radial-gradient(circle at 0% 0%, hsl(var(--primary) / .23), transparent 22rem),
+    linear-gradient(180deg, hsl(223 58% 16%), hsl(224 59% 10%));
+  border-right: 1px solid hsl(0 0% 100% / .08);
+}
+
+.app-sidebar nav a,
+.app-sidebar nav button {
+  border-radius: .9rem;
+  transition: transform 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.app-sidebar nav a:hover,
+.app-sidebar nav button:hover {
+  transform: translateX(2px);
+}
+
+.app-sidebar nav a[class*="bg-sidebar-primary"] {
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(28 94% 60%));
+  box-shadow: 0 10px 24px hsl(var(--primary) / .22);
+}
+
+.app-topbar {
+  border-color: hsl(0 0% 100% / .5);
+  background: hsl(220 38% 95% / .55) !important;
+}
+
+.dark .app-topbar {
+  border-color: hsl(0 0% 100% / .08);
+  background: hsl(223 46% 10% / .62) !important;
+}
+
+.app-content {
+  min-height: calc(100dvh - 64px);
+}
+
+.glass-surface {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid hsl(0 0% 100% / .76) !important;
+  border-radius: 1.5rem !important;
+  background:
+    linear-gradient(135deg, hsl(0 0% 100% / .77), hsl(220 54% 97% / .48)) !important;
+  box-shadow:
+    0 24px 60px hsl(222 48% 18% / .09),
+    0 2px 0 hsl(0 0% 100% / .82) inset,
+    0 -1px 0 hsl(222 48% 18% / .04) inset !important;
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
+}
+
+.glass-surface::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(120deg, hsl(0 0% 100% / .2), transparent 34%);
+  content: "";
+  pointer-events: none;
+}
+
+.dark .glass-surface {
+  border-color: hsl(0 0% 100% / .1) !important;
+  background:
+    linear-gradient(135deg, hsl(223 41% 22% / .82), hsl(223 42% 14% / .68)) !important;
+  box-shadow:
+    0 24px 60px hsl(0 0% 0% / .22),
+    0 2px 0 hsl(0 0% 100% / .08) inset !important;
+}
+
+.logistics-card {
+  border-top: 0 !important;
+  background:
+    linear-gradient(135deg, hsl(0 0% 100% / .84), hsl(28 100% 97% / .66)) !important;
+}
+
+.dark .logistics-card {
+  background:
+    linear-gradient(135deg, hsl(223 41% 22% / .9), hsl(28 32% 18% / .72)) !important;
+}
+
+.page-header {
+  position: relative;
+  margin-bottom: .5rem;
+}
+
+.page-header h2 {
+  max-width: 44rem;
+  color: hsl(var(--foreground));
+  font-size: clamp(2.1rem, 4vw, 3.25rem);
+  line-height: .98;
+}
+
+.page-header > div:first-child > p:first-child {
+  color: hsl(var(--primary));
+  font-weight: 700;
+}
+
+.home-action-grid > a {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid hsl(0 0% 100% / .68) !important;
+  border-radius: 1.35rem !important;
+  background: hsl(0 0% 100% / .52) !important;
+  box-shadow: 0 16px 30px hsl(222 48% 18% / .07);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.home-action-grid > a:first-child {
+  background:
+    linear-gradient(135deg, hsl(var(--primary) / .93), hsl(28 94% 60% / .84)) !important;
+  color: hsl(223 54% 14%);
+  box-shadow: 0 18px 34px hsl(var(--primary) / .2);
+}
+
+.home-action-grid > a:first-child p:last-child,
+.home-action-grid > a:first-child p:nth-last-child(2) {
+  color: hsl(223 54% 14% / .72);
+}
+
+.context-image {
+  border: 1px solid hsl(0 0% 100% / .65) !important;
+  border-radius: 1.6rem !important;
+  box-shadow: 0 28px 55px hsl(222 48% 18% / .18);
+}
+
+.context-image::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid hsl(0 0% 100% / .16);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+
+.map-shell {
+  border: 1px solid hsl(0 0% 100% / .66);
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 55px hsl(222 48% 18% / .12);
+}
+
+input,
+select,
+textarea {
+  border-color: hsl(0 0% 100% / .75) !important;
+  background: hsl(0 0% 100% / .46) !important;
+  box-shadow: 0 2px 0 hsl(0 0% 100% / .42) inset;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  border-color: hsl(0 0% 100% / .12) !important;
+  background: hsl(223 40% 11% / .46) !important;
+}
+
+@media (max-width: 767px) {
+  .app-shell {
+    background:
+      radial-gradient(circle at 100% 0%, hsl(var(--primary) / .16), transparent 20rem),
+      linear-gradient(135deg, hsl(var(--background)), hsl(220 42% 91%));
+  }
+
+  .app-content {
+    padding-top: 1.25rem !important;
+  }
+
+  .glass-surface {
+    border-radius: 1.35rem !important;
+    box-shadow:
+      0 18px 34px hsl(222 48% 18% / .1),
+      0 2px 0 hsl(0 0% 100% / .76) inset !important;
+  }
+
+  .page-header h2 {
+    font-size: 2.45rem;
+  }
+
+  .app-topbar {
+    background: hsl(220 38% 95% / .74) !important;
+  }
+
+  .dark .app-topbar {
+    background: hsl(223 46% 10% / .78) !important;
+  }
+}
 
 /* LIGHT MODE */
 :root {
@@ -1570,5 +2004,136 @@ header.sticky button[aria-label="Notifications"] + div {
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
+  }
+}
+
+/* Keep the reference treatment last so utility classes cannot flatten it. */
+.app-shell {
+  background:
+    radial-gradient(circle at 80% -10%, hsl(var(--primary) / .17), transparent 27rem),
+    radial-gradient(circle at 8% 18%, hsl(213 72% 62% / .13), transparent 30rem),
+    linear-gradient(135deg, hsl(var(--background)), hsl(220 42% 91%));
+}
+
+.app-sidebar {
+  background:
+    radial-gradient(circle at 0% 0%, hsl(var(--primary) / .23), transparent 22rem),
+    linear-gradient(180deg, hsl(223 58% 16%), hsl(224 59% 10%));
+}
+
+.app-topbar {
+  border-color: hsl(0 0% 100% / .5);
+  background: hsl(220 38% 95% / .55) !important;
+}
+
+.glass-surface {
+  border: 1px solid hsl(0 0% 100% / .76) !important;
+  border-radius: 1.5rem !important;
+  background:
+    linear-gradient(135deg, hsl(0 0% 100% / .77), hsl(220 54% 97% / .48)) !important;
+  box-shadow:
+    0 24px 60px hsl(222 48% 18% / .09),
+    0 2px 0 hsl(0 0% 100% / .82) inset,
+    0 -1px 0 hsl(222 48% 18% / .04) inset !important;
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
+}
+
+.logistics-card {
+  border-top: 0 !important;
+  background:
+    linear-gradient(135deg, hsl(0 0% 100% / .84), hsl(28 100% 97% / .66)) !important;
+}
+
+.page-header h2 {
+  max-width: 44rem;
+  font-size: clamp(2.1rem, 4vw, 3.25rem);
+  line-height: .98;
+}
+
+.page-header > div:first-child > p:first-child {
+  color: hsl(var(--primary));
+  font-weight: 700;
+}
+
+.home-action-grid > a {
+  border: 1px solid hsl(0 0% 100% / .68) !important;
+  border-radius: 1.35rem !important;
+  background: hsl(0 0% 100% / .52) !important;
+  box-shadow: 0 16px 30px hsl(222 48% 18% / .07);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.home-action-grid > a:first-child {
+  background:
+    linear-gradient(135deg, hsl(var(--primary) / .93), hsl(28 94% 60% / .84)) !important;
+  color: hsl(223 54% 14%);
+  box-shadow: 0 18px 34px hsl(var(--primary) / .2);
+}
+
+.context-image {
+  border: 1px solid hsl(0 0% 100% / .65) !important;
+  border-radius: 1.6rem !important;
+  box-shadow: 0 28px 55px hsl(222 48% 18% / .18);
+}
+
+.map-shell {
+  border-color: hsl(0 0% 100% / .66);
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 55px hsl(222 48% 18% / .12);
+}
+
+input,
+select,
+textarea {
+  border-color: hsl(0 0% 100% / .75) !important;
+  background: hsl(0 0% 100% / .46) !important;
+}
+
+.dark .app-topbar {
+  border-color: hsl(0 0% 100% / .08);
+  background: hsl(223 46% 10% / .62) !important;
+}
+
+.dark .glass-surface {
+  border-color: hsl(0 0% 100% / .1) !important;
+  background:
+    linear-gradient(135deg, hsl(223 41% 22% / .82), hsl(223 42% 14% / .68)) !important;
+  box-shadow:
+    0 24px 60px hsl(0 0% 0% / .22),
+    0 2px 0 hsl(0 0% 100% / .08) inset !important;
+}
+
+.dark .logistics-card {
+  background:
+    linear-gradient(135deg, hsl(223 41% 22% / .9), hsl(28 32% 18% / .72)) !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  border-color: hsl(0 0% 100% / .12) !important;
+  background: hsl(223 40% 11% / .46) !important;
+}
+
+@media (max-width: 767px) {
+  .app-topbar {
+    background: hsl(220 38% 95% / .74) !important;
+  }
+
+  .page-header h2 {
+    font-size: 2.45rem;
+  }
+
+  .glass-surface {
+    border-radius: 1.35rem !important;
+    box-shadow:
+      0 18px 34px hsl(222 48% 18% / .1),
+      0 2px 0 hsl(0 0% 100% / .76) inset !important;
+  }
+
+  .dark .app-topbar {
+    background: hsl(223 46% 10% / .78) !important;
   }
 }
