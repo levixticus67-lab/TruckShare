@@ -729,7 +729,7 @@ textarea {
   .map-shell {
     position: relative;
     overflow: hidden;
-    min-height: 320px;
+    min-height: 0;
     border: 1px solid hsl(var(--border) / .9);
     border-radius: 1rem;
     background: hsl(var(--muted));
@@ -749,6 +749,44 @@ textarea {
     border-color: transparent;
     background: hsl(var(--background));
     cursor: default;
+  }
+
+  .modal-layer {
+    isolation: isolate;
+  }
+
+  .modal-panel {
+    background:
+      linear-gradient(145deg, hsl(var(--card) / .98), hsl(var(--surface-warm) / .92)) !important;
+    box-shadow:
+      0 28px 80px hsl(var(--foreground) / .28),
+      0 2px 0 hsl(0 0% 100% / .72) inset !important;
+  }
+
+  .modal-content form {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .modal-content form > button[type="submit"] {
+    min-height: 3.25rem;
+    border-radius: 1rem;
+    box-shadow: 0 14px 28px hsl(var(--primary) / .24);
+  }
+
+  .modal-content input:not([type="checkbox"]),
+  .modal-content select,
+  .modal-content textarea {
+    border-color: hsl(var(--border)) !important;
+    background: hsl(var(--card)) !important;
+    color: hsl(var(--foreground));
+    box-shadow: 0 1px 0 hsl(0 0% 100% / .75) inset;
+  }
+
+  .modal-content input:not([type="checkbox"]):focus,
+  .modal-content select:focus,
+  .modal-content textarea:focus {
+    border-color: hsl(var(--primary)) !important;
+    box-shadow: 0 0 0 3px hsl(var(--primary) / .14);
   }
   .map-shell .route-map {
     border: 0;
@@ -1246,6 +1284,12 @@ header.sticky button[aria-label="Notifications"] + div {
   backdrop-filter: blur(22px);
 }
 
+@media (max-width: 1023px) {
+  .app-shell:has(.modal-layer) .mobile-bottom-nav {
+    display: none;
+  }
+}
+
 .mobile-nav-brand,
 .mobile-nav-item {
   position: relative;
@@ -1416,7 +1460,7 @@ header.sticky button[aria-label="Notifications"] + div {
   }
 
   .map-shell {
-    min-height: 260px;
+    min-height: 0;
     border-radius: 1.25rem;
   }
 

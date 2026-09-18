@@ -395,11 +395,11 @@ function Dashboard() {
 
 function Modal({ title, eyebrow, onClose, children, closable = true, heroImage, heroTitle }: { title: string; eyebrow: string; onClose: () => void; children: ReactNode; closable?: boolean; heroImage?: string; heroTitle?: string }) {
   const heroStyle = heroImage ? { backgroundImage: `linear-gradient(180deg, rgba(13, 27, 38, .2) 0%, rgba(13, 27, 38, .48) 42%, rgba(13, 27, 38, .68) 100%), url("${heroImage}")` } : undefined;
-  return <div className={`fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-5 ${heroImage ? "bg-cover bg-center" : "bg-primary/35 backdrop-blur-sm"}`} style={heroStyle}>
+  return <div className={`modal-layer fixed inset-0 z-[1100] flex items-end justify-center overscroll-contain p-0 sm:items-center sm:p-5 ${heroImage ? "bg-cover bg-center" : "bg-primary/35 backdrop-blur-sm"}`} style={heroStyle} role="dialog" aria-modal="true" aria-labelledby="modal-title">
     {heroTitle && <div className="pointer-events-none absolute inset-x-0 top-10 flex justify-center px-5 sm:top-14"><div className="rounded-2xl border border-white/35 bg-white/15 px-7 py-4 text-center shadow-2xl backdrop-blur-xl"><h1 className="font-display text-4xl font-semibold tracking-[-.06em] text-white drop-shadow-lg sm:text-5xl">{heroTitle}</h1></div></div>}
-    <div className={`relative max-h-[92dvh] w-full max-w-xl overflow-y-auto border border-border bg-card shadow-2xl ${heroImage ? "rounded-t-2xl sm:rounded-2xl" : "rounded-t-2xl sm:rounded-2xl"}`}>
-      {!heroTitle && <div className="flex items-start justify-between border-b border-border p-5"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">{eyebrow}</p><h2 className="mt-1 font-display text-2xl font-semibold tracking-[-.04em]">{title}</h2></div>{closable && <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="Close"><X size={18} /></button>}</div>}
-      <div className={heroTitle ? "p-5 pt-6" : "p-5"}>{children}</div>
+    <div className={`modal-panel relative flex max-h-[calc(100dvh-1rem)] w-full max-w-xl flex-col overflow-hidden border border-border bg-card shadow-2xl ${heroImage ? "rounded-t-2xl sm:rounded-2xl" : "rounded-t-2xl sm:rounded-2xl"}`}>
+      {!heroTitle && <div className="flex shrink-0 items-start justify-between border-b border-border p-5"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.16em] text-muted-foreground">{eyebrow}</p><h2 id="modal-title" className="mt-1 font-display text-2xl font-semibold tracking-[-.04em]">{title}</h2></div>{closable && <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="Close"><X size={18} /></button>}</div>}
+      <div className={`modal-content min-h-0 overflow-y-auto overscroll-contain ${heroTitle ? "p-5 pt-6" : "p-5"}`}>{children}</div>
     </div>
   </div>;
 }
