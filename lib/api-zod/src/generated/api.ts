@@ -523,7 +523,7 @@ export const ListBorderMilestonesParams = zod.object({
 export const ListBorderMilestonesResponseItem = zod.object({
   "id": zod.string(),
   "bookingId": zod.string(),
-  "sequence": zod.number().int(),
+  "sequence": zod.int(),
   "checkpoint": zod.string(),
   "country": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "border": zod.string(),
@@ -552,7 +552,7 @@ export const CreateBorderMilestoneBody = zod.object({
 export const CreateBorderMilestoneResponse = zod.object({
   "id": zod.string(),
   "bookingId": zod.string(),
-  "sequence": zod.number().int(),
+  "sequence": zod.int(),
   "checkpoint": zod.string(),
   "country": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "border": zod.string(),
@@ -577,7 +577,7 @@ export const UpdateBorderMilestoneBody = zod.object({
 export const UpdateBorderMilestoneResponse = zod.object({
   "id": zod.string(),
   "bookingId": zod.string(),
-  "sequence": zod.number().int(),
+  "sequence": zod.int(),
   "checkpoint": zod.string(),
   "country": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
   "border": zod.string(),
@@ -641,7 +641,7 @@ export const GetPaymentQuoteResponse = zod.object({
   "carrierPayout": zod.number(),
   "commissionRate": zod.number(),
   "carrierRate": zod.number(),
-  "expiresInSeconds": zod.number().int(),
+  "expiresInSeconds": zod.int(),
   "indicative": zod.boolean()
 })
 
@@ -697,6 +697,128 @@ export const SimulatePaymentResponse = zod.object({
   "status": zod.enum(['Initiated', 'Held', 'Released', 'Failed']),
   "createdAt": zod.string()
 })
+})
+
+
+/**
+ * @summary Get the finance control overview
+ */
+export const GetFinanceOverviewResponse = zod.object({
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "totalCollected": zod.number(),
+  "platformRevenue": zod.number(),
+  "providerFees": zod.number(),
+  "carrierFundsPendingRelease": zod.number(),
+  "payoutsDue": zod.number(),
+  "payoutsCompleted": zod.number(),
+  "refundsPending": zod.number(),
+  "reconciliationRequired": zod.number(),
+  "bookingsFunded": zod.int()
+})
+
+
+/**
+ * @summary Get the payment, escrow, ledger, and payout state for a booking
+ */
+export const GetBookingFinanceParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetBookingFinanceResponse = zod.object({
+  "bookingId": zod.string(),
+  "grossAmount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "platformFee": zod.number(),
+  "providerFee": zod.number(),
+  "carrierPayable": zod.number(),
+  "paymentState": zod.enum(['PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'PAYMENT_FAILED', 'REFUND_PENDING', 'REFUNDED', 'DISPUTED']),
+  "escrowState": zod.enum(['FUNDS_PENDING', 'FUNDS_HELD', 'RELEASE_ELIGIBLE', 'PAYOUT_PENDING', 'PAYOUT_PROCESSING', 'PAYOUT_COMPLETED', 'PAYOUT_FAILED', 'REFUND_PENDING', 'REFUNDED']),
+  "payoutState": zod.enum(['NOT_DUE', 'PENDING_RELEASE', 'PROCESSING', 'COMPLETED', 'FAILED', 'REVERSED']),
+  "ledgerEntries": zod.array(zod.object({
+  "id": zod.string(),
+  "account": zod.string(),
+  "entryType": zod.enum(['CUSTOMER_PAYMENT', 'CARRIER_LIABILITY', 'PLATFORM_REVENUE', 'PROVIDER_FEE', 'TAX', 'REFUND', 'PAYOUT']),
+  "direction": zod.enum(['debit', 'credit']),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "reference": zod.string(),
+  "idempotencyKey": zod.string(),
+  "createdAt": zod.string()
+})),
+  "payout": zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "provider": zod.enum(['flutterwave', 'simulation']),
+  "providerTransferId": zod.string().optional(),
+  "status": zod.enum(['PENDING_RELEASE', 'PROCESSING', 'COMPLETED', 'FAILED', 'REVERSED']),
+  "releaseReason": zod.string().optional(),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().optional()
+}).nullable(),
+  "timeline": zod.array(zod.object({
+  "state": zod.string(),
+  "label": zod.string(),
+  "occurredAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Release a carrier payout after delivery verification
+ */
+export const ReleaseBookingPayoutParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const releaseBookingPayoutBodyReasonMin = 3;
+export const releaseBookingPayoutBodyReasonMax = 240;
+
+
+
+export const ReleaseBookingPayoutBody = zod.object({
+  "reason": zod.string().min(releaseBookingPayoutBodyReasonMin).max(releaseBookingPayoutBodyReasonMax)
+})
+
+export const ReleaseBookingPayoutResponse = zod.object({
+  "bookingId": zod.string(),
+  "grossAmount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "platformFee": zod.number(),
+  "providerFee": zod.number(),
+  "carrierPayable": zod.number(),
+  "paymentState": zod.enum(['PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'PAYMENT_FAILED', 'REFUND_PENDING', 'REFUNDED', 'DISPUTED']),
+  "escrowState": zod.enum(['FUNDS_PENDING', 'FUNDS_HELD', 'RELEASE_ELIGIBLE', 'PAYOUT_PENDING', 'PAYOUT_PROCESSING', 'PAYOUT_COMPLETED', 'PAYOUT_FAILED', 'REFUND_PENDING', 'REFUNDED']),
+  "payoutState": zod.enum(['NOT_DUE', 'PENDING_RELEASE', 'PROCESSING', 'COMPLETED', 'FAILED', 'REVERSED']),
+  "ledgerEntries": zod.array(zod.object({
+  "id": zod.string(),
+  "account": zod.string(),
+  "entryType": zod.enum(['CUSTOMER_PAYMENT', 'CARRIER_LIABILITY', 'PLATFORM_REVENUE', 'PROVIDER_FEE', 'TAX', 'REFUND', 'PAYOUT']),
+  "direction": zod.enum(['debit', 'credit']),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "reference": zod.string(),
+  "idempotencyKey": zod.string(),
+  "createdAt": zod.string()
+})),
+  "payout": zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "provider": zod.enum(['flutterwave', 'simulation']),
+  "providerTransferId": zod.string().optional(),
+  "status": zod.enum(['PENDING_RELEASE', 'PROCESSING', 'COMPLETED', 'FAILED', 'REVERSED']),
+  "releaseReason": zod.string().optional(),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().optional()
+}).nullable(),
+  "timeline": zod.array(zod.object({
+  "state": zod.string(),
+  "label": zod.string(),
+  "occurredAt": zod.string()
+}))
 })
 
 

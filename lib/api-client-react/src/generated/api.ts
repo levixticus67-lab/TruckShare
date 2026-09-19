@@ -21,12 +21,14 @@ import type {
 
 import type {
   Booking,
+  BookingFinance,
   BookingInput,
   BorderMilestone,
   BorderMilestoneInput,
   Dashboard,
   Document,
   DocumentInput,
+  FinanceOverview,
   Freight,
   FreightInput,
   FreightUpdate,
@@ -44,6 +46,7 @@ import type {
   Payment,
   PaymentInput,
   PaymentQuote,
+  ReleasePayoutInput,
   SimulatePayment200,
   StatusInput,
   Trip,
@@ -1592,6 +1595,232 @@ export const useSimulatePayment = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSimulatePaymentMutationOptions(options));
+    }
+
+export const getGetFinanceOverviewUrl = () => {
+
+
+
+
+  return `/api/finance/overview`
+}
+
+/**
+ * @summary Get the finance control overview
+ */
+export const getFinanceOverview = async ( options?: Parameters<typeof customFetch>[1]): Promise<FinanceOverview> => {
+
+  return customFetch<FinanceOverview>(getGetFinanceOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFinanceOverviewQueryKey = () => {
+    return [
+    `/api/finance/overview`
+    ] as const;
+    }
+
+
+export const getGetFinanceOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getFinanceOverview>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFinanceOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFinanceOverviewQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFinanceOverview>>> = ({ signal }) => getFinanceOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFinanceOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFinanceOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getFinanceOverview>>>
+export type GetFinanceOverviewQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the finance control overview
+ */
+
+export function useGetFinanceOverview<TData = Awaited<ReturnType<typeof getFinanceOverview>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFinanceOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFinanceOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBookingFinanceUrl = (id: string,) => {
+
+
+
+
+  return `/api/finance/bookings/${id}`
+}
+
+/**
+ * @summary Get the payment, escrow, ledger, and payout state for a booking
+ */
+export const getBookingFinance = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<BookingFinance> => {
+
+  return customFetch<BookingFinance>(getGetBookingFinanceUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBookingFinanceQueryKey = (id: string,) => {
+    return [
+    `/api/finance/bookings/${id}`
+    ] as const;
+    }
+
+
+export const getGetBookingFinanceQueryOptions = <TData = Awaited<ReturnType<typeof getBookingFinance>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBookingFinance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBookingFinanceQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBookingFinance>>> = ({ signal }) => getBookingFinance(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBookingFinance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBookingFinanceQueryResult = NonNullable<Awaited<ReturnType<typeof getBookingFinance>>>
+export type GetBookingFinanceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the payment, escrow, ledger, and payout state for a booking
+ */
+
+export function useGetBookingFinance<TData = Awaited<ReturnType<typeof getBookingFinance>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBookingFinance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBookingFinanceQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReleaseBookingPayoutUrl = (id: string,) => {
+
+
+
+
+  return `/api/finance/bookings/${id}/release`
+}
+
+/**
+ * @summary Release a carrier payout after delivery verification
+ */
+export const releaseBookingPayout = async (id: string,
+    releasePayoutInput: ReleasePayoutInput, options?: Parameters<typeof customFetch>[1]): Promise<BookingFinance> => {
+
+  return customFetch<BookingFinance>(getReleaseBookingPayoutUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(releasePayoutInput)
+  }
+);}
+
+
+
+
+
+export const getReleaseBookingPayoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseBookingPayout>>, TError,{id: string;data: BodyType<ReleasePayoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof releaseBookingPayout>>, TError,{id: string;data: BodyType<ReleasePayoutInput>}, TContext> => {
+
+const mutationKey = ['releaseBookingPayout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof releaseBookingPayout>>, {id: string;data: BodyType<ReleasePayoutInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  releaseBookingPayout(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReleaseBookingPayoutMutationResult = NonNullable<Awaited<ReturnType<typeof releaseBookingPayout>>>
+    export type ReleaseBookingPayoutMutationBody = BodyType<ReleasePayoutInput>
+    export type ReleaseBookingPayoutMutationError = ErrorType<void>
+
+    /**
+ * @summary Release a carrier payout after delivery verification
+ */
+export const useReleaseBookingPayout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseBookingPayout>>, TError,{id: string;data: BodyType<ReleasePayoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof releaseBookingPayout>>,
+        TError,
+        {id: string;data: BodyType<ReleasePayoutInput>},
+        TContext
+      > => {
+      return useMutation(getReleaseBookingPayoutMutationOptions(options));
     }
 
 export const getListMessagesUrl = () => {

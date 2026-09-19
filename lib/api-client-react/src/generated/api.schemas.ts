@@ -323,6 +323,152 @@ export interface PaymentQuote {
   indicative: boolean;
 }
 
+export interface FinanceOverview {
+  currency: CurrencyCode;
+  totalCollected: number;
+  platformRevenue: number;
+  providerFees: number;
+  carrierFundsPendingRelease: number;
+  payoutsDue: number;
+  payoutsCompleted: number;
+  refundsPending: number;
+  reconciliationRequired: number;
+  bookingsFunded: number;
+}
+
+export type FinanceLedgerEntryEntryType = typeof FinanceLedgerEntryEntryType[keyof typeof FinanceLedgerEntryEntryType];
+
+
+export const FinanceLedgerEntryEntryType = {
+  CUSTOMER_PAYMENT: 'CUSTOMER_PAYMENT',
+  CARRIER_LIABILITY: 'CARRIER_LIABILITY',
+  PLATFORM_REVENUE: 'PLATFORM_REVENUE',
+  PROVIDER_FEE: 'PROVIDER_FEE',
+  TAX: 'TAX',
+  REFUND: 'REFUND',
+  PAYOUT: 'PAYOUT',
+} as const;
+
+export type FinanceLedgerEntryDirection = typeof FinanceLedgerEntryDirection[keyof typeof FinanceLedgerEntryDirection];
+
+
+export const FinanceLedgerEntryDirection = {
+  debit: 'debit',
+  credit: 'credit',
+} as const;
+
+export interface FinanceLedgerEntry {
+  id: string;
+  account: string;
+  entryType: FinanceLedgerEntryEntryType;
+  direction: FinanceLedgerEntryDirection;
+  amount: number;
+  currency: CurrencyCode;
+  reference: string;
+  idempotencyKey: string;
+  createdAt: string;
+}
+
+export type FinancePayoutProvider = typeof FinancePayoutProvider[keyof typeof FinancePayoutProvider];
+
+
+export const FinancePayoutProvider = {
+  flutterwave: 'flutterwave',
+  simulation: 'simulation',
+} as const;
+
+export type FinancePayoutStatus = typeof FinancePayoutStatus[keyof typeof FinancePayoutStatus];
+
+
+export const FinancePayoutStatus = {
+  PENDING_RELEASE: 'PENDING_RELEASE',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  REVERSED: 'REVERSED',
+} as const;
+
+export interface FinancePayout {
+  id: string;
+  bookingId: string;
+  amount: number;
+  currency: CurrencyCode;
+  provider: FinancePayoutProvider;
+  providerTransferId?: string;
+  status: FinancePayoutStatus;
+  releaseReason?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export type BookingFinancePaymentState = typeof BookingFinancePaymentState[keyof typeof BookingFinancePaymentState];
+
+
+export const BookingFinancePaymentState = {
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
+  PAYMENT_VERIFIED: 'PAYMENT_VERIFIED',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
+  REFUND_PENDING: 'REFUND_PENDING',
+  REFUNDED: 'REFUNDED',
+  DISPUTED: 'DISPUTED',
+} as const;
+
+export type BookingFinanceEscrowState = typeof BookingFinanceEscrowState[keyof typeof BookingFinanceEscrowState];
+
+
+export const BookingFinanceEscrowState = {
+  FUNDS_PENDING: 'FUNDS_PENDING',
+  FUNDS_HELD: 'FUNDS_HELD',
+  RELEASE_ELIGIBLE: 'RELEASE_ELIGIBLE',
+  PAYOUT_PENDING: 'PAYOUT_PENDING',
+  PAYOUT_PROCESSING: 'PAYOUT_PROCESSING',
+  PAYOUT_COMPLETED: 'PAYOUT_COMPLETED',
+  PAYOUT_FAILED: 'PAYOUT_FAILED',
+  REFUND_PENDING: 'REFUND_PENDING',
+  REFUNDED: 'REFUNDED',
+} as const;
+
+export type BookingFinancePayoutState = typeof BookingFinancePayoutState[keyof typeof BookingFinancePayoutState];
+
+
+export const BookingFinancePayoutState = {
+  NOT_DUE: 'NOT_DUE',
+  PENDING_RELEASE: 'PENDING_RELEASE',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  REVERSED: 'REVERSED',
+} as const;
+
+export type BookingFinanceTimelineItem = {
+  state: string;
+  label: string;
+  occurredAt: string;
+};
+
+export interface BookingFinance {
+  bookingId: string;
+  grossAmount: number;
+  currency: CurrencyCode;
+  platformFee: number;
+  providerFee: number;
+  carrierPayable: number;
+  paymentState: BookingFinancePaymentState;
+  escrowState: BookingFinanceEscrowState;
+  payoutState: BookingFinancePayoutState;
+  ledgerEntries: FinanceLedgerEntry[];
+  payout: FinancePayout | null;
+  timeline: BookingFinanceTimelineItem[];
+}
+
+export interface ReleasePayoutInput {
+  /**
+     * @minLength 3
+     * @maxLength 240
+     */
+  reason: string;
+}
+
 export type BorderMilestoneStatus = typeof BorderMilestoneStatus[keyof typeof BorderMilestoneStatus];
 
 

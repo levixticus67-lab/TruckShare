@@ -17,7 +17,7 @@
 //   export type InsertPost = z.infer<typeof insertPostSchema>;
 //   export type Post = typeof postsTable.$inferSelect;
 
-import { boolean, date, integer, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, date, integer, numeric, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -128,6 +128,100 @@ export const paymentsTable = pgTable("returnhaul_payments", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const financeInvoicesTable = pgTable("returnhaul_finance_invoices", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  invoiceNumber: text("invoice_number").notNull(),
+  grossAmount: numeric("gross_amount").notNull(),
+  currency: text("currency").notNull().default("UGX"),
+  platformFee: numeric("platform_fee").notNull().default("0"),
+  providerFee: numeric("provider_fee").notNull().default("0"),
+  taxAmount: numeric("tax_amount").notNull().default("0"),
+  totalAmount: numeric("total_amount").notNull(),
+  status: text("status").notNull().default("Issued"),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+});
+
+export const financeLedgerEntriesTable = pgTable("returnhaul_finance_ledger_entries", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  paymentId: text("payment_id"),
+  payoutId: text("payout_id"),
+  refundId: text("refund_id"),
+  account: text("account").notNull(),
+  entryType: text("entry_type").notNull(),
+  direction: text("direction").notNull(),
+  amount: numeric("amount").notNull(),
+  currency: text("currency").notNull().default("UGX"),
+  reference: text("reference").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  idempotencyKeyIndex: uniqueIndex("returnhaul_finance_ledger_idempotency_idx").on(table.idempotencyKey),
+}));
+
+export const financePayoutsTable = pgTable("returnhaul_finance_payouts", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  paymentId: text("payment_id"),
+  recipientName: text("recipient_name").notNull(),
+  recipientCountry: text("recipient_country").notNull().default("UG"),
+  network: text("network").notNull(),
+  accountReference: text("account_reference").notNull(),
+  amount: numeric("amount").notNull(),
+  currency: text("currency").notNull().default("UGX"),
+  provider: text("provider").notNull().default("flutterwave"),
+  providerTransferId: text("provider_transfer_id"),
+  status: text("status").notNull().default("Pending Release"),
+  releaseReason: text("release_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+export const financeRefundsTable = pgTable("returnhaul_finance_refunds", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  paymentId: text("payment_id").notNull(),
+  amount: numeric("amount").notNull(),
+  currency: text("currency").notNull().default("UGX"),
+  reason: text("reason").notNull(),
+  providerRefundId: text("provider_refund_id"),
+  status: text("status").notNull().default("Pending"),
+  requestedBy: text("requested_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+export const financeWebhookEventsTable = pgTable("returnhaul_finance_webhook_events", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull().default("flutterwave"),
+  eventType: text("event_type").notNull(),
+  providerEventId: text("provider_event_id").notNull(),
+  signature: text("signature"),
+  payload: text("payload").notNull(),
+  status: text("status").notNull().default("Received"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+}, (table) => ({
+  providerEventIndex: uniqueIndex("returnhaul_finance_webhook_provider_event_idx").on(table.provider, table.providerEventId),
+}));
+
+export const financeReconciliationsTable = pgTable("returnhaul_finance_reconciliations", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull().default("flutterwave"),
+  settlementReference: text("settlement_reference").notNull(),
+  currency: text("currency").notNull().default("UGX"),
+  settledAmount: numeric("settled_amount").notNull(),
+  expectedAmount: numeric("expected_amount").notNull(),
+  variance: numeric("variance").notNull().default("0"),
+  status: text("status").notNull().default("Open"),
+  reviewedBy: text("reviewed_by"),
+  notes: text("notes"),
+  settledAt: timestamp("settled_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const borderMilestonesTable = pgTable("returnhaul_border_milestones", {
   id: text("id").primaryKey(),
   bookingId: text("booking_id").notNull(),
@@ -174,6 +268,12 @@ export const insertUserSchema = createInsertSchema(usersTable).omit({ createdAt:
 export const insertVerificationSchema = createInsertSchema(verificationsTable).omit({ createdAt: true, reviewedAt: true });
 export const insertBookingSchema = createInsertSchema(bookingsTable).omit({ createdAt: true });
 export const insertPaymentSchema = createInsertSchema(paymentsTable).omit({ createdAt: true });
+export const insertFinanceInvoiceSchema = createInsertSchema(financeInvoicesTable).omit({ issuedAt: true });
+export const insertFinanceLedgerEntrySchema = createInsertSchema(financeLedgerEntriesTable).omit({ createdAt: true });
+export const insertFinancePayoutSchema = createInsertSchema(financePayoutsTable).omit({ createdAt: true, completedAt: true });
+export const insertFinanceRefundSchema = createInsertSchema(financeRefundsTable).omit({ createdAt: true, completedAt: true });
+export const insertFinanceWebhookEventSchema = createInsertSchema(financeWebhookEventsTable).omit({ receivedAt: true, processedAt: true });
+export const insertFinanceReconciliationSchema = createInsertSchema(financeReconciliationsTable).omit({ createdAt: true });
 export const insertBorderMilestoneSchema = createInsertSchema(borderMilestonesTable).omit({ createdAt: true });
 export const insertMessageSchema = createInsertSchema(messagesTable).omit({ createdAt: true });
 export const insertDocumentSchema = createInsertSchema(documentsTable).omit({ createdAt: true });
@@ -190,6 +290,18 @@ export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookingsTable.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof paymentsTable.$inferSelect;
+export type InsertFinanceInvoice = z.infer<typeof insertFinanceInvoiceSchema>;
+export type FinanceInvoice = typeof financeInvoicesTable.$inferSelect;
+export type InsertFinanceLedgerEntry = z.infer<typeof insertFinanceLedgerEntrySchema>;
+export type FinanceLedgerEntry = typeof financeLedgerEntriesTable.$inferSelect;
+export type InsertFinancePayout = z.infer<typeof insertFinancePayoutSchema>;
+export type FinancePayout = typeof financePayoutsTable.$inferSelect;
+export type InsertFinanceRefund = z.infer<typeof insertFinanceRefundSchema>;
+export type FinanceRefund = typeof financeRefundsTable.$inferSelect;
+export type InsertFinanceWebhookEvent = z.infer<typeof insertFinanceWebhookEventSchema>;
+export type FinanceWebhookEvent = typeof financeWebhookEventsTable.$inferSelect;
+export type InsertFinanceReconciliation = z.infer<typeof insertFinanceReconciliationSchema>;
+export type FinanceReconciliation = typeof financeReconciliationsTable.$inferSelect;
 export type InsertBorderMilestone = z.infer<typeof insertBorderMilestoneSchema>;
 export type BorderMilestone = typeof borderMilestonesTable.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;

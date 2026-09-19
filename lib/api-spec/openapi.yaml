@@ -392,6 +392,56 @@ paths:
                 properties:
                   booking: { $ref: "#/components/schemas/Booking" }
                   payment: { $ref: "#/components/schemas/Payment" }
+  /finance/overview:
+    get:
+      operationId: getFinanceOverview
+      tags: [finance]
+      summary: Get the finance control overview
+      responses:
+        "200":
+          description: Finance overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinanceOverview"
+  /finance/bookings/{id}:
+    get:
+      operationId: getBookingFinance
+      tags: [finance]
+      summary: Get the payment, escrow, ledger, and payout state for a booking
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Booking finance state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingFinance"
+        "404":
+          description: Booking finance state not found
+  /finance/bookings/{id}/release:
+    post:
+      operationId: releaseBookingPayout
+      tags: [finance]
+      summary: Release a carrier payout after delivery verification
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleasePayoutInput"
+      responses:
+        "200":
+          description: Payout release accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingFinance"
+        "409":
+          description: Booking is not eligible for release
   /messages:
     get:
       operationId: listMessages
@@ -682,6 +732,81 @@ components:
         carrierRate: { type: number }
         expiresInSeconds: { type: integer }
         indicative: { type: boolean }
+    FinanceOverview:
+      type: object
+      required: [currency, totalCollected, platformRevenue, providerFees, carrierFundsPendingRelease, payoutsDue, payoutsCompleted, refundsPending, reconciliationRequired, bookingsFunded]
+      properties:
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        totalCollected: { type: number }
+        platformRevenue: { type: number }
+        providerFees: { type: number }
+        carrierFundsPendingRelease: { type: number }
+        payoutsDue: { type: number }
+        payoutsCompleted: { type: number }
+        refundsPending: { type: number }
+        reconciliationRequired: { type: number }
+        bookingsFunded: { type: integer }
+    FinanceLedgerEntry:
+      type: object
+      required: [id, account, entryType, direction, amount, currency, reference, idempotencyKey, createdAt]
+      properties:
+        id: { type: string }
+        account: { type: string }
+        entryType: { type: string, enum: [CUSTOMER_PAYMENT, CARRIER_LIABILITY, PLATFORM_REVENUE, PROVIDER_FEE, TAX, REFUND, PAYOUT] }
+        direction: { type: string, enum: [debit, credit] }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        reference: { type: string }
+        idempotencyKey: { type: string }
+        createdAt: { type: string }
+    FinancePayout:
+      type: object
+      required: [id, bookingId, amount, currency, provider, status, createdAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        provider: { type: string, enum: [flutterwave, simulation] }
+        providerTransferId: { type: string }
+        status: { type: string, enum: [PENDING_RELEASE, PROCESSING, COMPLETED, FAILED, REVERSED] }
+        releaseReason: { type: string }
+        createdAt: { type: string }
+        completedAt: { type: string }
+    BookingFinance:
+      type: object
+      required: [bookingId, grossAmount, currency, platformFee, providerFee, carrierPayable, paymentState, escrowState, payoutState, ledgerEntries, payout, timeline]
+      properties:
+        bookingId: { type: string }
+        grossAmount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        platformFee: { type: number }
+        providerFee: { type: number }
+        carrierPayable: { type: number }
+        paymentState: { type: string, enum: [PAYMENT_PENDING, PAYMENT_VERIFIED, PAYMENT_FAILED, REFUND_PENDING, REFUNDED, DISPUTED] }
+        escrowState: { type: string, enum: [FUNDS_PENDING, FUNDS_HELD, RELEASE_ELIGIBLE, PAYOUT_PENDING, PAYOUT_PROCESSING, PAYOUT_COMPLETED, PAYOUT_FAILED, REFUND_PENDING, REFUNDED] }
+        payoutState: { type: string, enum: [NOT_DUE, PENDING_RELEASE, PROCESSING, COMPLETED, FAILED, REVERSED] }
+        ledgerEntries:
+          type: array
+          items: { $ref: "#/components/schemas/FinanceLedgerEntry" }
+        payout:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/FinancePayout"
+        timeline:
+          type: array
+          items:
+            type: object
+            required: [state, label, occurredAt]
+            properties:
+              state: { type: string }
+              label: { type: string }
+              occurredAt: { type: string }
+    ReleasePayoutInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 240 }
     BorderMilestoneStatus:
       type: string
       enum: [Planned, "Documents Pending", Submitted, Cleared, Held, Crossed]

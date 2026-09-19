@@ -24,9 +24,22 @@ import {
   ListTripsQueryParams,
   ListTripsResponse,
   GetDashboardResponse,
+  GetFinanceOverviewResponse,
+  GetBookingFinanceResponse,
+  ReleaseBookingPayoutBody,
   UpdateBookingStatusBody,
   UpdateBookingStatusParams,
 } from "@workspace/api-zod";
+import {
+  getBookingFinance,
+  getFinanceOverview,
+  hydrateFinanceState,
+  markReleaseEligible,
+  recordPayment,
+  releasePayout,
+  ensureBookingFinance,
+  serializeFinanceState,
+} from "../lib/finance";
 
 type Trip = {
   id: string;
@@ -445,15 +458,20 @@ const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
-const stateKeys = ["trips", "freight", "bookings", "payments", "borderMilestones", "messages", "documents", "users", "verifications", "brokerRequests", "adminActivities"] as const;
+const stateKeys = ["trips", "freight", "bookings", "payments", "finance", "borderMilestones", "messages", "documents", "users", "verifications", "brokerRequests", "adminActivities"] as const;
 type StateKey = (typeof stateKeys)[number];
 let stateReady: Promise<void> | undefined;
 
 function stateValue(key: StateKey) {
+  if (key === "finance") return serializeFinanceState();
   return JSON.stringify({ trips, freight, bookings, payments, borderMilestones, messages, documents, users, verifications, brokerRequests, adminActivities }[key]);
 }
 
 function applyState(key: string, value: string) {
+  if (key === "finance") {
+    hydrateFinanceState(value);
+    return;
+  }
   const parsed: unknown = JSON.parse(value);
   if (!Array.isArray(parsed)) return;
   if (key === "trips") trips.splice(0, trips.length, ...(parsed as Partial<Trip>[]).map((item) => ({
@@ -498,8 +516,26 @@ function applyState(key: string, value: string) {
   if (key === "adminActivities") adminActivities.splice(0, adminActivities.length, ...parsed as AdminActivity[]);
 }
 
+function syncFinanceFromPayments() {
+  for (const payment of payments) {
+    recordPayment({
+      bookingId: payment.bookingId,
+      paymentId: payment.id,
+      grossAmount: payment.settlementAmount,
+      currency: payment.settlementCurrency,
+      platformFee: payment.commissionAmount,
+      providerFee: payment.fee,
+      carrierPayable: payment.carrierPayout,
+      reference: payment.reference,
+    });
+  }
+}
+
 async function ensureDatabaseState() {
-  if (!databaseConfigured) return;
+  if (!databaseConfigured) {
+    syncFinanceFromPayments();
+    return;
+  }
   if (!stateReady) {
     stateReady = (async () => {
       const rows = await db.select().from(runtimeStateTable);
@@ -508,10 +544,18 @@ async function ensureDatabaseState() {
         return;
       }
       for (const row of rows) applyState(row.key, row.value);
+      const existingKeys = new Set(rows.map((row) => row.key));
+      const missingKeys = stateKeys.filter((key) => !existingKeys.has(key));
+      if (missingKeys.length > 0) {
+        await db.insert(runtimeStateTable)
+          .values(missingKeys.map((key) => ({ key, value: stateValue(key) })))
+          .onConflictDoNothing();
+      }
     })();
   }
   try {
     await stateReady;
+    syncFinanceFromPayments();
   } catch (error) {
     stateReady = undefined;
     throw error;
@@ -862,6 +906,55 @@ router.get("/dashboard", (_req, res) => {
       { id: "activity-3", label: "Verification submitted", detail: "Thabo Transport · Driver documents", time: "3 hrs ago", tone: "amber" },
     ],
   }));
+});
+
+router.get("/finance/overview", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user || user.role !== "Admin") {
+    res.status(403).json({ error: "Only finance administrators can view the finance overview." });
+    return;
+  }
+  res.json(GetFinanceOverviewResponse.parse(getFinanceOverview()));
+});
+
+router.get("/finance/bookings/:id", (req, res) => {
+  const booking = bookings.find((item) => item.id === text(req.params.id));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found." });
+    return;
+  }
+  const current = getBookingFinance(booking.id) ?? ensureBookingFinance({
+    bookingId: booking.id,
+    grossAmount: booking.amount,
+    currency: booking.currency,
+    platformFee: booking.commissionAmount,
+    providerFee: 0,
+    carrierPayable: booking.carrierPayout,
+  });
+  res.json(GetBookingFinanceResponse.parse({ ...current, payout: current.payout ?? null }));
+});
+
+router.post("/finance/bookings/:id/release", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user || user.role !== "Admin") {
+    res.status(403).json({ error: "Only finance administrators can release carrier payouts." });
+    return;
+  }
+  const booking = bookings.find((item) => item.id === text(req.params.id));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found." });
+    return;
+  }
+  const data = ReleaseBookingPayoutBody.parse(req.body);
+  const current = releasePayout(booking.id, data.reason);
+  if (!current) {
+    res.status(409).json({ error: "This booking is not eligible for payout release. Delivery confirmation must be completed first." });
+    return;
+  }
+  booking.escrowStatus = "Released";
+  releaseHeldPayment(booking.id);
+  await persistDatabaseState();
+  res.json(GetBookingFinanceResponse.parse({ ...current, payout: current.payout ?? null }));
 });
 
 router.get("/reference/eac", (_req, res) => {
@@ -1688,9 +1781,9 @@ router.patch("/bookings/:id/status", async (req, res) => {
   }
   booking.status = data.status;
   if (data.status === "Delivered") {
-    booking.escrowStatus = "Released";
+    booking.escrowStatus = "Held";
     booking.podStatus = "Delivered";
-    releaseHeldPayment(booking.id);
+    markReleaseEligible(booking.id);
   }
   await persistDatabaseState();
   res.json(booking);
@@ -1716,12 +1809,12 @@ router.post("/bookings/:id/complete-delivery", async (req, res) => {
     return;
   }
   booking.status = "Delivered";
-  booking.escrowStatus = "Released";
+  booking.escrowStatus = "Held";
   booking.podStatus = "Delivered";
   booking.deliveryPhoto = text(req.body?.photoName) || undefined;
-  releaseHeldPayment(booking.id);
+  markReleaseEligible(booking.id);
   await persistDatabaseState();
-  res.json({ booking, payoutUnlocked: true });
+  res.json({ booking, payoutUnlocked: false, releaseEligible: true });
 });
 
 router.get("/payments", (_req, res) => {
@@ -1805,6 +1898,16 @@ router.post("/payments/simulate", async (req, res) => {
   booking.paymentNetwork = network as Booking["paymentNetwork"];
   booking.paymentStatus = "Paid";
   booking.escrowStatus = "Held";
+  recordPayment({
+    bookingId: booking.id,
+    paymentId: payment.id,
+    grossAmount: settlementAmount,
+    currency: settlementCurrency,
+    platformFee: commissionAmount,
+    providerFee: fee,
+    carrierPayable: payment.carrierPayout,
+    reference: payment.reference,
+  });
   await persistDatabaseState();
   res.json({ booking, payment, message: `${network} payment simulated and escrow funded.` });
 });
