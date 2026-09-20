@@ -16,15 +16,12 @@ import "leaflet/dist/leaflet.css";
 
 const API_ROOT = (() => {
   const value = String(import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
-  if (!value) return "";
+  if (!value) return "/api";
   return value.endsWith("/api") ? value : `${value}/api`;
 })();
 const ADMIN_PREVIEW_STORAGE_KEY = "truckshare_admin_preview";
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  if (!API_ROOT) {
-    throw new Error("The API is not configured. Add VITE_API_URL in Vercel and redeploy.");
-  }
   let response: Response;
   try {
     const token = typeof window !== "undefined" ? localStorage.getItem("truckshare_token") : null;
