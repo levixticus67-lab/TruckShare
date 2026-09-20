@@ -49,15 +49,19 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return body as T;
 }
 
-function useApi<T>(path: string, initial: T) {
+function useApi<T>(path: string, initial: T, enabled = true) {
   const [data, setData] = useState<T>(initial);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const reload = () => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     api<T>(path).then(setData).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Unable to load data.")).finally(() => setLoading(false));
   };
-  useEffect(reload, [path]);
+  useEffect(reload, [path, enabled]);
   return { data, loading, error, reload, setData };
 }
 
@@ -70,6 +74,10 @@ type DashboardData = { activeTrips: number; availableLoads: number; inTransit: n
 type EacReference = { countries: { code: string; name: string; currency: string }[]; corridors: { origin: string; originCountry: string; destination: string; destinationCountry: string; border: string }[] };
 type BorderMilestone = { id: string; bookingId: string; sequence: number; country: string; checkpoint: string; status: string; requiredDocuments: string[]; updatedAt: string };
 type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: string; amount: number; payerAmount?: number; currency: string; settlementAmount: number; settlementCurrency: string; exchangeRate: number; fee: number; commissionAmount: number; carrierPayout: number; indicative: boolean; expiresInSeconds: number };
+type FinanceOverview = { currency: string; totalCollected: number; platformRevenue: number; providerFees: number; carrierFundsPendingRelease: number; payoutsDue: number; payoutsCompleted: number; refundsPending: number; reconciliationRequired: number; bookingsFunded: number };
+type FinanceLedgerEntry = { id: string; account: string; entryType: string; direction: string; amount: number; currency: string; reference: string; idempotencyKey: string; createdAt: string };
+type FinancePayout = { id: string; bookingId: string; amount: number; currency: string; provider: string; providerTransferId?: string; status: string; releaseReason?: string; createdAt: string; completedAt?: string };
+type BookingFinance = { bookingId: string; grossAmount: number; currency: string; platformFee: number; providerFee: number; carrierPayable: number; paymentState: string; escrowState: string; payoutState: string; ledgerEntries: FinanceLedgerEntry[]; payout: FinancePayout | null; timeline: { state: string; label: string; occurredAt: string }[] };
 type WorkspaceRole = "Carrier" | "Shipper" | "Admin";
 type AuthUser = { id: string; name: string; phone?: string; email?: string; country: string; role: WorkspaceRole; roles?: Array<"Carrier" | "Shipper">; verified: boolean; hasPassword?: boolean };
 type BrokerSuggestion = { id: string; kind: "Load" | "Trip"; title: string; counterpart: string; corridor: string; date: string; price: number; compatibility: number };
@@ -149,7 +157,7 @@ const nav = [
   ["/matches", "Find a match", Gauge], ["/bookings", "My bookings", LockKeyhole], ["/tracking", "Track delivery", MapPin],
   ["/messages", "Messages", MessageSquare], ["/account", "My account", UserRound],
   ["/documents", "Documents", FileCheck2], ["/verification", "Verify account", ShieldCheck],
-  ["/admin", "Admin", UsersRound], ["/payments", "Payments", Banknote], ["/regional", "Routes & countries", Globe2],
+  ["/admin", "Admin", UsersRound], ["/finance", "Finance", BarChart3], ["/payments", "Payments", Banknote], ["/regional", "Routes & countries", Globe2],
 ] as const;
 
 function navLabel(href: string, role: WorkspaceRole) {
@@ -195,8 +203,9 @@ function Shell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setAuthLoading(true);
     const params = new URLSearchParams(window.location.search);
-    const adminPreview = params.get("admin_preview") === "1" && localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1";
+    const adminPreview = params.get("admin_preview") === "1" && (localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1" || import.meta.env.DEV);
     if (adminPreview) {
+      if (import.meta.env.DEV) localStorage.setItem(ADMIN_PREVIEW_STORAGE_KEY, "1");
       setRole("Admin");
       setAuthUser({ id: "admin-preview", name: "Admin Preview", email: "admin-preview@localhost", country: "UG", role: "Admin", verified: true });
       setAuthLoading(false);
@@ -235,10 +244,10 @@ function Shell({ children }: { children: ReactNode }) {
     navigate(nextRole === "Carrier" ? "/trips" : nextRole === "Shipper" ? "/freight" : "/admin");
   };
   const visibleNav = nav.filter(([href]) => role === "Carrier"
-    ? ["/", "/trips", "/bookings", "/tracking", "/messages", "/account", "/documents", "/verification", "/payments", "/regional"].includes(href)
+    ? ["/", "/trips", "/bookings", "/tracking", "/messages", "/account", "/documents", "/verification", "/finance", "/payments", "/regional"].includes(href)
     : role === "Shipper"
-      ? ["/", "/freight", "/bookings", "/tracking", "/messages", "/account", "/documents", "/verification", "/payments", "/regional"].includes(href)
-      : ["/", "/admin", "/bookings", "/account", "/messages", "/regional"].includes(href));
+      ? ["/", "/freight", "/bookings", "/tracking", "/messages", "/account", "/documents", "/verification", "/finance", "/payments", "/regional"].includes(href)
+      : ["/", "/admin", "/finance", "/bookings", "/account", "/messages", "/regional"].includes(href));
   const primaryHrefs = role === "Carrier"
     ? ["/", "/trips", "/bookings", "/messages"]
     : role === "Shipper"
@@ -1314,7 +1323,7 @@ const previewAdminOperations: AdminOperations = {
 };
 
 function AdminPage() {
-  const adminPreview = typeof window !== "undefined" && localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1";
+  const adminPreview = typeof window !== "undefined" && (localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1" || (import.meta.env.DEV && new URLSearchParams(window.location.search).get("admin_preview") === "1"));
   const previewUser: AuthUser = { id: "admin-preview", name: "Admin Preview", email: "admin-preview@localhost", country: "UG", role: "Admin", verified: true };
   const emptyOperations: AdminOperations = { requests: [], activities: [], verifications: [], metrics: { totalOpen: 0, newSubmissions: 0, needsAttention: 0, matching: 0, activeOperations: 0, pendingVerifications: 0, activeBookings: 0, grossVolume: 0, commissionValue: 0, unpaidBookings: 0, borderIssues: 0 } };
   const auth = useApi<{ user: AuthUser | null }>("/auth/me", { user: adminPreview ? previewUser : null });
@@ -1447,6 +1456,177 @@ function EacNetworkPage() {
   return <div className="space-y-6"><Header eyebrow="Regional operations" title="EAC network control" detail="See the supported settlement currencies, starter corridors, and customs handoffs that make cross-border bookings operational." /><ContextImage src="/branding/story/border-queue.jpg" alt="Line of freight trucks waiting at a border checkpoint" eyebrow="Across the region" title="Routes, borders, and handoffs in one connected network." /><Card><div className="mb-4 flex items-center justify-between"><div><p className={labelClass}>Network map</p><h3 className="mt-1 font-display text-xl font-semibold">Routes across East Africa</h3><p className="mt-1 text-xs text-muted-foreground">Starter corridors from the TruckShare network.</p></div><Globe2 className="text-accent-foreground" size={22} /></div><EacNetworkMap /></Card><div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]"><Card><div className="flex items-center justify-between"><div><p className={labelClass}>Supported markets</p><h3 className="mt-1 font-display text-xl font-semibold">{reference.data.countries.length} countries · local currencies</h3></div><Globe2 className="text-accent-foreground" size={22} /></div><div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">{reference.data.countries.map((country) => <div key={country.code} className="rounded-lg border border-border bg-muted/40 p-3"><p className="font-mono-ui text-[10px] font-bold text-accent-foreground">{country.code}</p><p className="mt-1 text-xs font-semibold">{country.name}</p><p className="mt-1 text-[10px] text-muted-foreground">{country.currency}</p></div>)}</div></Card><Card className="border-primary/15 bg-[#e5eee9] text-primary"><p className={labelClass}>Settlement foundation</p><h3 className="mt-1 font-display text-xl font-semibold">Quote before you collect</h3><p className="mt-3 text-sm leading-relaxed text-primary/70">Every payment can carry a payer country, payee country, source currency, settlement currency, indicative FX rate, and transparent fee split.</p><Link href="/payments" className={`${button} mt-5`}>Open regional checkout <ArrowRight size={14} /></Link></Card></div><Card><div className="mb-5 flex items-center justify-between"><div><p className={labelClass}>Starter corridors</p><h3 className="mt-1 font-display text-xl font-semibold">Border-aware routes</h3></div><RouteIcon className="text-accent-foreground" size={20} /></div><div className="grid gap-3 md:grid-cols-2">{reference.data.corridors.map((corridor) => <div key={`${corridor.originCountry}-${corridor.destinationCountry}`} className="rounded-lg border border-border p-4"><div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">{corridor.origin} <span className="text-accent-foreground">→</span> {corridor.destination}</p><span className="font-mono-ui text-[9px] font-bold text-muted-foreground">{corridor.originCountry}/{corridor.destinationCountry}</span></div><p className="mt-2 text-xs text-muted-foreground">Border checkpoints: {corridor.border}</p></div>)}</div></Card><Card><div className="mb-5 flex items-center justify-between"><div><p className={labelClass}>Customs handoff</p><h3 className="mt-1 font-display text-xl font-semibold">Booking {bookingId} milestones</h3></div><Status value={milestones.data.length ? milestones.data[milestones.data.length - 1].status : "Planned"} /></div>{milestones.data.length ? <div className="grid gap-3 md:grid-cols-2">{milestones.data.map((milestone) => <div key={milestone.id} className="rounded-lg border border-border p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold">{milestone.checkpoint}</p><p className="mt-1 text-[11px] text-muted-foreground">{milestone.country} · {milestone.requiredDocuments.length} required documents</p></div><Status value={milestone.status} /></div></div>)}</div> : <p className="text-sm text-muted-foreground">No border milestones have been recorded for this booking yet.</p>}</Card></div>;
 }
 
+function FinanceOperationsPage() {
+  const role = useRole();
+  const adminPreview = typeof window !== "undefined" && localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1";
+  const previewBooking: Booking = {
+    id: "booking-1",
+    tripId: "trip-3",
+    freightId: "load-3",
+    corridor: "Malaba → Kampala",
+    originCountry: "UG",
+    destinationCountry: "UG",
+    amount: 1320000,
+    currency: "UGX",
+    commissionAmount: 158400,
+    carrierPayout: 1161600,
+    paymentStatus: "Paid",
+    escrowStatus: "Held",
+    status: "Delivered",
+    bookedAt: "2026-08-26",
+    podStatus: "Verified",
+  };
+  const previewOverview: FinanceOverview = {
+    currency: "UGX",
+    totalCollected: 1320000,
+    platformRevenue: 158400,
+    providerFees: 26400,
+    carrierFundsPendingRelease: 1161600,
+    payoutsDue: 1161600,
+    payoutsCompleted: 0,
+    refundsPending: 0,
+    reconciliationRequired: 0,
+    bookingsFunded: 1,
+  };
+  const previewFinance: BookingFinance = {
+    bookingId: "booking-1",
+    grossAmount: 1320000,
+    currency: "UGX",
+    platformFee: 158400,
+    providerFee: 26400,
+    carrierPayable: 1161600,
+    paymentState: "PAYMENT_VERIFIED",
+    escrowState: "RELEASE_ELIGIBLE",
+    payoutState: "PENDING_RELEASE",
+    ledgerEntries: [
+      { id: "ledger-payment", account: "flutterwave_collection", entryType: "CUSTOMER_PAYMENT", direction: "debit", amount: 1320000, currency: "UGX", reference: "FLW-DEMO-4001", idempotencyKey: "payment:demo:collection", createdAt: "2026-08-26T08:42:00.000Z" },
+      { id: "ledger-liability", account: "carrier_payable", entryType: "CARRIER_LIABILITY", direction: "credit", amount: 1161600, currency: "UGX", reference: "FLW-DEMO-4001", idempotencyKey: "payment:demo:carrier", createdAt: "2026-08-26T08:42:00.000Z" },
+      { id: "ledger-revenue", account: "truckshare_revenue", entryType: "PLATFORM_REVENUE", direction: "credit", amount: 158400, currency: "UGX", reference: "FLW-DEMO-4001", idempotencyKey: "payment:demo:revenue", createdAt: "2026-08-26T08:42:00.000Z" },
+    ],
+    payout: null,
+    timeline: [
+      { state: "PAYMENT_VERIFIED", label: "Payment verified", occurredAt: "2026-08-26T08:42:00.000Z" },
+      { state: "FUNDS_HELD", label: "Carrier funds held pending delivery confirmation", occurredAt: "2026-08-26T08:42:00.000Z" },
+      { state: "RELEASE_ELIGIBLE", label: "Delivery verified; payout is awaiting release approval", occurredAt: "2026-08-26T11:18:00.000Z" },
+    ],
+  };
+  const bookings = useApi<Booking[]>("/bookings", adminPreview ? [previewBooking] : [], !adminPreview);
+  const [overview, setOverview] = useState<FinanceOverview>(previewOverview);
+  const [overviewLoading, setOverviewLoading] = useState(role === "Admin" && !adminPreview);
+  const [overviewError, setOverviewError] = useState("");
+  const [financeRows, setFinanceRows] = useState<BookingFinance[]>(adminPreview ? [previewFinance] : []);
+  const [financeLoading, setFinanceLoading] = useState(!adminPreview);
+  const [financeError, setFinanceError] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [releaseReason, setReleaseReason] = useState("Delivery confirmation and broker review completed.");
+  const [feedback, setFeedback] = useState("");
+
+  useEffect(() => {
+    if (role !== "Admin") {
+      setOverviewLoading(false);
+      return;
+    }
+    if (adminPreview) {
+      setOverview(previewOverview);
+      setOverviewLoading(false);
+      return;
+    }
+    setOverviewLoading(true);
+    setOverviewError("");
+    api<FinanceOverview>("/finance/overview")
+      .then(setOverview)
+      .catch((reason: unknown) => setOverviewError(reason instanceof Error ? reason.message : "Finance overview could not be loaded."))
+      .finally(() => setOverviewLoading(false));
+  }, [role, adminPreview]);
+
+  useEffect(() => {
+    if (adminPreview) {
+      setFinanceRows([previewFinance]);
+      setFinanceLoading(false);
+      return;
+    }
+    if (!bookings.data.length) {
+      setFinanceRows([]);
+      setFinanceLoading(false);
+      return;
+    }
+    let active = true;
+    setFinanceLoading(true);
+    setFinanceError("");
+    Promise.all(bookings.data.map((booking) => api<BookingFinance>(`/finance/bookings/${booking.id}`)))
+      .then((rows) => {
+        if (active) setFinanceRows(rows);
+      })
+      .catch((reason: unknown) => {
+        if (active) setFinanceError(reason instanceof Error ? reason.message : "Booking finance details could not be loaded.");
+      })
+      .finally(() => {
+        if (active) setFinanceLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [bookings.data, adminPreview]);
+
+  useEffect(() => {
+    setSelectedId((current) => financeRows.some((row) => row.bookingId === current) ? current : financeRows[0]?.bookingId || "");
+  }, [financeRows]);
+
+  const selected = financeRows.find((row) => row.bookingId === selectedId) || financeRows[0];
+  const selectedBooking = bookings.data.find((booking) => booking.id === selected?.bookingId) || previewBooking;
+  const prettyState = (value: string) => value.replace(/_/g, " ").toLowerCase().replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
+  const roleCopy = {
+    Admin: { eyebrow: "Finance operations", title: "Money control center", detail: "Review collections, carrier liabilities, payout releases, refunds, and reconciliation exceptions." },
+    Carrier: { eyebrow: "Carrier finance", title: "Expected payouts", detail: "Track the booking value assigned to you, release requirements, and transfer status." },
+    Shipper: { eyebrow: "Shipper finance", title: "Invoices & payments", detail: "See what you paid, where the money is held, and the current refund or dispute state." },
+  }[role];
+  const release = async () => {
+    if (!selected || role !== "Admin") return;
+    if (adminPreview) {
+      setFeedback("Preview only — payout release is not connected to production data.");
+      return;
+    }
+    if (releaseReason.trim().length < 3) {
+      setFeedback("Add a release reason before approving this payout.");
+      return;
+    }
+    try {
+      const updated = await api<BookingFinance>(`/finance/bookings/${selected.bookingId}/release`, {
+        method: "POST",
+        body: JSON.stringify({ reason: releaseReason.trim() }),
+      });
+      setFinanceRows((rows) => rows.map((row) => row.bookingId === updated.bookingId ? updated : row));
+      setOverview((current) => ({
+        ...current,
+        payoutsDue: Math.max(0, current.payoutsDue - selected.carrierPayable),
+        payoutsCompleted: current.payoutsCompleted + selected.carrierPayable,
+        carrierFundsPendingRelease: Math.max(0, current.carrierFundsPendingRelease - selected.carrierPayable),
+      }));
+      setFeedback("Payout released and the finance ledger was updated.");
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "Payout release failed.");
+    }
+  };
+  const accessError = bookings.error && !bookings.data.length ? bookings.error : financeError;
+
+  return <div className="space-y-6">
+    <Header eyebrow={roleCopy.eyebrow} title={roleCopy.title} detail={roleCopy.detail} />
+    {role === "Admin" && <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <Stat label="Total collected" value={overviewLoading ? "…" : money(overview.totalCollected, overview.currency)} note={`${overview.bookingsFunded} funded booking${overview.bookingsFunded === 1 ? "" : "s"}`} icon={Banknote} accent />
+      <Stat label="Carrier funds pending" value={overviewLoading ? "…" : money(overview.carrierFundsPendingRelease, overview.currency)} note="Liability awaiting release" icon={LockKeyhole} />
+      <Stat label="Platform revenue" value={overviewLoading ? "…" : money(overview.platformRevenue, overview.currency)} note="TruckShare fee earned" icon={BarChart3} />
+      <Stat label="Payouts due" value={overviewLoading ? "…" : money(overview.payoutsDue, overview.currency)} note={`${overview.refundsPending} refunds pending`} icon={Send} />
+    </div>}
+    {role === "Admin" && <Card><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-border p-4"><p className={labelClass}>Provider fees</p><p className="mt-2 font-display text-xl font-semibold">{money(overview.providerFees, overview.currency)}</p><p className="mt-1 text-xs text-muted-foreground">Tracked separately from revenue</p></div><div className="rounded-lg border border-border p-4"><p className={labelClass}>Payouts completed</p><p className="mt-2 font-display text-xl font-semibold">{money(overview.payoutsCompleted, overview.currency)}</p><p className="mt-1 text-xs text-muted-foreground">Flutterwave transfer value</p></div><div className={`rounded-lg border p-4 ${overview.reconciliationRequired ? "border-[#e4b4a9] bg-[#fbefeb]" : "border-border"}`}><p className={labelClass}>Reconciliation</p><p className="mt-2 font-display text-xl font-semibold">{overview.reconciliationRequired}</p><p className="mt-1 text-xs text-muted-foreground">{overview.reconciliationRequired ? "Settlement mismatches need review" : "No settlement mismatches"}</p></div></div></Card>}
+    {feedback && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{feedback}</div>}
+    {accessError && !financeLoading && <Card><div className="flex items-start gap-3"><CircleAlert className="mt-0.5 text-[#ad4339]" size={18} /><div><p className="font-semibold">Finance data is not available yet</p><p className="mt-1 text-sm text-muted-foreground">{accessError}</p><button type="button" onClick={() => bookings.reload()} className={`${secondaryButton} mt-4`}>Retry</button></div></div></Card>}
+    {financeLoading ? <Loading error="" retry={() => bookings.reload()} /> : financeRows.length === 0 && !accessError ? <Card><div className="py-8 text-center"><Banknote className="mx-auto text-muted-foreground" size={24} /><p className="mt-3 font-display text-xl font-semibold">No finance records yet</p><p className="mt-1 text-sm text-muted-foreground">{role === "Admin" ? "Funded bookings and payout exceptions will appear here." : "Your booking finance details will appear after a booking is created."}</p><Link href="/bookings" className={`${button} mt-5`}>Open bookings <ArrowRight size={14} /></Link></div></Card> : <div className="grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
+      <Card><div className="mb-4 flex items-center justify-between gap-3"><div><p className={labelClass}>{role === "Admin" ? "Finance queue" : role === "Carrier" ? "Bookings connected to payout" : "Your payment records"}</p><h3 className="mt-1 font-display text-xl font-semibold">{financeRows.length} booking{financeRows.length === 1 ? "" : "s"}</h3></div><RefreshCw size={18} className="text-muted-foreground" /></div><div className="space-y-3">{financeRows.map((row) => { const booking = bookings.data.find((item) => item.id === row.bookingId) || previewBooking; return <button type="button" key={row.bookingId} onClick={() => setSelectedId(row.bookingId)} className={`w-full rounded-xl border p-4 text-left transition ${selected?.bookingId === row.bookingId ? "border-accent bg-accent/10" : "border-border hover:border-primary/30 hover:bg-muted/30"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-bold">{booking.corridor}</p><p className="mt-1 text-[11px] text-muted-foreground">Booking {booking.id} · {dateFmt(booking.bookedAt)}</p></div><Status value={prettyState(role === "Shipper" ? row.paymentState : role === "Carrier" ? row.payoutState : row.escrowState)} /></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><p className={labelClass}>{role === "Carrier" ? "Expected payout" : "Booking value"}</p><p className="font-semibold">{money(role === "Carrier" ? row.carrierPayable : row.grossAmount, row.currency)}</p></div><div><p className={labelClass}>{role === "Admin" ? "Platform fee" : role === "Carrier" ? "Release condition" : "TruckShare fee"}</p><p className="font-semibold">{role === "Admin" ? money(row.platformFee, row.currency) : role === "Carrier" ? (booking.podStatus === "Verified" || row.escrowState === "RELEASE_ELIGIBLE" ? "Delivery verified" : "Delivery confirmation") : money(row.platformFee, row.currency)}</p></div></div></button>; })}</div></Card>
+      {selected && <Card><div className="flex items-start justify-between gap-3"><div><p className={labelClass}>Booking finance detail</p><h3 className="mt-1 font-display text-xl font-semibold">{selectedBooking.corridor}</h3><p className="mt-1 text-xs text-muted-foreground">Ledger-backed status for {selected.bookingId}</p></div><Status value={prettyState(selected.paymentState)} /></div><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4"><div><p className={labelClass}>Gross</p><p className="font-semibold">{money(selected.grossAmount, selected.currency)}</p></div><div><p className={labelClass}>Provider fee</p><p className="font-semibold">{money(selected.providerFee, selected.currency)}</p></div><div><p className={labelClass}>TruckShare</p><p className="font-semibold">{money(selected.platformFee, selected.currency)}</p></div><div><p className={labelClass}>Carrier payable</p><p className="font-semibold">{money(selected.carrierPayable, selected.currency)}</p></div></div><div className="mt-6 grid gap-5 lg:grid-cols-[.9fr_1.1fr]"><div><p className={labelClass}>Status timeline</p><div className="mt-3 space-y-3">{selected.timeline.map((item) => <div key={`${item.state}-${item.occurredAt}`} className="flex gap-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent-foreground" /><div><p className="text-sm font-semibold">{item.label}</p><p className="text-[11px] text-muted-foreground">{dateFmt(item.occurredAt)}</p></div></div>)}</div></div><div><p className={labelClass}>Ledger entries</p><div className="mt-3 space-y-2">{selected.ledgerEntries.slice().reverse().map((entry) => <div key={entry.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-xs"><div><p className="font-semibold">{prettyState(entry.entryType)}</p><p className="mt-1 text-[10px] text-muted-foreground">{entry.account} · {entry.reference}</p></div><span className="font-semibold">{entry.direction === "debit" ? "−" : "+"}{money(entry.amount, entry.currency)}</span></div>)}</div></div></div>{role === "Carrier" && <div className="mt-5 rounded-lg border border-accent/30 bg-[#fff5e3] p-4 text-sm"><p className="font-semibold">Release requirements</p><p className="mt-1 text-xs text-muted-foreground">Payout is released only after delivery OTP/photo confirmation and broker approval. Current state: {prettyState(selected.escrowState)}.</p></div>}{role === "Shipper" && <div className="mt-5 rounded-lg border border-border bg-muted/30 p-4 text-sm"><p className="font-semibold">Refund or dispute status</p><p className="mt-1 text-xs text-muted-foreground">{selected.paymentState === "REFUND_PENDING" ? "A refund is being processed." : selected.paymentState === "REFUNDED" ? "This payment has been refunded." : selected.paymentState === "DISPUTED" ? "This payment is under dispute review." : "No refund or dispute is currently recorded."}</p><Link href="/payments" className={`${secondaryButton} mt-3`}>Open payment center <ArrowRight size={14} /></Link></div>}{role === "Admin" && <div className="mt-5 rounded-lg border border-primary/15 bg-[#e5eee9] p-4 text-primary"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div className="min-w-0 flex-1"><p className="font-semibold">Guarded payout release</p><p className="mt-1 text-xs text-primary/70">Only eligible, payment-verified bookings can be released. The reason is saved with the payout audit trail.</p><input className={`${input} mt-3 bg-white/60`} value={releaseReason} onChange={(event) => setReleaseReason(event.target.value)} aria-label="Payout release reason" /></div><button type="button" onClick={release} disabled={selected.escrowState !== "RELEASE_ELIGIBLE" && selected.escrowState !== "PAYOUT_PENDING"} className={`${button} shrink-0`}>{selected.payoutState === "COMPLETED" ? "Already released" : "Release payout"} <Send size={14} /></button></div></div>}</Card>}
+    </div>}
+  </div>;
+}
+
 function HomePage() {
   const role = useRole();
   const bookings = useApi<Booking[]>("/bookings", []);
@@ -1547,5 +1727,5 @@ function AccountPage() {
   </div>;
 }
 
-function Router() { return <ErrorBoundary resetKey={useLocation()[0]}><Shell><Switch><Route path="/" component={HomePage} /><Route path="/trips" component={TripsPage} /><Route path="/freight" component={FreightPage} /><Route path="/matches" component={MatchesPage} /><Route path="/bookings" component={BookingsPage} /><Route path="/tracking" component={TrackingPage} /><Route path="/messages" component={MessagesPage} /><Route path="/account" component={AccountPage} /><Route path="/documents" component={DocumentsPage} /><Route path="/verification" component={VerificationPage} /><Route path="/admin" component={AdminPage} /><Route path="/payments" component={RegionalPaymentsPage} /><Route path="/regional" component={EacNetworkPage} /><Route component={NotFound} /></Switch></Shell></ErrorBoundary>; }
+function Router() { return <ErrorBoundary resetKey={useLocation()[0]}><Shell><Switch><Route path="/" component={HomePage} /><Route path="/trips" component={TripsPage} /><Route path="/freight" component={FreightPage} /><Route path="/matches" component={MatchesPage} /><Route path="/bookings" component={BookingsPage} /><Route path="/tracking" component={TrackingPage} /><Route path="/messages" component={MessagesPage} /><Route path="/account" component={AccountPage} /><Route path="/documents" component={DocumentsPage} /><Route path="/verification" component={VerificationPage} /><Route path="/admin" component={AdminPage} /><Route path="/finance" component={FinanceOperationsPage} /><Route path="/payments" component={RegionalPaymentsPage} /><Route path="/regional" component={EacNetworkPage} /><Route component={NotFound} /></Switch></Shell></ErrorBoundary>; }
 export default function App() { return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /><InstallPrompt /></WouterRouter>; }

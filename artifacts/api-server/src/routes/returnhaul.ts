@@ -818,6 +818,12 @@ function adminUser(req: Request, res: Response) {
   return user;
 }
 
+function canViewBookingFinance(user: User, booking: Booking) {
+  if (user.role === "Admin") return true;
+  return trips.find((trip) => trip.id === booking.tripId)?.ownerUserId === user.id
+    || freight.find((load) => load.id === booking.freightId)?.ownerUserId === user.id;
+}
+
 function brokerRequestForEntity(kind: BrokerRequestKind, entityId: string) {
   return brokerRequests.find((request) => request.kind === kind && request.entityId === entityId);
 }
@@ -935,9 +941,18 @@ router.get("/finance/overview", (req, res) => {
 });
 
 router.get("/finance/bookings/:id", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in to view booking finance details." });
+    return;
+  }
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!booking) {
     res.status(404).json({ error: "Booking not found." });
+    return;
+  }
+  if (!canViewBookingFinance(user, booking)) {
+    res.status(403).json({ error: "You can only view finance details for your own bookings." });
     return;
   }
   const current = getBookingFinance(booking.id) ?? ensureBookingFinance({
