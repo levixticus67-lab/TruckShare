@@ -266,6 +266,96 @@ export interface PaymentInput {
   currency?: CurrencyCode;
 }
 
+export type PaymentCheckoutInputNetwork = typeof PaymentCheckoutInputNetwork[keyof typeof PaymentCheckoutInputNetwork];
+
+
+export const PaymentCheckoutInputNetwork = {
+  MTN_MoMo: 'MTN MoMo',
+  Airtel_Money: 'Airtel Money',
+  Bank_Transfer: 'Bank Transfer',
+} as const;
+
+export interface PaymentCheckoutInput {
+  bookingId: string;
+  network: PaymentCheckoutInputNetwork;
+  phone: string;
+  payerCountry?: CountryCode;
+  currency?: CurrencyCode;
+}
+
+export type PaymentCheckoutProvider = typeof PaymentCheckoutProvider[keyof typeof PaymentCheckoutProvider];
+
+
+export const PaymentCheckoutProvider = {
+  flutterwave: 'flutterwave',
+} as const;
+
+export type PaymentCheckoutMode = typeof PaymentCheckoutMode[keyof typeof PaymentCheckoutMode];
+
+
+export const PaymentCheckoutMode = {
+  flutterwave: 'flutterwave',
+  simulation: 'simulation',
+} as const;
+
+export type PaymentCheckoutStatus = typeof PaymentCheckoutStatus[keyof typeof PaymentCheckoutStatus];
+
+
+export const PaymentCheckoutStatus = {
+  PENDING: 'PENDING',
+  SIMULATION_PENDING: 'SIMULATION_PENDING',
+} as const;
+
+export interface PaymentCheckout {
+  bookingId: string;
+  provider: PaymentCheckoutProvider;
+  mode: PaymentCheckoutMode;
+  transactionReference: string;
+  checkoutUrl?: string | null;
+  status: PaymentCheckoutStatus;
+}
+
+export interface RefundInput {
+  /** @exclusiveMinimum 0 */
+  amount?: number;
+  /**
+     * @minLength 3
+     * @maxLength 240
+     */
+  reason: string;
+}
+
+export type RefundProvider = typeof RefundProvider[keyof typeof RefundProvider];
+
+
+export const RefundProvider = {
+  flutterwave: 'flutterwave',
+  simulation: 'simulation',
+} as const;
+
+export type RefundStatus = typeof RefundStatus[keyof typeof RefundStatus];
+
+
+export const RefundStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+} as const;
+
+export interface Refund {
+  id: string;
+  paymentId: string;
+  bookingId: string;
+  amount: number;
+  currency: CurrencyCode;
+  provider: RefundProvider;
+  providerRefundId?: string;
+  status: RefundStatus;
+  reason: string;
+  createdAt: string;
+}
+
 export type PaymentNetwork = typeof PaymentNetwork[keyof typeof PaymentNetwork];
 
 
@@ -643,5 +733,12 @@ payeeCountry?: CountryCode;
 export type SimulatePayment200 = {
   booking: Booking;
   payment: Payment;
+};
+
+export type ReceiveFlutterwaveWebhookBody = { [key: string]: unknown };
+
+export type ReceiveFlutterwaveWebhook200 = {
+  received: boolean;
+  duplicate: boolean;
 };
 

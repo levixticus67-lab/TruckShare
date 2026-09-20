@@ -58,6 +58,28 @@ type FinanceTimelineItem = {
   occurredAt: string;
 };
 
+export type FinanceWebhookEvent = {
+  provider: "flutterwave";
+  providerEventId: string;
+  eventType: string;
+  status: "Received" | "Processed" | "Ignored";
+  receivedAt: string;
+  processedAt?: string;
+};
+
+export type FinanceRefund = {
+  id: string;
+  paymentId: string;
+  bookingId: string;
+  amount: number;
+  currency: string;
+  provider: "flutterwave" | "simulation";
+  providerRefundId?: string;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  reason: string;
+  createdAt: string;
+};
+
 type FinanceBookingState = {
   bookingId: string;
   grossAmount: number;
@@ -75,9 +97,11 @@ type FinanceBookingState = {
 
 export type FinanceState = {
   bookings: FinanceBookingState[];
+  webhookEvents: FinanceWebhookEvent[];
+  refunds: FinanceRefund[];
 };
 
-const state: FinanceState = { bookings: [] };
+const state: FinanceState = { bookings: [], webhookEvents: [], refunds: [] };
 
 function view(current: FinanceBookingState) {
   return { ...current, payout: current.payout ?? null };
@@ -287,10 +311,83 @@ export function getFinanceOverview() {
     if (["FUNDS_HELD", "RELEASE_ELIGIBLE"].includes(current.escrowState)) overview.carrierFundsPendingRelease += current.carrierPayable;
     if (current.payoutState === "PENDING_RELEASE") overview.payoutsDue += current.carrierPayable;
     if (current.payoutState === "COMPLETED") overview.payoutsCompleted += current.carrierPayable;
-    if (current.paymentState === "REFUND_PENDING") overview.refundsPending += 1;
-    if (current.paymentState === "PAYMENT_VERIFIED") overview.bookingsFunded += 1;
   }
+  overview.refundsPending = state.refunds.filter((refund) => refund.status === "PENDING" || refund.status === "PROCESSING").length;
   return overview;
+}
+
+export function recordRefund(input: Omit<FinanceRefund, "createdAt">) {
+  const existing = state.refunds.find((refund) => refund.id === input.id);
+  if (existing) return existing;
+  const refund = { ...input, createdAt: now() };
+  state.refunds.push(refund);
+  const current = bookingState(input.bookingId);
+  current.paymentState = input.status === "COMPLETED" ? "REFUNDED" : "REFUND_PENDING";
+  current.escrowState = input.status === "COMPLETED" ? "REFUNDED" : "REFUND_PENDING";
+  timeline(current, current.escrowState, input.status === "COMPLETED" ? "Payment refunded" : "Refund requested");
+  if (input.status === "COMPLETED") {
+    entry(current, {
+      account: "refund_expense",
+      entryType: "REFUND",
+      direction: "debit",
+      amount: input.amount,
+      currency: input.currency,
+      reference: input.id,
+      idempotencyKey: `refund:${input.id}:expense`,
+    });
+    entry(current, {
+      account: "flutterwave_collection",
+      entryType: "REFUND",
+      direction: "credit",
+      amount: input.amount,
+      currency: input.currency,
+      reference: input.id,
+      idempotencyKey: `refund:${input.id}:collection`,
+    });
+  }
+  return refund;
+}
+
+export function getRefund(refundId: string) {
+  return state.refunds.find((refund) => refund.id === refundId);
+}
+
+export function updateRefund(refundId: string, status: FinanceRefund["status"], providerRefundId?: string) {
+  const refund = getRefund(refundId);
+  if (!refund) return undefined;
+  refund.status = status;
+  refund.providerRefundId = providerRefundId ?? refund.providerRefundId;
+  return refund;
+}
+
+export function recordWebhookEvent(input: {
+  providerEventId: string;
+  eventType: string;
+}) {
+  const existing = state.webhookEvents.find(
+    (item) => item.provider === "flutterwave" && item.providerEventId === input.providerEventId,
+  );
+  if (existing) return { event: existing, duplicate: true };
+  const event: FinanceWebhookEvent = {
+    provider: "flutterwave",
+    providerEventId: input.providerEventId,
+    eventType: input.eventType,
+    status: "Received",
+    receivedAt: now(),
+  };
+  state.webhookEvents.push(event);
+  return { event, duplicate: false };
+}
+
+export function completeWebhookEvent(providerEventId: string, status: "Processed" | "Ignored") {
+  const event = state.webhookEvents.find(
+    (item) => item.provider === "flutterwave" && item.providerEventId === providerEventId,
+  );
+  if (event) {
+    event.status = status;
+    event.processedAt = now();
+  }
+  return event;
 }
 
 export function serializeFinanceState() {
@@ -300,9 +397,9 @@ export function serializeFinanceState() {
 export function hydrateFinanceState(value: string) {
   try {
     const parsed = JSON.parse(value) as Partial<FinanceState>;
-    if (Array.isArray(parsed.bookings)) {
-      state.bookings.splice(0, state.bookings.length, ...parsed.bookings);
-    }
+    if (Array.isArray(parsed.bookings)) state.bookings.splice(0, state.bookings.length, ...parsed.bookings);
+    if (Array.isArray(parsed.webhookEvents)) state.webhookEvents.splice(0, state.webhookEvents.length, ...parsed.webhookEvents);
+    if (Array.isArray(parsed.refunds)) state.refunds.splice(0, state.refunds.length, ...parsed.refunds);
   } catch {
     // Invalid persisted finance state should not prevent the app from starting.
   }

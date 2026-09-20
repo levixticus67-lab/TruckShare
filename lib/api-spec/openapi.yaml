@@ -392,6 +392,74 @@ paths:
                 properties:
                   booking: { $ref: "#/components/schemas/Booking" }
                   payment: { $ref: "#/components/schemas/Payment" }
+  /payments/checkout:
+    post:
+      operationId: createPaymentCheckout
+      tags: [payments]
+      summary: Create a Flutterwave checkout or development simulation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentCheckoutInput"
+      responses:
+        "201":
+          description: Checkout created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentCheckout"
+  /payments/{id}/refund:
+    post:
+      operationId: createPaymentRefund
+      tags: [payments]
+      summary: Request a full or partial payment refund
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundInput"
+      responses:
+        "201":
+          description: Refund requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Refund"
+  /webhooks/flutterwave:
+    post:
+      operationId: receiveFlutterwaveWebhook
+      tags: [payments]
+      summary: Receive and idempotently process a Flutterwave webhook
+      parameters:
+        - name: verif-hash
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Webhook accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received, duplicate]
+                properties:
+                  received: { type: boolean }
+                  duplicate: { type: boolean }
+        "401":
+          description: Invalid webhook signature
   /finance/overview:
     get:
       operationId: getFinanceOverview
@@ -692,6 +760,45 @@ components:
         payerCountry: { $ref: "#/components/schemas/CountryCode" }
         amount: { type: number, exclusiveMinimum: 0 }
         currency: { $ref: "#/components/schemas/CurrencyCode" }
+    PaymentCheckoutInput:
+      type: object
+      required: [bookingId, network, phone]
+      properties:
+        bookingId: { type: string }
+        network: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
+        phone: { type: string }
+        payerCountry: { $ref: "#/components/schemas/CountryCode" }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    PaymentCheckout:
+      type: object
+      required: [bookingId, provider, mode, transactionReference, status]
+      properties:
+        bookingId: { type: string }
+        provider: { type: string, enum: [flutterwave] }
+        mode: { type: string, enum: [flutterwave, simulation] }
+        transactionReference: { type: string }
+        checkoutUrl: { type: string, nullable: true }
+        status: { type: string, enum: [PENDING, SIMULATION_PENDING] }
+    RefundInput:
+      type: object
+      required: [reason]
+      properties:
+        amount: { type: number, exclusiveMinimum: 0 }
+        reason: { type: string, minLength: 3, maxLength: 240 }
+    Refund:
+      type: object
+      required: [id, paymentId, bookingId, amount, currency, provider, status, reason, createdAt]
+      properties:
+        id: { type: string }
+        paymentId: { type: string }
+        bookingId: { type: string }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        provider: { type: string, enum: [flutterwave, simulation] }
+        providerRefundId: { type: string }
+        status: { type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED] }
+        reason: { type: string }
+        createdAt: { type: string }
     Payment:
       type: object
       required: [id, bookingId, network, phone, payerCountry, payeeCountry, amount, currency, settlementAmount, settlementCurrency, exchangeRate, commissionAmount, carrierPayout, fee, reference, status, createdAt]
@@ -711,7 +818,7 @@ components:
         carrierPayout: { type: number }
         fee: { type: number }
         reference: { type: string }
-        status: { type: string, enum: [Initiated, Held, Released, Failed] }
+        status: { type: string, enum: [Initiated, Held, Released, Refunded, Failed] }
         createdAt: { type: string }
     PaymentQuote:
       type: object

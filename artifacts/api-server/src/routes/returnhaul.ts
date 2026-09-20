@@ -27,6 +27,11 @@ import {
   GetFinanceOverviewResponse,
   GetBookingFinanceResponse,
   ReleaseBookingPayoutBody,
+  CreatePaymentCheckoutBody,
+  CreatePaymentCheckoutResponse,
+  CreatePaymentRefundBody,
+  CreatePaymentRefundResponse,
+  ReceiveFlutterwaveWebhookResponse,
   UpdateBookingStatusBody,
   UpdateBookingStatusParams,
 } from "@workspace/api-zod";
@@ -38,8 +43,18 @@ import {
   recordPayment,
   releasePayout,
   ensureBookingFinance,
+  completeWebhookEvent,
+  recordRefund,
+  recordWebhookEvent,
   serializeFinanceState,
 } from "../lib/finance";
+import {
+  createCheckout,
+  createRefund,
+  flutterwaveMode,
+  verifyFlutterwaveWebhook,
+  verifyTransaction,
+} from "../lib/flutterwave";
 
 type Trip = {
   id: string;
@@ -116,7 +131,7 @@ type Booking = {
 };
 
 type PaymentNetwork = "MTN MoMo" | "Airtel Money" | "Bank Transfer";
-type PaymentStatus = "Initiated" | "Held" | "Released" | "Failed";
+type PaymentStatus = "Initiated" | "Held" | "Released" | "Refunded" | "Failed";
 type Payment = {
   id: string;
   bookingId: string;
@@ -133,6 +148,8 @@ type Payment = {
   carrierPayout: number;
   fee: number;
   reference: string;
+  providerTransactionId?: string;
+  providerStatus?: string;
   status: PaymentStatus;
   createdAt: string;
 };
@@ -1848,6 +1865,212 @@ router.get("/payments/quote", (req, res) => {
     expiresInSeconds: 300,
     indicative: true,
   });
+});
+
+router.post("/payments/checkout", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in before creating a payment checkout." });
+    return;
+  }
+  const data = CreatePaymentCheckoutBody.parse(req.body);
+  const booking = bookings.find((item) => item.id === data.bookingId);
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found." });
+    return;
+  }
+  if (booking.paymentStatus === "Paid") {
+    res.status(409).json({ error: "This booking has already been funded." });
+    return;
+  }
+  const detectedPayerCountry = phoneCountry(data.phone);
+  if (!detectedPayerCountry) {
+    res.status(400).json({ error: "Use an international phone number with a supported EAC country code." });
+    return;
+  }
+  const payerCountry = data.payerCountry ?? detectedPayerCountry;
+  if (detectedPayerCountry !== payerCountry) {
+    res.status(400).json({ error: "The payer country must match the phone number country code." });
+    return;
+  }
+  const settlementCurrency = booking.currency;
+  const settlementAmount = booking.amount;
+  const payerCurrency = data.currency ?? settlementCurrency;
+  const fee = Math.round(settlementAmount * 0.015);
+  const commissionAmount = Math.round(settlementAmount * 0.12);
+  const existingPayment = payments.find((item) => item.bookingId === booking.id && item.status === "Initiated");
+  if (existingPayment) {
+    res.status(201).json(CreatePaymentCheckoutResponse.parse({
+      bookingId: booking.id,
+      provider: "flutterwave",
+      mode: flutterwaveMode(),
+      transactionReference: existingPayment.reference,
+      checkoutUrl: null,
+      status: flutterwaveMode() === "flutterwave" ? "PENDING" : "SIMULATION_PENDING",
+    }));
+    return;
+  }
+  const transactionReference = `TS-${booking.id}-${randomUUID().slice(0, 12).toUpperCase()}`;
+  try {
+    const checkout = await createCheckout({
+      txRef: transactionReference,
+      amount: convertedAmount(settlementAmount, settlementCurrency, payerCurrency),
+      currency: payerCurrency,
+      email: user.email || `${data.phone.replace(/\D/g, "")}@checkout.truckshare.local`,
+      phoneNumber: data.phone,
+      name: user.name,
+      redirectUrl: process.env.FLW_REDIRECT_URL,
+      paymentOptions: data.network === "Bank Transfer" ? "banktransfer" : "mobilemoney",
+      meta: { bookingId: booking.id },
+    });
+    const payment: Payment = {
+      id: id("payment"),
+      bookingId: booking.id,
+      network: data.network,
+      phone: data.phone,
+      payerCountry,
+      payeeCountry: booking.destinationCountry,
+      amount: convertedAmount(settlementAmount, settlementCurrency, payerCurrency),
+      currency: payerCurrency,
+      settlementAmount,
+      settlementCurrency,
+      exchangeRate: exchangeRate(payerCurrency, settlementCurrency),
+      commissionAmount,
+      carrierPayout: settlementAmount - fee - commissionAmount,
+      fee,
+      reference: checkout.txRef,
+      providerTransactionId: checkout.providerTransactionId,
+      providerStatus: checkout.providerStatus,
+      status: "Initiated",
+      createdAt: nowDate(),
+    };
+    payments.unshift(payment);
+    await persistDatabaseState();
+    res.status(201).json(CreatePaymentCheckoutResponse.parse({
+      bookingId: booking.id,
+      provider: "flutterwave",
+      mode: flutterwaveMode(),
+      transactionReference: checkout.txRef,
+      checkoutUrl: checkout.link ?? null,
+      status: checkout.providerStatus,
+    }));
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : "Payment provider checkout failed." });
+  }
+});
+
+router.post("/payments/:id/refund", async (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  const payment = payments.find((item) => item.id === text(req.params.id));
+  if (!payment) {
+    res.status(404).json({ error: "Payment not found." });
+    return;
+  }
+  const data = CreatePaymentRefundBody.parse(req.body);
+  if (payment.status === "Refunded") {
+    res.status(409).json({ error: "This payment has already been refunded." });
+    return;
+  }
+  const amount = data.amount ?? payment.settlementAmount;
+  if (amount > payment.settlementAmount) {
+    res.status(400).json({ error: "Refund amount cannot exceed the funded amount." });
+    return;
+  }
+  try {
+    if (flutterwaveMode() === "flutterwave" && !payment.providerTransactionId) {
+      res.status(409).json({ error: "The payment has not been verified by Flutterwave yet." });
+      return;
+    }
+    const providerRefund = flutterwaveMode() === "flutterwave"
+      ? await createRefund(payment.providerTransactionId as string, amount)
+      : { id: undefined, status: "COMPLETED", amount, currency: payment.settlementCurrency };
+    const refundId = id("refund");
+    const refundStatus = providerRefund.status === "COMPLETED" ? "COMPLETED" as const : "PROCESSING" as const;
+    const refund = {
+      id: refundId,
+      paymentId: payment.id,
+      bookingId: payment.bookingId,
+      amount,
+      currency: payment.settlementCurrency,
+      provider: flutterwaveMode(),
+      providerRefundId: providerRefund.id,
+      status: refundStatus,
+      reason: data.reason,
+      createdAt: nowDate(),
+    };
+    recordRefund(refund);
+    if (refundStatus === "COMPLETED") {
+      payment.status = "Refunded";
+      const booking = bookings.find((item) => item.id === payment.bookingId);
+      if (booking) {
+        booking.paymentStatus = "Unpaid";
+        booking.escrowStatus = "Pending";
+      }
+    }
+    await persistDatabaseState();
+    res.status(201).json(CreatePaymentRefundResponse.parse(refund));
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : "Payment provider refund failed." });
+  }
+});
+
+router.post("/webhooks/flutterwave", async (req, res) => {
+  if (!verifyFlutterwaveWebhook(text(req.headers["verif-hash"]))) {
+    res.status(401).json({ error: "Invalid Flutterwave webhook signature." });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  const eventType = text(body.event || body["event.type"] || body.type) || "unknown";
+  const data = typeof body.data === "object" && body.data !== null ? body.data as Record<string, unknown> : {};
+  const providerEventId = text(data.id || data.tx_ref || data.reference);
+  if (!providerEventId) {
+    res.status(400).json({ error: "Flutterwave webhook is missing an event identifier." });
+    return;
+  }
+  const result = recordWebhookEvent({ providerEventId, eventType });
+  if (result.duplicate) {
+    res.json(ReceiveFlutterwaveWebhookResponse.parse({ received: true, duplicate: true }));
+    return;
+  }
+  try {
+    if (eventType === "charge.completed" || eventType === "charge.success") {
+      const transactionId = text(data.id);
+      const verified = flutterwaveMode() === "flutterwave" && transactionId
+        ? await verifyTransaction(transactionId)
+        : undefined;
+      const providerStatus = text(verified?.status || data.status).toUpperCase();
+      const transactionReference = text(verified?.txRef || verified?.tx_ref || data.tx_ref || data.reference);
+      const payment = payments.find((item) => item.reference === transactionReference);
+      if (payment && providerStatus === "SUCCESSFUL") {
+        payment.providerTransactionId = transactionId || payment.providerTransactionId;
+        payment.providerStatus = providerStatus;
+        payment.status = "Held";
+        const booking = bookings.find((item) => item.id === payment.bookingId);
+        if (booking) {
+          booking.paymentStatus = "Paid";
+          booking.escrowStatus = "Held";
+        }
+        recordPayment({
+          bookingId: payment.bookingId,
+          paymentId: payment.id,
+          grossAmount: payment.settlementAmount,
+          currency: payment.settlementCurrency,
+          platformFee: payment.commissionAmount,
+          providerFee: payment.fee,
+          carrierPayable: payment.carrierPayout,
+          reference: payment.reference,
+        });
+      }
+    }
+    completeWebhookEvent(providerEventId, "Processed");
+    await persistDatabaseState();
+    res.json(ReceiveFlutterwaveWebhookResponse.parse({ received: true, duplicate: false }));
+  } catch (error) {
+    completeWebhookEvent(providerEventId, "Ignored");
+    await persistDatabaseState();
+    res.status(502).json({ error: error instanceof Error ? error.message : "Flutterwave webhook processing failed." });
+  }
 });
 
 router.post("/payments/simulate", async (req, res) => {

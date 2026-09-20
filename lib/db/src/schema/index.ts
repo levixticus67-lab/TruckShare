@@ -124,6 +124,8 @@ export const paymentsTable = pgTable("returnhaul_payments", {
   carrierPayout: numeric("carrier_payout").notNull(),
   fee: numeric("fee").notNull().default("0"),
   reference: text("reference").notNull().default(""),
+  providerTransactionId: text("provider_transaction_id"),
+  providerStatus: text("provider_status"),
   status: text("status").notNull().default("Simulated"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

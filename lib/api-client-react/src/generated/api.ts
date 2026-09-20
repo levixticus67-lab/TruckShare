@@ -44,8 +44,14 @@ import type {
   Message,
   MessageInput,
   Payment,
+  PaymentCheckout,
+  PaymentCheckoutInput,
   PaymentInput,
   PaymentQuote,
+  ReceiveFlutterwaveWebhook200,
+  ReceiveFlutterwaveWebhookBody,
+  Refund,
+  RefundInput,
   ReleasePayoutInput,
   SimulatePayment200,
   StatusInput,
@@ -1595,6 +1601,220 @@ export const useSimulatePayment = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSimulatePaymentMutationOptions(options));
+    }
+
+export const getCreatePaymentCheckoutUrl = () => {
+
+
+
+
+  return `/api/payments/checkout`
+}
+
+/**
+ * @summary Create a Flutterwave checkout or development simulation
+ */
+export const createPaymentCheckout = async (paymentCheckoutInput: PaymentCheckoutInput, options?: Parameters<typeof customFetch>[1]): Promise<PaymentCheckout> => {
+
+  return customFetch<PaymentCheckout>(getCreatePaymentCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(paymentCheckoutInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePaymentCheckoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPaymentCheckout>>, TError,{data: BodyType<PaymentCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPaymentCheckout>>, TError,{data: BodyType<PaymentCheckoutInput>}, TContext> => {
+
+const mutationKey = ['createPaymentCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPaymentCheckout>>, {data: BodyType<PaymentCheckoutInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPaymentCheckout(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePaymentCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createPaymentCheckout>>>
+    export type CreatePaymentCheckoutMutationBody = BodyType<PaymentCheckoutInput>
+    export type CreatePaymentCheckoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a Flutterwave checkout or development simulation
+ */
+export const useCreatePaymentCheckout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPaymentCheckout>>, TError,{data: BodyType<PaymentCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPaymentCheckout>>,
+        TError,
+        {data: BodyType<PaymentCheckoutInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePaymentCheckoutMutationOptions(options));
+    }
+
+export const getCreatePaymentRefundUrl = (id: string,) => {
+
+
+
+
+  return `/api/payments/${id}/refund`
+}
+
+/**
+ * @summary Request a full or partial payment refund
+ */
+export const createPaymentRefund = async (id: string,
+    refundInput: RefundInput, options?: Parameters<typeof customFetch>[1]): Promise<Refund> => {
+
+  return customFetch<Refund>(getCreatePaymentRefundUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(refundInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePaymentRefundMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPaymentRefund>>, TError,{id: string;data: BodyType<RefundInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPaymentRefund>>, TError,{id: string;data: BodyType<RefundInput>}, TContext> => {
+
+const mutationKey = ['createPaymentRefund'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPaymentRefund>>, {id: string;data: BodyType<RefundInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createPaymentRefund(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePaymentRefundMutationResult = NonNullable<Awaited<ReturnType<typeof createPaymentRefund>>>
+    export type CreatePaymentRefundMutationBody = BodyType<RefundInput>
+    export type CreatePaymentRefundMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Request a full or partial payment refund
+ */
+export const useCreatePaymentRefund = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPaymentRefund>>, TError,{id: string;data: BodyType<RefundInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPaymentRefund>>,
+        TError,
+        {id: string;data: BodyType<RefundInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePaymentRefundMutationOptions(options));
+    }
+
+export const getReceiveFlutterwaveWebhookUrl = () => {
+
+
+
+
+  return `/api/webhooks/flutterwave`
+}
+
+/**
+ * @summary Receive and idempotently process a Flutterwave webhook
+ */
+export const receiveFlutterwaveWebhook = async (receiveFlutterwaveWebhookBody: ReceiveFlutterwaveWebhookBody, options?: Parameters<typeof customFetch>[1]): Promise<ReceiveFlutterwaveWebhook200> => {
+
+  return customFetch<ReceiveFlutterwaveWebhook200>(getReceiveFlutterwaveWebhookUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(receiveFlutterwaveWebhookBody)
+  }
+);}
+
+
+
+
+
+export const getReceiveFlutterwaveWebhookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveFlutterwaveWebhook>>, TError,{data: BodyType<ReceiveFlutterwaveWebhookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof receiveFlutterwaveWebhook>>, TError,{data: BodyType<ReceiveFlutterwaveWebhookBody>}, TContext> => {
+
+const mutationKey = ['receiveFlutterwaveWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof receiveFlutterwaveWebhook>>, {data: BodyType<ReceiveFlutterwaveWebhookBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  receiveFlutterwaveWebhook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReceiveFlutterwaveWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof receiveFlutterwaveWebhook>>>
+    export type ReceiveFlutterwaveWebhookMutationBody = BodyType<ReceiveFlutterwaveWebhookBody>
+    export type ReceiveFlutterwaveWebhookMutationError = ErrorType<void>
+
+    /**
+ * @summary Receive and idempotently process a Flutterwave webhook
+ */
+export const useReceiveFlutterwaveWebhook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveFlutterwaveWebhook>>, TError,{data: BodyType<ReceiveFlutterwaveWebhookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof receiveFlutterwaveWebhook>>,
+        TError,
+        {data: BodyType<ReceiveFlutterwaveWebhookBody>},
+        TContext
+      > => {
+      return useMutation(getReceiveFlutterwaveWebhookMutationOptions(options));
     }
 
 export const getGetFinanceOverviewUrl = () => {

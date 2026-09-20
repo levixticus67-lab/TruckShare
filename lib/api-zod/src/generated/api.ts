@@ -701,6 +701,75 @@ export const SimulatePaymentResponse = zod.object({
 
 
 /**
+ * @summary Create a Flutterwave checkout or development simulation
+ */
+export const CreatePaymentCheckoutBody = zod.object({
+  "bookingId": zod.string(),
+  "network": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']),
+  "phone": zod.string(),
+  "payerCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional()
+})
+
+export const CreatePaymentCheckoutResponse = zod.object({
+  "bookingId": zod.string(),
+  "provider": zod.enum(['flutterwave']),
+  "mode": zod.enum(['flutterwave', 'simulation']),
+  "transactionReference": zod.string(),
+  "checkoutUrl": zod.string().nullish(),
+  "status": zod.enum(['PENDING', 'SIMULATION_PENDING'])
+})
+
+
+/**
+ * @summary Request a full or partial payment refund
+ */
+export const CreatePaymentRefundParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const createPaymentRefundBodyAmountExclusiveMin = 0;
+
+export const createPaymentRefundBodyReasonMin = 3;
+export const createPaymentRefundBodyReasonMax = 240;
+
+
+
+export const CreatePaymentRefundBody = zod.object({
+  "amount": zod.number().gt(createPaymentRefundBodyAmountExclusiveMin).optional(),
+  "reason": zod.string().min(createPaymentRefundBodyReasonMin).max(createPaymentRefundBodyReasonMax)
+})
+
+export const CreatePaymentRefundResponse = zod.object({
+  "id": zod.string(),
+  "paymentId": zod.string(),
+  "bookingId": zod.string(),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "provider": zod.enum(['flutterwave', 'simulation']),
+  "providerRefundId": zod.string().optional(),
+  "status": zod.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED']),
+  "reason": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Receive and idempotently process a Flutterwave webhook
+ */
+export const ReceiveFlutterwaveWebhookHeader = zod.object({
+  "verif-hash": zod.string().optional()
+})
+
+export const ReceiveFlutterwaveWebhookBody = zod.record(zod.string(), zod.unknown())
+
+export const ReceiveFlutterwaveWebhookResponse = zod.object({
+  "received": zod.boolean(),
+  "duplicate": zod.boolean()
+})
+
+
+/**
  * @summary Get the finance control overview
  */
 export const GetFinanceOverviewResponse = zod.object({
