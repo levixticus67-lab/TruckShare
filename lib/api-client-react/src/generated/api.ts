@@ -25,6 +25,8 @@ import type {
   BookingInput,
   BorderMilestone,
   BorderMilestoneInput,
+  CompleteDeliveryInput,
+  CompleteDeliveryResponse,
   Dashboard,
   Document,
   DocumentInput,
@@ -53,6 +55,7 @@ import type {
   Refund,
   RefundInput,
   ReleasePayoutInput,
+  RequestPodResponse,
   SimulatePayment200,
   StatusInput,
   Trip,
@@ -1146,6 +1149,149 @@ export const useUpdateBookingStatus = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateBookingStatusMutationOptions(options));
+    }
+
+export const getRequestBookingPodUrl = (id: string,) => {
+
+
+
+
+  return `/api/bookings/${id}/request-pod`
+}
+
+/**
+ * @summary Send a receiver OTP for proof of delivery
+ */
+export const requestBookingPod = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<RequestPodResponse> => {
+
+  return customFetch<RequestPodResponse>(getRequestBookingPodUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRequestBookingPodMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBookingPod>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestBookingPod>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['requestBookingPod'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestBookingPod>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  requestBookingPod(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestBookingPodMutationResult = NonNullable<Awaited<ReturnType<typeof requestBookingPod>>>
+
+    export type RequestBookingPodMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a receiver OTP for proof of delivery
+ */
+export const useRequestBookingPod = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBookingPod>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestBookingPod>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getRequestBookingPodMutationOptions(options));
+    }
+
+export const getCompleteBookingDeliveryUrl = (id: string,) => {
+
+
+
+
+  return `/api/bookings/${id}/complete-delivery`
+}
+
+/**
+ * @summary Confirm delivery with the receiver OTP
+ */
+export const completeBookingDelivery = async (id: string,
+    completeDeliveryInput: CompleteDeliveryInput, options?: Parameters<typeof customFetch>[1]): Promise<CompleteDeliveryResponse> => {
+
+  return customFetch<CompleteDeliveryResponse>(getCompleteBookingDeliveryUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(completeDeliveryInput)
+  }
+);}
+
+
+
+
+
+export const getCompleteBookingDeliveryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeBookingDelivery>>, TError,{id: string;data: BodyType<CompleteDeliveryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeBookingDelivery>>, TError,{id: string;data: BodyType<CompleteDeliveryInput>}, TContext> => {
+
+const mutationKey = ['completeBookingDelivery'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeBookingDelivery>>, {id: string;data: BodyType<CompleteDeliveryInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  completeBookingDelivery(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteBookingDeliveryMutationResult = NonNullable<Awaited<ReturnType<typeof completeBookingDelivery>>>
+    export type CompleteBookingDeliveryMutationBody = BodyType<CompleteDeliveryInput>
+    export type CompleteBookingDeliveryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Confirm delivery with the receiver OTP
+ */
+export const useCompleteBookingDelivery = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeBookingDelivery>>, TError,{id: string;data: BodyType<CompleteDeliveryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeBookingDelivery>>,
+        TError,
+        {id: string;data: BodyType<CompleteDeliveryInput>},
+        TContext
+      > => {
+      return useMutation(getCompleteBookingDeliveryMutationOptions(options));
     }
 
 export const getListBorderMilestonesUrl = (id: string,) => {

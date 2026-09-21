@@ -8,6 +8,7 @@
 import type { BookingEscrowStatus } from './bookingEscrowStatus';
 import type { BookingPaymentNetwork } from './bookingPaymentNetwork';
 import type { BookingPaymentStatus } from './bookingPaymentStatus';
+import type { BookingPodStatus } from './bookingPodStatus';
 import type { CountryCode } from './countryCode';
 import type { CurrencyCode } from './currencyCode';
 
@@ -25,4 +26,6 @@ export interface Booking {
   bookedAt: string;
   paymentNetwork?: BookingPaymentNetwork;
   paymentStatus?: BookingPaymentStatus;
+  podStatus?: BookingPodStatus;
+  deliveryPhoto?: string;
 }

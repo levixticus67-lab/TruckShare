@@ -13,5 +13,6 @@ export const PaymentStatus = {
   Initiated: 'Initiated',
   Held: 'Held',
   Released: 'Released',
+  Refunded: 'Refunded',
   Failed: 'Failed',
 } as const;

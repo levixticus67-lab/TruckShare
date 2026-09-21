@@ -72,8 +72,10 @@ type Match = { id: string; type: "trip" | "freight"; title: string; corridor: st
 type Verification = { id: string; userId: string; name: string; phone: string; nin: string; licenseNumber: string; logbookNumber: string; logbookPhotoName?: string; status: string; submittedAt: string };
 type DashboardData = { activeTrips: number; availableLoads: number; inTransit: number; delivered: number; totalEscrow: number; matchRate: number; recentActivity: { id: string; label: string; detail: string; time: string; tone: string }[] };
 type EacReference = { countries: { code: string; name: string; currency: string }[]; corridors: { origin: string; originCountry: string; destination: string; destinationCountry: string; border: string }[] };
-type BorderMilestone = { id: string; bookingId: string; sequence: number; country: string; checkpoint: string; status: string; requiredDocuments: string[]; updatedAt: string };
+type BorderMilestone = { id: string; bookingId: string; sequence: number; country: string; checkpoint: string; border?: string; status: string; requiredDocuments: string[]; updatedAt?: string; completedAt?: string };
 type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: string; amount: number; payerAmount?: number; currency: string; settlementAmount: number; settlementCurrency: string; exchangeRate: number; fee: number; commissionAmount: number; carrierPayout: number; indicative: boolean; expiresInSeconds: number };
+type PodRequestResponse = { bookingId: string; message: string; devOtp?: string };
+type PodCompleteResponse = { booking: Booking; payoutUnlocked: boolean; releaseEligible: boolean };
 type FinanceOverview = { currency: string; totalCollected: number; platformRevenue: number; providerFees: number; carrierFundsPendingRelease: number; payoutsDue: number; payoutsCompleted: number; refundsPending: number; reconciliationRequired: number; bookingsFunded: number };
 type FinanceLedgerEntry = { id: string; account: string; entryType: string; direction: string; amount: number; currency: string; reference: string; idempotencyKey: string; createdAt: string };
 type FinancePayout = { id: string; bookingId: string; amount: number; currency: string; provider: string; providerTransferId?: string; status: string; releaseReason?: string; createdAt: string; completedAt?: string };
@@ -84,6 +86,27 @@ type BrokerSuggestion = { id: string; kind: "Load" | "Trip"; title: string; coun
 type BrokerActivity = { id: string; requestId?: string; label: string; detail: string; actor: string; createdAt: string };
 type BrokerRequest = { id: string; kind: "Load" | "Trip"; entityId: string; title: string; counterpart: string; corridor: string; date: string; priority: "Low" | "Normal" | "High" | "Urgent"; status: "New" | "Needs information" | "Approved" | "Matching" | "Offer sent" | "Confirmed" | "Assigned" | "In progress" | "On hold" | "Closed" | "Rejected"; assignedTo?: string; proposedMatchId?: string; bookingId?: string; notes: string[]; createdAt: string; updatedAt: string; suggestions: BrokerSuggestion[]; activities?: BrokerActivity[] };
 type CustomerRequest = { id: string; kind: "Load" | "Trip"; title: string; counterpart: string; corridor: string; date: string; priority: "Low" | "Normal" | "High" | "Urgent"; status: BrokerRequest["status"]; bookingId?: string; proposedMatchId?: string; notes: string[]; createdAt: string; updatedAt: string };
+const previewOperationsBooking: Booking = {
+  id: "booking-1",
+  tripId: "trip-3",
+  freightId: "load-3",
+  corridor: "Malaba → Kampala",
+  originCountry: "UG",
+  destinationCountry: "UG",
+  amount: 1320000,
+  currency: "UGX",
+  commissionAmount: 158400,
+  carrierPayout: 1161600,
+  paymentStatus: "Paid",
+  escrowStatus: "Held",
+  status: "At Border",
+  bookedAt: "2026-08-26",
+  podStatus: "Not requested",
+};
+const previewBorderMilestones: BorderMilestone[] = [
+  { id: "milestone-1", bookingId: "booking-1", sequence: 1, checkpoint: "Malaba border", country: "UG", border: "Malaba / Busia", requiredDocuments: ["Commercial invoice", "Packing list"], status: "Documents Pending" },
+];
+const isAdminPreview = () => typeof window !== "undefined" && localStorage.getItem(ADMIN_PREVIEW_STORAGE_KEY) === "1";
 const truckAssetPaths: Record<string, string> = {
   fuso: "/transport/trucks/truck-fuso.png",
   canter: "/transport/trucks/truck-canter.png",
@@ -1247,24 +1270,114 @@ function MatchesPage() {
   return <div className="mx-auto max-w-4xl space-y-6"><Header eyebrow="Broker-managed matching" title="Your request status" detail="TruckShare’s operations team reviews every load or trip, selects the match, and sends the proposed arrangement for confirmation." action={<Link href="/messages" className={button}><MessageSquare size={14} /> Contact operations</Link>} />{feedback && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{feedback}</div>}<Card className="border-primary/15 bg-[#e5eee9] text-primary"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 text-[#28765a]" size={22} /><div><h3 className="font-display text-xl font-semibold">No self-service matching</h3><p className="mt-2 text-sm leading-6 text-primary/70">Your requests stay private while the broker qualifies the details, verifies the counterpart, and controls the final booking.</p></div></div></Card>{query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? <div className="space-y-4">{query.data.map((request) => { const currentStep = flow.indexOf(request.status); return <Card key={request.id} className="request-status-card"><div className="request-status-visual"><img src={request.kind === "Trip" ? truckAsset("Flatbed") : "/branding/story/cargo-loading.jpg"} alt="" /><div><p className={labelClass}>{request.kind === "Trip" ? "Available transport" : "Shipment in review"}</p><p className="font-display text-lg font-semibold">{request.kind === "Trip" ? "Broker is finding a load" : "Broker is finding a carrier"}</p><p className="text-[11px] text-muted-foreground">{request.corridor}</p></div></div><div className="mt-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">{request.kind} request</span><Status value={request.status} /></div><h3 className="mt-2 font-display text-xl font-semibold">{request.title}</h3><p className="mt-1 text-xs text-muted-foreground">{request.counterpart} · {request.corridor} · pickup/departure {dateFmt(request.date)}</p></div><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">Updated {dateFmt(request.updatedAt)}</p></div><div className="mt-5 flex flex-wrap gap-1">{flow.slice(0, 7).map((step, index) => <span key={step} className={`rounded-full px-2 py-1 font-mono-ui text-[9px] font-bold ${index <= currentStep ? "bg-[#e5f1e9] text-[#28765a]" : "bg-muted text-muted-foreground"}`}>{step}</span>)}</div>{request.notes[0] && <div className="mt-4 rounded-lg bg-muted/60 p-3 text-xs leading-5"><span className="font-bold">Next step from operations:</span> {request.notes[0]}</div>}{request.status === "Offer sent" && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-[#fff5e3] p-3"><p className="text-xs font-semibold text-[#8c5b20]">A proposed arrangement is ready for your confirmation.</p><button type="button" onClick={() => void confirm(request)} className={button}><Check size={14} /> Confirm details</button></div>}{request.bookingId && <Link href="/bookings" className={`${secondaryButton} mt-4`}>View broker-managed booking <ArrowRight size={14} /></Link>}</Card>; })}</div> : <Card><div className="py-10 text-center"><p className="font-display text-xl font-semibold">No requests yet</p><p className="mt-2 text-sm text-muted-foreground">Submit a load or trip capacity and the operations desk will track it here.</p><div className="mt-5 flex justify-center gap-2"><Link href="/freight" className={secondaryButton}>Submit a load</Link><Link href="/trips" className={button}>Submit capacity</Link></div></div></Card>}<div className="grid gap-4 md:grid-cols-3"><Card><p className={labelClass}>Step 1</p><h3 className="mt-2 font-display text-lg font-semibold">Submit</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Send route, timing, cargo, or available capacity.</p></Card><Card><p className={labelClass}>Step 2</p><h3 className="mt-2 font-display text-lg font-semibold">Broker review</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">The operations team qualifies the request and finds the best fit.</p></Card><Card><p className={labelClass}>Step 3</p><h3 className="mt-2 font-display text-lg font-semibold">Confirm</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Review the proposed arrangement before it becomes a booking.</p></Card></div></div>;
 }
 
+function DeliveryProofPanel({ booking, onRefresh }: { booking: Booking; onRefresh: () => void }) {
+  const role = useRole();
+  const canManage = (role === "Admin" || role === "Carrier") && !isAdminPreview();
+  const [open, setOpen] = useState(false);
+  const [otpSent, setOtpSent] = useState(booking.podStatus === "OTP sent");
+  const [otp, setOtp] = useState("");
+  const [photoName, setPhotoName] = useState("delivery-proof.jpg");
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!canManage || booking.status === "Delivered") return null;
+  const requestOtp = async () => {
+    setBusy(true);
+    setFeedback("");
+    try {
+      const response = await api<PodRequestResponse>(`/bookings/${booking.id}/request-pod`, { method: "POST", body: "{}" });
+      setOtpSent(true);
+      setFeedback(response.devOtp ? `Development receiver OTP: ${response.devOtp}` : response.message);
+      onRefresh();
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "The receiver OTP could not be sent.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const completeDelivery = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!otp.trim() || busy) return;
+    setBusy(true);
+    setFeedback("");
+    try {
+      const response = await api<PodCompleteResponse>(`/bookings/${booking.id}/complete-delivery`, { method: "POST", body: JSON.stringify({ otp: otp.trim(), photoName: photoName.trim() || undefined }) });
+      setFeedback(response.releaseEligible ? "Delivery verified. The carrier payout is now eligible for release." : "Delivery verified.");
+      setOpen(false);
+      onRefresh();
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "Delivery could not be verified.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <div className="mt-4 rounded-xl border border-accent/30 bg-[#fff8ec] p-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div><p className={labelClass}>Receiver confirmation</p><p className="text-sm font-semibold">Verify delivery before payout release.</p>{feedback && <p className="mt-1 text-xs text-[#8c5b20]">{feedback}</p>}</div>
+      <button type="button" onClick={() => { setOpen((value) => !value); setFeedback(""); }} className={button}><ShieldCheck size={14} /> {open ? "Close verification" : "Verify delivery"}</button>
+    </div>
+    {open && <div className="mt-4 border-t border-accent/20 pt-4">
+      {!otpSent && <div className="flex flex-wrap items-center gap-3"><p className="text-xs text-muted-foreground">Send a one-time code to the receiver once the goods are at the destination.</p><button type="button" disabled={busy} onClick={() => void requestOtp()} className={secondaryButton}>{busy ? "Sending..." : "Send receiver OTP"}</button></div>}
+      {otpSent && <form onSubmit={completeDelivery} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"><label><span className={labelClass}>Receiver OTP</span><input className={input} value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the code" inputMode="numeric" /></label><label><span className={labelClass}>Proof filename</span><input className={input} value={photoName} onChange={(event) => setPhotoName(event.target.value)} placeholder="delivery-proof.jpg" /></label><button type="submit" disabled={busy || !otp.trim()} className={button}>{busy ? "Verifying..." : "Confirm delivery"}</button></form>}
+    </div>}
+  </div>;
+}
+
 function BookingsPage() {
   const role = useRole();
   const admin = role === "Admin";
-  const query = useApi<Booking[]>("/bookings", []);
-  const advance = async (booking: Booking, status: string) => { await api(`/bookings/${booking.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); query.reload(); };
-  const pod = async (booking: Booking) => { const response = await api<{ devOtp?: string }>(`/bookings/${booking.id}/request-pod`, { method: "POST", body: "{}" }); const otp = window.prompt(`Receiver OTP sent. In development use ${response.devOtp || "the receiver's code"}. Enter OTP:`); if (otp) { await api(`/bookings/${booking.id}/complete-delivery`, { method: "POST", body: JSON.stringify({ otp, photoName: "delivery-proof.jpg" }) }); query.reload(); } };
-  return <div className="space-y-6"><Header eyebrow={admin ? "Operations control" : "Broker-managed bookings"} title={admin ? "Bookings & payout control" : "My bookings"} detail={admin ? "Move each assigned load through pickup, transit, border handoff, and verified delivery." : "Review bookings assigned by the broker team. Status changes and payout actions are handled by operations."} action={admin ? <Link href="/payments" className={button}><Banknote size={14} /> Mobile Money checkout</Link> : undefined} /><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="Bookings" value={query.data.length} note="All corridors" icon={ClipboardCheck} /><Stat label="Held in escrow" value={money(query.data.filter((item) => item.escrowStatus === "Held").reduce((sum, item) => sum + item.amount, 0))} note="Protected" icon={LockKeyhole} accent /><Stat label="In transit" value={query.data.filter((item) => /transit|border/i.test(item.status)).length} note="Live handoffs" icon={RouteIcon} /><Stat label="Released" value={money(query.data.filter((item) => item.escrowStatus === "Released").reduce((sum, item) => sum + item.amount, 0))} note="Verified delivery" icon={BadgeCheck} /></div>{query.loading ? <Loading error={query.error} retry={query.reload} /> : <div className="space-y-3">{query.data.map((booking) => <Card key={booking.id} className="booking-card"><div className="booking-card-hero"><img src={truckAsset("Trailer")} alt="" /><div><p className={labelClass}>Assigned transport</p><p className="font-display text-lg font-semibold">{booking.corridor}</p><p className="text-[11px] text-muted-foreground">Broker-managed booking · {booking.status}</p></div></div><div className="mt-5 flex flex-col justify-between gap-4 md:flex-row md:items-center"><div><div className="flex flex-wrap items-center gap-2"><LockKeyhole size={16} className="text-accent-foreground" /><h3 className="text-sm font-bold">{booking.corridor}</h3><Status value={booking.status} /><Status value={booking.escrowStatus} /></div><p className="mt-2 font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{booking.id} · booked {dateFmt(booking.bookedAt)} · {booking.paymentStatus || "Unpaid"}</p></div><div className="flex flex-wrap gap-2">{admin && booking.status !== "Delivered" && <button onClick={() => advance(booking, /pickup/i.test(booking.status) ? "In Transit" : /transit/i.test(booking.status) ? "At Border" : "Delivered")} className={secondaryButton}><ArrowRight size={14} /> Advance status</button>}{admin && booking.status !== "Delivered" && <button onClick={() => pod(booking)} className={button}><ShieldCheck size={14} /> Verify delivery</button>}{booking.status === "Delivered" && <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#28765a]"><Check size={15} /> Payout unlocked</span>}</div></div><div className="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-4"><div><p className={labelClass}>Load value</p><p className="font-display text-lg font-semibold">{money(booking.amount)}</p></div><div><p className={labelClass}>TruckShare 12%</p><p className="font-display text-lg font-semibold">{money(booking.commissionAmount || booking.amount * .12)}</p></div><div><p className={labelClass}>Carrier 88%</p><p className="font-display text-lg font-semibold text-[#28765a]">{money(booking.carrierPayout || booking.amount * .88)}</p></div></div></Card>)}</div>}</div>;
+  const adminPreview = isAdminPreview();
+  const canManage = (role === "Admin" || role === "Carrier") && !adminPreview;
+  const query = useApi<Booking[]>("/bookings", adminPreview ? [previewOperationsBooking] : [], !adminPreview);
+  const advance = async (booking: Booking, status: string) => {
+    try {
+      await api(`/bookings/${booking.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      query.reload();
+    } catch {
+      // The page-level API error remains visible through the next refresh path.
+    }
+  };
+  return <div className="space-y-6"><Header eyebrow={admin ? "Operations control" : "Broker-managed bookings"} title={admin ? "Bookings & payout control" : "My bookings"} detail={admin ? "Move each assigned load through pickup, transit, border handoff, and verified delivery." : "Review bookings assigned by the broker team. Status changes and payout actions are handled by operations."} action={admin ? <Link href="/payments" className={button}><Banknote size={14} /> Mobile Money checkout</Link> : undefined} /><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="Bookings" value={query.data.length} note="All corridors" icon={ClipboardCheck} /><Stat label="Held in escrow" value={money(query.data.filter((item) => item.escrowStatus === "Held").reduce((sum, item) => sum + item.amount, 0))} note="Protected" icon={LockKeyhole} accent /><Stat label="In transit" value={query.data.filter((item) => /transit|border/i.test(item.status)).length} note="Live handoffs" icon={RouteIcon} /><Stat label="Released" value={money(query.data.filter((item) => item.escrowStatus === "Released").reduce((sum, item) => sum + item.amount, 0))} note="Verified delivery" icon={BadgeCheck} /></div>{query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? <div className="space-y-3">{query.data.map((booking) => <Card key={booking.id} className="booking-card"><div className="booking-card-hero"><img src={truckAsset("Trailer")} alt="" /><div><p className={labelClass}>Assigned transport</p><p className="font-display text-lg font-semibold">{booking.corridor}</p><p className="text-[11px] text-muted-foreground">Broker-managed booking · {booking.status}</p></div></div><div className="mt-5 flex flex-col justify-between gap-4 md:flex-row md:items-center"><div><div className="flex flex-wrap items-center gap-2"><LockKeyhole size={16} className="text-accent-foreground" /><h3 className="text-sm font-bold">{booking.corridor}</h3><Status value={booking.status} /><Status value={booking.escrowStatus} /></div><p className="mt-2 font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{booking.id} · booked {dateFmt(booking.bookedAt)} · {booking.paymentStatus || "Unpaid"} · POD {booking.podStatus || "Not requested"}</p></div><div className="flex flex-wrap gap-2">{canManage && booking.status !== "Delivered" && <button onClick={() => void advance(booking, /pickup/i.test(booking.status) ? "In Transit" : /transit/i.test(booking.status) ? "At Border" : "Delivered")} className={secondaryButton}><ArrowRight size={14} /> Advance status</button>}{booking.status === "Delivered" && <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#28765a]"><Check size={15} /> Delivery verified</span>}</div></div><div className="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-4"><div><p className={labelClass}>Load value</p><p className="font-display text-lg font-semibold">{money(booking.amount, booking.currency)}</p></div><div><p className={labelClass}>TruckShare 12%</p><p className="font-display text-lg font-semibold">{money(booking.commissionAmount || booking.amount * .12, booking.currency)}</p></div><div><p className={labelClass}>Carrier 88%</p><p className="font-display text-lg font-semibold text-[#28765a]">{money(booking.carrierPayout || booking.amount * .88, booking.currency)}</p></div></div><DeliveryProofPanel booking={booking} onRefresh={query.reload} /></Card>)}</div> : <Card><div className="py-12 text-center"><p className="font-display text-xl font-semibold">No bookings assigned yet</p><p className="mt-2 text-sm text-muted-foreground">Your broker-managed bookings will appear here once an arrangement is confirmed.</p></div></Card>}</div>;
 }
 
 function TrackingPage() {
-  const query = useApi<Booking[]>("/bookings", []);
-  const active = query.data.find((booking) => booking.status !== "Delivered") || query.data[0];
-  const routeStops: RouteStop[] = [
-    { label: "Malaba pickup", city: "Malaba", country: "Uganda", position: [0.635, 34.255], status: "complete" },
-    { label: "Current position", city: "Jinja", country: "Uganda", position: [0.4479, 33.2026], status: "active" },
-    { label: "Kampala delivery", city: "Kampala", country: "Uganda", position: [0.3476, 32.5825], status: "upcoming" },
-  ];
-  return <div className="space-y-6"><Header eyebrow="Live operations" title="Delivery tracker" detail="Follow pickup, transit, border crossing, and destination handoff from one route view." action={<a href="tel:+256700000000" className={secondaryButton}><Phone size={14} /> Call driver</a>} /><div className="grid gap-5 lg:grid-cols-[1.3fr_.7fr]"><Card><div className="relative"><RouteMap stops={routeStops} height="360px" routing /><div className="pointer-events-none absolute left-4 top-4 z-[500] rounded-lg border border-border bg-card/90 p-3 shadow-sm"><p className="font-mono-ui text-[9px] text-muted-foreground">ACTIVE ROUTE</p><p className="mt-1 font-display text-lg font-semibold">{active?.corridor || "Malaba → Kampala"}</p><p className="mt-1 text-[11px] text-muted-foreground">{active?.status || "Awaiting booking"}</p></div></div><div className="grid grid-cols-3 divide-x divide-border border-t border-border p-4 text-center"><div><MapPin className="mx-auto text-accent-foreground" size={17} /><p className="mt-2 text-[11px] font-bold">Pickup</p></div><div><TruckTypeVisual vehicleType="Trailer" compact /><p className="mt-2 text-[11px] font-bold">In transit</p></div><div><BadgeCheck className="mx-auto text-primary" size={17} /><p className="mt-2 text-[11px] font-bold">Destination</p></div></div></Card><Card><p className={labelClass}>Handoff timeline</p><h3 className="mt-1 font-display text-xl font-semibold">Proof at every step</h3><div className="mt-6 space-y-5">{["En Route to Pickup", "Goods Loaded", "In Transit", "Arrived for Unloading"].map((step, index) => <div key={step} className="flex gap-3"><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${index < 2 ? "bg-[#e4f1ea] text-[#28765a]" : "bg-muted text-muted-foreground"}`}>{index < 2 ? <Check size={14} /> : index + 1}</span><div><p className="text-xs font-bold">{step}</p><p className="mt-1 text-[11px] text-muted-foreground">{index < 2 ? "Recorded" : "Waiting for driver update"}</p></div></div>)}</div><Link href="/bookings" className={`${button} mt-7 w-full`}>Manage handoff <ArrowRight size={14} /></Link></Card></div></div>;
+  const role = useRole();
+  const adminPreview = isAdminPreview();
+  const canManage = (role === "Admin" || role === "Carrier") && !adminPreview;
+  const query = useApi<Booking[]>("/bookings", adminPreview ? [previewOperationsBooking] : [], !adminPreview);
+  const [selectedId, setSelectedId] = useState("");
+  const active = query.data.find((booking) => booking.id === selectedId) || query.data.find((booking) => booking.status !== "Delivered") || query.data[0];
+  const milestones = useApi<BorderMilestone[]>(active ? `/bookings/${active.id}/border-milestones` : "", adminPreview ? previewBorderMilestones : [], Boolean(active) && !adminPreview);
+  const [checkpoint, setCheckpoint] = useState("");
+  const [border, setBorder] = useState("");
+  const [requiredDocuments, setRequiredDocuments] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const baseStops = active ? routeStopsFor(active.corridor.split("→")[0]?.trim() || "", active.originCountry || "", active.corridor.split("→")[1]?.trim() || "", active.destinationCountry || "") : [];
+  const routeStops: RouteStop[] = baseStops.map((stop, index) => ({ ...stop, label: index === 0 ? "Origin" : "Destination", status: active?.status === "Delivered" ? "complete" : index === 0 ? "complete" : "active" }));
+  const updateMilestone = async (milestone: BorderMilestone, status: string) => {
+    try {
+      await api(`/bookings/${milestone.bookingId}/border-milestones/${milestone.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      setFeedback("Border handoff updated.");
+      milestones.reload();
+      query.reload();
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "The border handoff could not be updated.");
+    }
+  };
+  const addMilestone = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!active || !checkpoint.trim() || !canManage) return;
+    try {
+      await api(`/bookings/${active.id}/border-milestones`, { method: "POST", body: JSON.stringify({ checkpoint: checkpoint.trim(), border: border.trim() || undefined, requiredDocuments: requiredDocuments.split(",").map((item) => item.trim()).filter(Boolean), status: requiredDocuments.trim() ? "Documents Pending" : "Planned" }) });
+      setCheckpoint("");
+      setBorder("");
+      setRequiredDocuments("");
+      setFeedback("Border checkpoint added.");
+      milestones.reload();
+    } catch (reason: unknown) {
+      setFeedback(reason instanceof Error ? reason.message : "The border checkpoint could not be added.");
+    }
+  };
+  return <div className="space-y-6"><Header eyebrow="Live operations" title="Delivery tracker" detail="Follow each assigned booking, border checkpoint, required document, and verified destination handoff." action={<a href="tel:+256700000000" className={secondaryButton}><Phone size={14} /> Call driver</a>} />{query.loading ? <Loading error={query.error} retry={query.reload} /> : !active ? <Card><div className="py-12 text-center"><MapPin className="mx-auto text-muted-foreground" size={28} /><p className="mt-3 font-display text-xl font-semibold">No active delivery</p><p className="mt-2 text-sm text-muted-foreground">A broker-managed booking will appear here once it is assigned.</p></div></Card> : <><Card><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className={labelClass}>Selected booking</p><h3 className="mt-1 font-display text-xl font-semibold">{active.corridor}</h3><p className="mt-1 text-xs text-muted-foreground">{active.id} · {active.status} · POD {active.podStatus || "Not requested"}</p></div>{query.data.length > 1 && <label className="sm:min-w-[260px]"><span className={labelClass}>Switch booking</span><select className={input} value={active.id} onChange={(event) => setSelectedId(event.target.value)}>{query.data.map((booking) => <option key={booking.id} value={booking.id}>{booking.corridor} · {booking.status}</option>)}</select></label>}</div></Card><div className="grid gap-5 lg:grid-cols-[1.3fr_.7fr]"><Card><div className="relative">{routeStops.length ? <RouteMap stops={routeStops} height="360px" routing /> : <div className="flex h-[360px] items-center justify-center rounded-xl bg-muted text-sm text-muted-foreground">Route coordinates are not available for this corridor yet.</div>}<div className="pointer-events-none absolute left-4 top-4 z-[500] rounded-lg border border-border bg-card/90 p-3 shadow-sm"><p className="font-mono-ui text-[9px] text-muted-foreground">ACTIVE ROUTE</p><p className="mt-1 font-display text-lg font-semibold">{active.corridor}</p><p className="mt-1 text-[11px] text-muted-foreground">{active.status}</p></div></div><div className="grid grid-cols-3 divide-x divide-border border-t border-border p-4 text-center"><div><MapPin className="mx-auto text-accent-foreground" size={17} /><p className="mt-2 text-[11px] font-bold">Pickup</p></div><div><TruckTypeVisual vehicleType="Trailer" compact /><p className="mt-2 text-[11px] font-bold">{/border/i.test(active.status) ? "At border" : active.status}</p></div><div><BadgeCheck className="mx-auto text-primary" size={17} /><p className="mt-2 text-[11px] font-bold">Destination</p></div></div></Card><Card><p className={labelClass}>Handoff timeline</p><h3 className="mt-1 font-display text-xl font-semibold">Recorded delivery states</h3><div className="mt-6 space-y-5">{["En Route to Pickup", "In Transit", "At Border", "Delivered"].map((step, index, steps) => { const currentIndex = steps.indexOf(active.status); const complete = active.status === "Delivered" || (currentIndex >= 0 && index <= currentIndex); return <div key={step} className="flex gap-3"><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${complete ? "bg-[#e4f1ea] text-[#28765a]" : "bg-muted text-muted-foreground"}`}>{complete ? <Check size={14} /> : index + 1}</span><div><p className="text-xs font-bold">{step}</p><p className="mt-1 text-[11px] text-muted-foreground">{complete ? "Recorded" : "Waiting for operations update"}</p></div></div>; })}</div><Link href="/bookings" className={`${button} mt-7 w-full`}>Manage booking <ArrowRight size={14} /></Link></Card></div><Card><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className={labelClass}>Customs handoffs</p><h3 className="mt-1 font-display text-xl font-semibold">{milestones.data.length ? `${milestones.data.length} checkpoint${milestones.data.length === 1 ? "" : "s"} recorded` : "No checkpoints recorded"}</h3></div>{feedback && <p className="text-xs text-[#28765a]">{feedback}</p>}</div>{milestones.loading ? <div className="py-6"><Loading error={milestones.error} retry={milestones.reload} /></div> : <div className="mt-5 space-y-3">{milestones.data.map((milestone) => <div key={milestone.id} className="rounded-xl border border-border p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-bold">{milestone.checkpoint}</p><p className="mt-1 text-[11px] text-muted-foreground">{milestone.country} · {milestone.border} · {milestone.requiredDocuments.length} required document{milestone.requiredDocuments.length === 1 ? "" : "s"}</p>{milestone.requiredDocuments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{milestone.requiredDocuments.map((document) => <span key={document} className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold">{document}</span>)}</div>}</div><div className="flex flex-wrap items-center gap-2"><Status value={milestone.status} />{canManage && <select className="h-9 rounded-lg border border-input bg-background px-2 text-xs" value={milestone.status} onChange={(event) => void updateMilestone(milestone, event.target.value)}>{["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"].map((status) => <option key={status}>{status}</option>)}</select>}</div></div></div>)}</div>}{canManage && <form onSubmit={addMilestone} className="mt-5 grid gap-3 border-t border-border pt-5 sm:grid-cols-3"><label><span className={labelClass}>Checkpoint</span><input className={input} value={checkpoint} onChange={(event) => setCheckpoint(event.target.value)} placeholder="Malaba border" /></label><label><span className={labelClass}>Border / handoff</span><input className={input} value={border} onChange={(event) => setBorder(event.target.value)} placeholder="Malaba / Busia" /></label><label><span className={labelClass}>Required documents</span><input className={input} value={requiredDocuments} onChange={(event) => setRequiredDocuments(event.target.value)} placeholder="Invoice, customs form" /></label><button type="submit" disabled={!checkpoint.trim()} className={`${button} sm:col-span-3`}><Plus size={14} /> Add checkpoint</button></form>}</Card><DeliveryProofPanel booking={active} onRefresh={() => { query.reload(); milestones.reload(); }} /></>}</div>;
 }
 
 function MessagesPage() {

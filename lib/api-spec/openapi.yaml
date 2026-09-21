@@ -265,6 +265,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Booking"
+  /bookings/{id}/request-pod:
+    post:
+      operationId: requestBookingPod
+      tags: [bookings]
+      summary: Send a receiver OTP for proof of delivery
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Proof of delivery challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestPodResponse"
+  /bookings/{id}/complete-delivery:
+    post:
+      operationId: completeBookingDelivery
+      tags: [bookings]
+      summary: Confirm delivery with the receiver OTP
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteDeliveryInput"
+      responses:
+        "200":
+          description: Delivery confirmed and payout eligibility updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteDeliveryResponse"
   /bookings/{id}/border-milestones:
     get:
       operationId: listBorderMilestones
@@ -739,6 +773,8 @@ components:
         bookedAt: { type: string }
         paymentNetwork: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
         paymentStatus: { type: string, enum: [Unpaid, Paid] }
+        podStatus: { type: string, enum: ["Not requested", "OTP sent", Delivered] }
+        deliveryPhoto: { type: string }
     BookingInput:
       type: object
       required: [tripId, freightId, amount, corridor]
@@ -750,6 +786,27 @@ components:
         originCountry: { $ref: "#/components/schemas/CountryCode" }
         destinationCountry: { $ref: "#/components/schemas/CountryCode" }
         currency: { $ref: "#/components/schemas/CurrencyCode" }
+    RequestPodResponse:
+      type: object
+      required: [bookingId, message]
+      properties:
+        bookingId: { type: string }
+        message: { type: string }
+        devOtp: { type: string, nullable: true }
+    CompleteDeliveryInput:
+      type: object
+      required: [otp]
+      properties:
+        otp: { type: string, minLength: 4, maxLength: 10 }
+        photoName: { type: string }
+    CompleteDeliveryResponse:
+      type: object
+      required: [booking, payoutUnlocked, releaseEligible]
+      properties:
+        booking:
+          $ref: "#/components/schemas/Booking"
+        payoutUnlocked: { type: boolean }
+        releaseEligible: { type: boolean }
     PaymentInput:
       type: object
       required: [bookingId, network, phone]

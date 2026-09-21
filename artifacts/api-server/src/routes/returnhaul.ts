@@ -824,6 +824,11 @@ function canViewBookingFinance(user: User, booking: Booking) {
     || freight.find((load) => load.id === booking.freightId)?.ownerUserId === user.id;
 }
 
+function canManageBookingOperations(user: User, booking: Booking) {
+  if (user.role === "Admin") return true;
+  return user.role === "Carrier" && trips.find((trip) => trip.id === booking.tripId)?.ownerUserId === user.id;
+}
+
 function brokerRequestForEntity(kind: BrokerRequestKind, entityId: string) {
   return brokerRequests.find((request) => request.kind === kind && request.entityId === entityId);
 }
@@ -1754,14 +1759,20 @@ router.post("/bookings", async (req, res) => {
 });
 
 router.get("/bookings/:id/border-milestones", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) { res.status(401).json({ error: "Log in to view border milestones." }); return; }
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  if (!canViewBookingFinance(user, booking)) { res.status(403).json({ error: "You can only view milestones for your own bookings." }); return; }
   res.json(borderMilestones.filter((milestone) => milestone.bookingId === booking.id).sort((a, b) => a.sequence - b.sequence));
 });
 
 router.post("/bookings/:id/border-milestones", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) { res.status(401).json({ error: "Log in before adding a border milestone." }); return; }
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can update border milestones." }); return; }
   const status = text(req.body?.status) as BorderMilestoneStatus || "Planned";
   const validStatuses: BorderMilestoneStatus[] = ["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"];
   if (!validStatuses.includes(status)) { res.status(400).json({ error: "Invalid border milestone status." }); return; }
@@ -1783,9 +1794,12 @@ router.post("/bookings/:id/border-milestones", async (req, res) => {
 });
 
 router.patch("/bookings/:id/border-milestones/:milestoneId", async (req, res) => {
+  const user = authenticatedUser(req);
   const booking = bookings.find((item) => item.id === text(req.params.id));
   const milestone = borderMilestones.find((item) => item.id === text(req.params.milestoneId) && item.bookingId === text(req.params.id));
+  if (!user) { res.status(401).json({ error: "Log in before updating a border milestone." }); return; }
   if (!booking || !milestone) { res.status(404).json({ error: "Border milestone not found." }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can update border milestones." }); return; }
   const status = text(req.body?.status) as BorderMilestoneStatus;
   const validStatuses: BorderMilestoneStatus[] = ["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"];
   if (!validStatuses.includes(status)) { res.status(400).json({ error: "Invalid border milestone status." }); return; }
@@ -1798,10 +1812,13 @@ router.patch("/bookings/:id/border-milestones/:milestoneId", async (req, res) =>
 });
 
 router.patch("/bookings/:id/status", async (req, res) => {
+  const user = authenticatedUser(req);
   const params = UpdateBookingStatusParams.parse(req.params);
   const data = UpdateBookingStatusBody.parse(req.body);
   const booking = bookings.find((item) => item.id === params.id);
+  if (!user) { res.status(401).json({ error: "Log in before updating a booking status." }); return; }
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can update booking status." }); return; }
   const nextStatuses = bookingStatusTransitions[booking.status] || [];
   if (!nextStatuses.includes(data.status)) {
     res.status(400).json({ error: `Cannot move a booking from ${booking.status} to ${data.status}.` });
@@ -1822,16 +1839,22 @@ router.patch("/bookings/:id/status", async (req, res) => {
 });
 
 router.post("/bookings/:id/request-pod", async (req, res) => {
+  const user = authenticatedUser(req);
   const booking = bookings.find((item) => item.id === text(req.params.id));
+  if (!user) { res.status(401).json({ error: "Log in before requesting delivery confirmation." }); return; }
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can request delivery confirmation." }); return; }
   booking.podStatus = "OTP sent";
   await persistDatabaseState();
   res.json({ bookingId: booking.id, message: "Mock receiver OTP sent.", devOtp: process.env.NODE_ENV === "production" ? undefined : booking.podOtp });
 });
 
 router.post("/bookings/:id/complete-delivery", async (req, res) => {
+  const user = authenticatedUser(req);
   const booking = bookings.find((item) => item.id === text(req.params.id));
+  if (!user) { res.status(401).json({ error: "Log in before confirming delivery." }); return; }
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can confirm delivery." }); return; }
   if (booking.paymentStatus !== "Paid" || booking.escrowStatus !== "Held") {
     res.status(409).json({ error: "Payment must be held before delivery can release escrow." });
     return;

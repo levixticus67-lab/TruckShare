@@ -450,7 +450,9 @@ export const ListBookingsResponseItem = zod.object({
   "status": zod.string(),
   "bookedAt": zod.string(),
   "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
-  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional()
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional(),
+  "podStatus": zod.enum(['Not requested', 'OTP sent', 'Delivered']).optional(),
+  "deliveryPhoto": zod.string().optional()
 })
 export const ListBookingsResponse = zod.array(ListBookingsResponseItem)
 
@@ -481,7 +483,9 @@ export const CreateBookingResponse = zod.object({
   "status": zod.string(),
   "bookedAt": zod.string(),
   "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
-  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional()
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional(),
+  "podStatus": zod.enum(['Not requested', 'OTP sent', 'Delivered']).optional(),
+  "deliveryPhoto": zod.string().optional()
 })
 
 
@@ -509,7 +513,63 @@ export const UpdateBookingStatusResponse = zod.object({
   "status": zod.string(),
   "bookedAt": zod.string(),
   "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
-  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional()
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional(),
+  "podStatus": zod.enum(['Not requested', 'OTP sent', 'Delivered']).optional(),
+  "deliveryPhoto": zod.string().optional()
+})
+
+
+/**
+ * @summary Send a receiver OTP for proof of delivery
+ */
+export const RequestBookingPodParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RequestBookingPodResponse = zod.object({
+  "bookingId": zod.string(),
+  "message": zod.string(),
+  "devOtp": zod.string().nullish()
+})
+
+
+/**
+ * @summary Confirm delivery with the receiver OTP
+ */
+export const CompleteBookingDeliveryParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const completeBookingDeliveryBodyOtpMin = 4;
+export const completeBookingDeliveryBodyOtpMax = 10;
+
+
+
+export const CompleteBookingDeliveryBody = zod.object({
+  "otp": zod.string().min(completeBookingDeliveryBodyOtpMin).max(completeBookingDeliveryBodyOtpMax),
+  "photoName": zod.string().optional()
+})
+
+export const CompleteBookingDeliveryResponse = zod.object({
+  "booking": zod.object({
+  "id": zod.string(),
+  "tripId": zod.string(),
+  "freightId": zod.string(),
+  "corridor": zod.string(),
+  "originCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "destinationCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']),
+  "amount": zod.number(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
+  "escrowStatus": zod.enum(['Pending', 'Held', 'Released']),
+  "status": zod.string(),
+  "bookedAt": zod.string(),
+  "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional(),
+  "podStatus": zod.enum(['Not requested', 'OTP sent', 'Delivered']).optional(),
+  "deliveryPhoto": zod.string().optional()
+}),
+  "payoutUnlocked": zod.boolean(),
+  "releaseEligible": zod.boolean()
 })
 
 
@@ -606,7 +666,7 @@ export const ListPaymentsResponseItem = zod.object({
   "carrierPayout": zod.number(),
   "fee": zod.number(),
   "reference": zod.string(),
-  "status": zod.enum(['Initiated', 'Held', 'Released', 'Failed']),
+  "status": zod.enum(['Initiated', 'Held', 'Released', 'Refunded', 'Failed']),
   "createdAt": zod.string()
 })
 export const ListPaymentsResponse = zod.array(ListPaymentsResponseItem)
@@ -676,7 +736,9 @@ export const SimulatePaymentResponse = zod.object({
   "status": zod.string(),
   "bookedAt": zod.string(),
   "paymentNetwork": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']).optional(),
-  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional()
+  "paymentStatus": zod.enum(['Unpaid', 'Paid']).optional(),
+  "podStatus": zod.enum(['Not requested', 'OTP sent', 'Delivered']).optional(),
+  "deliveryPhoto": zod.string().optional()
 }),
   "payment": zod.object({
   "id": zod.string(),
@@ -694,7 +756,7 @@ export const SimulatePaymentResponse = zod.object({
   "carrierPayout": zod.number(),
   "fee": zod.number(),
   "reference": zod.string(),
-  "status": zod.enum(['Initiated', 'Held', 'Released', 'Failed']),
+  "status": zod.enum(['Initiated', 'Held', 'Released', 'Refunded', 'Failed']),
   "createdAt": zod.string()
 })
 })

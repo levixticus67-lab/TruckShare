@@ -221,6 +221,15 @@ export const BookingPaymentStatus = {
   Paid: 'Paid',
 } as const;
 
+export type BookingPodStatus = typeof BookingPodStatus[keyof typeof BookingPodStatus];
+
+
+export const BookingPodStatus = {
+  Not_requested: 'Not requested',
+  OTP_sent: 'OTP sent',
+  Delivered: 'Delivered',
+} as const;
+
 export interface Booking {
   id: string;
   tripId: string;
@@ -235,6 +244,8 @@ export interface Booking {
   bookedAt: string;
   paymentNetwork?: BookingPaymentNetwork;
   paymentStatus?: BookingPaymentStatus;
+  podStatus?: BookingPodStatus;
+  deliveryPhoto?: string;
 }
 
 export interface BookingInput {
@@ -245,6 +256,27 @@ export interface BookingInput {
   originCountry?: CountryCode;
   destinationCountry?: CountryCode;
   currency?: CurrencyCode;
+}
+
+export interface RequestPodResponse {
+  bookingId: string;
+  message: string;
+  devOtp?: string | null;
+}
+
+export interface CompleteDeliveryInput {
+  /**
+     * @minLength 4
+     * @maxLength 10
+     */
+  otp: string;
+  photoName?: string;
+}
+
+export interface CompleteDeliveryResponse {
+  booking: Booking;
+  payoutUnlocked: boolean;
+  releaseEligible: boolean;
 }
 
 export type PaymentInputNetwork = typeof PaymentInputNetwork[keyof typeof PaymentInputNetwork];
@@ -372,6 +404,7 @@ export const PaymentStatus = {
   Initiated: 'Initiated',
   Held: 'Held',
   Released: 'Released',
+  Refunded: 'Refunded',
   Failed: 'Failed',
 } as const;
 
