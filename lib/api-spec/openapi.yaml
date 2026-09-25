@@ -1,22 +1,26 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ReturnHaul freight matching API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: dashboard
+  - name: trips
+  - name: freight
+  - name: matches
+  - name: bookings
+  - name: messages
+  - name: documents
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +28,1063 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Return dashboard overview
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /auth/account-status:
+    post:
+      operationId: getAccountStatus
+      tags: [auth]
+      summary: Check whether a phone number already has a TruckShare account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string }
+      responses:
+        "200":
+          description: Account status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exists]
+                properties:
+                  exists: { type: boolean }
+        "400":
+          description: Invalid phone number
+  /reference/eac:
+    get:
+      operationId: getEacReference
+      tags: [reference]
+      summary: List supported EAC countries, currencies, and starter corridors
+      responses:
+        "200":
+          description: EAC reference data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [countries, corridors]
+                properties:
+                  countries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EacCountry"
+                  corridors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EacCorridor"
+  /trips:
+    get:
+      operationId: listTrips
+      tags: [trips]
+      summary: List return trips
+      parameters:
+        - $ref: "#/components/parameters/Corridor"
+        - $ref: "#/components/parameters/Date"
+        - $ref: "#/components/parameters/VehicleType"
+      responses:
+        "200":
+          description: Return trips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trip"
+    post:
+      operationId: createTrip
+      tags: [trips]
+      summary: Post a return trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TripInput"
+      responses:
+        "201":
+          description: Created trip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trip"
+  /trips/{id}:
+    patch:
+      operationId: updateTrip
+      tags: [trips]
+      summary: Edit a return trip
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TripUpdate"
+      responses:
+        "200":
+          description: Updated trip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trip"
+  /freight:
+    get:
+      operationId: listFreight
+      tags: [freight]
+      summary: List freight requests
+      parameters:
+        - $ref: "#/components/parameters/Corridor"
+        - $ref: "#/components/parameters/Date"
+      responses:
+        "200":
+          description: Freight requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Freight"
+    post:
+      operationId: createFreight
+      tags: [freight]
+      summary: Post a freight request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreightInput"
+      responses:
+        "201":
+          description: Created freight request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Freight"
+  /freight/{id}:
+    patch:
+      operationId: updateFreight
+      tags: [freight]
+      summary: Edit a freight request
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreightUpdate"
+      responses:
+        "200":
+          description: Updated freight request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Freight"
+  /matches:
+    get:
+      operationId: listMatches
+      tags: [matches]
+      summary: Find corridor and capacity compatible matches
+      parameters:
+        - $ref: "#/components/parameters/Mode"
+        - $ref: "#/components/parameters/Corridor"
+      responses:
+        "200":
+          description: Matching results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Match"
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      summary: List bookings and escrow status
+      responses:
+        "200":
+          description: Bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Book a match and hold escrow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingInput"
+      responses:
+        "201":
+          description: Created booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+  /bookings/{id}/status:
+    patch:
+      operationId: updateBookingStatus
+      tags: [bookings]
+      summary: Advance trip status and release escrow on delivery
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusInput"
+      responses:
+        "200":
+          description: Updated booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+  /bookings/{id}/request-pod:
+    post:
+      operationId: requestBookingPod
+      tags: [bookings]
+      summary: Send a receiver OTP for proof of delivery
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Proof of delivery challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestPodResponse"
+  /bookings/{id}/complete-delivery:
+    post:
+      operationId: completeBookingDelivery
+      tags: [bookings]
+      summary: Confirm delivery with the receiver OTP
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteDeliveryInput"
+      responses:
+        "200":
+          description: Delivery confirmed and payout eligibility updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteDeliveryResponse"
+  /bookings/{id}/border-milestones:
+    get:
+      operationId: listBorderMilestones
+      tags: [border]
+      summary: List customs and border milestones for a booking
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Border milestones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BorderMilestone"
+    post:
+      operationId: createBorderMilestone
+      tags: [border]
+      summary: Add a customs or border milestone
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BorderMilestoneInput"
+      responses:
+        "201":
+          description: Created border milestone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BorderMilestone"
+  /bookings/{id}/border-milestones/{milestoneId}:
+    patch:
+      operationId: updateBorderMilestone
+      tags: [border]
+      summary: Update a customs or border milestone
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: milestoneId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/BorderMilestoneStatus" }
+      responses:
+        "200":
+          description: Updated border milestone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BorderMilestone"
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      summary: List payment settlement records
+      responses:
+        "200":
+          description: Payment records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+  /payments/quote:
+    get:
+      operationId: getPaymentQuote
+      tags: [payments]
+      summary: Quote a cross-border settlement
+      parameters:
+        - name: amount
+          in: query
+          required: true
+          schema: { type: number, exclusiveMinimum: 0 }
+        - name: fromCurrency
+          in: query
+          schema: { $ref: "#/components/schemas/CurrencyCode" }
+        - name: toCurrency
+          in: query
+          schema: { $ref: "#/components/schemas/CurrencyCode" }
+        - name: payerCountry
+          in: query
+          schema: { $ref: "#/components/schemas/CountryCode" }
+        - name: payeeCountry
+          in: query
+          schema: { $ref: "#/components/schemas/CountryCode" }
+      responses:
+        "200":
+          description: Indicative settlement quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentQuote"
+  /payments/simulate:
+    post:
+      operationId: simulatePayment
+      tags: [payments]
+      summary: Simulate a payment and hold its settlement amount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "200":
+          description: Simulated payment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [booking, payment]
+                properties:
+                  booking: { $ref: "#/components/schemas/Booking" }
+                  payment: { $ref: "#/components/schemas/Payment" }
+  /payments/checkout:
+    post:
+      operationId: createPaymentCheckout
+      tags: [payments]
+      summary: Create a Flutterwave checkout or development simulation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentCheckoutInput"
+      responses:
+        "201":
+          description: Checkout created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentCheckout"
+  /payments/{id}/refund:
+    post:
+      operationId: createPaymentRefund
+      tags: [payments]
+      summary: Request a full or partial payment refund
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundInput"
+      responses:
+        "201":
+          description: Refund requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Refund"
+  /webhooks/flutterwave:
+    post:
+      operationId: receiveFlutterwaveWebhook
+      tags: [payments]
+      summary: Receive and idempotently process a Flutterwave webhook
+      parameters:
+        - name: verif-hash
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Webhook accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received, duplicate]
+                properties:
+                  received: { type: boolean }
+                  duplicate: { type: boolean }
+        "401":
+          description: Invalid webhook signature
+  /finance/overview:
+    get:
+      operationId: getFinanceOverview
+      tags: [finance]
+      summary: Get the finance control overview
+      responses:
+        "200":
+          description: Finance overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinanceOverview"
+  /finance/bookings/{id}:
+    get:
+      operationId: getBookingFinance
+      tags: [finance]
+      summary: Get the payment, escrow, ledger, and payout state for a booking
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Booking finance state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingFinance"
+        "404":
+          description: Booking finance state not found
+  /finance/bookings/{id}/release:
+    post:
+      operationId: releaseBookingPayout
+      tags: [finance]
+      summary: Release a carrier payout after delivery verification
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleasePayoutInput"
+      responses:
+        "200":
+          description: Payout release accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingFinance"
+        "409":
+          description: Booking is not eligible for release
+  /messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: List negotiation messages
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: createMessage
+      tags: [messages]
+      summary: Send a negotiation message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /documents:
+    get:
+      operationId: listDocuments
+      tags: [documents]
+      summary: List uploaded logistics documents
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+    post:
+      operationId: createDocument
+      tags: [documents]
+      summary: Register a document upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentInput"
+      responses:
+        "201":
+          description: Created document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    Corridor:
+      name: corridor
+      in: query
+      schema: { type: string }
+    Date:
+      name: date
+      in: query
+      schema: { type: string }
+    VehicleType:
+      name: vehicleType
+      in: query
+      schema:
+        type: string
+        enum: [Flatbed, Enclosed, Refrigerated, "Box Truck"]
+    Mode:
+      name: mode
+      in: query
+      schema:
+        type: string
+        enum: [shipper, carrier]
   schemas:
     HealthStatus:
       type: object
       properties:
-        status:
-          type: string
-      required:
-        - status
-
+        status: { type: string }
+      required: [status]
+    Trip:
+      type: object
+      required: [id, carrier, origin, originCountry, destination, destinationCountry, corridor, departureDate, vehicleType, capacityTons, capacityM3, price, currency, priceType, status]
+      properties:
+        id: { type: string }
+        carrier: { type: string }
+        carrierRating: { type: number }
+        origin: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        originLocation: { $ref: "#/components/schemas/LocationPoint" }
+        destination: { type: string }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationLocation: { $ref: "#/components/schemas/LocationPoint" }
+        corridor: { type: string }
+        departureDate: { type: string }
+        vehicleType: { type: string }
+        capacityTons: { type: number }
+        capacityM3: { type: number }
+        price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        priceType: { type: string, enum: [Fixed, "Per Ton"] }
+        status: { type: string, enum: [Available, Booked, "En Route to Pickup", Loaded, "At Border", Delivered] }
+    TripInput:
+      type: object
+      required: [origin, destination, departureDate, vehicleType, capacityTons, capacityM3, price, priceType]
+      properties:
+        origin: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        originLocation: { $ref: "#/components/schemas/LocationPoint" }
+        destination: { type: string }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationLocation: { $ref: "#/components/schemas/LocationPoint" }
+        departureDate: { type: string }
+        vehicleType: { type: string }
+        capacityTons: { type: number }
+        capacityM3: { type: number }
+        price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        priceType: { type: string }
+    TripUpdate:
+      type: object
+      properties:
+        origin: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        originLocation: { $ref: "#/components/schemas/LocationPoint" }
+        destination: { type: string }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationLocation: { $ref: "#/components/schemas/LocationPoint" }
+        departureDate: { type: string }
+        vehicleType: { type: string }
+        capacityTons: { type: number }
+        capacityM3: { type: number }
+        price: { type: number }
+        priceType: { type: string }
+    Freight:
+      type: object
+      required: [id, shipper, pickup, pickupCountry, dropoff, dropoffCountry, corridor, description, weightTons, dimensions, pickupDate, price, currency, status]
+      properties:
+        id: { type: string }
+        shipper: { type: string }
+        pickup: { type: string }
+        pickupCountry: { $ref: "#/components/schemas/CountryCode" }
+        pickupLocation: { $ref: "#/components/schemas/LocationPoint" }
+        dropoff: { type: string }
+        dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
+        dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
+        corridor: { type: string }
+        description: { type: string }
+        weightTons: { type: number }
+        dimensions: { type: string }
+        pickupDate: { type: string }
+        price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        status: { type: string, enum: [Pending, Matched, "In-Transit", Delivered] }
+    FreightInput:
+      type: object
+      required: [pickup, dropoff, description, weightTons, dimensions, pickupDate, price]
+      properties:
+        pickup: { type: string }
+        pickupCountry: { $ref: "#/components/schemas/CountryCode" }
+        pickupLocation: { $ref: "#/components/schemas/LocationPoint" }
+        dropoff: { type: string }
+        dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
+        dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
+        description: { type: string }
+        weightTons: { type: number }
+        dimensions: { type: string }
+        pickupDate: { type: string }
+        price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    FreightUpdate:
+      type: object
+      properties:
+        pickup: { type: string }
+        pickupCountry: { $ref: "#/components/schemas/CountryCode" }
+        pickupLocation: { $ref: "#/components/schemas/LocationPoint" }
+        dropoff: { type: string }
+        dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
+        dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
+        description: { type: string }
+        weightTons: { type: number }
+        dimensions: { type: string }
+        pickupDate: { type: string }
+        price: { type: number }
+    Match:
+      type: object
+      required: [id, type, title, corridor, date, capacity, price, compatibility]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [trip, freight] }
+        title: { type: string }
+        corridor: { type: string }
+        date: { type: string }
+        capacity: { type: string }
+        price: { type: number }
+        compatibility: { type: number }
+        counterpart: { type: string }
+    Booking:
+      type: object
+      required: [id, tripId, freightId, corridor, originCountry, destinationCountry, amount, currency, escrowStatus, status, bookedAt]
+      properties:
+        id: { type: string }
+        tripId: { type: string }
+        freightId: { type: string }
+        corridor: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        escrowStatus: { type: string, enum: [Pending, Held, Released] }
+        status: { type: string }
+        bookedAt: { type: string }
+        paymentNetwork: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
+        paymentStatus: { type: string, enum: [Unpaid, Paid] }
+        podStatus: { type: string, enum: ["Not requested", "OTP sent", Delivered] }
+        deliveryPhoto: { type: string }
+    BookingInput:
+      type: object
+      required: [tripId, freightId, amount, corridor]
+      properties:
+        tripId: { type: string }
+        freightId: { type: string }
+        amount: { type: number }
+        corridor: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    RequestPodResponse:
+      type: object
+      required: [bookingId, message]
+      properties:
+        bookingId: { type: string }
+        message: { type: string }
+        devOtp: { type: string, nullable: true }
+    CompleteDeliveryInput:
+      type: object
+      required: [otp]
+      properties:
+        otp: { type: string, minLength: 4, maxLength: 10 }
+        photoName: { type: string }
+    CompleteDeliveryResponse:
+      type: object
+      required: [booking, payoutUnlocked, releaseEligible]
+      properties:
+        booking:
+          $ref: "#/components/schemas/Booking"
+        payoutUnlocked: { type: boolean }
+        releaseEligible: { type: boolean }
+    PaymentInput:
+      type: object
+      required: [bookingId, network, phone]
+      properties:
+        bookingId: { type: string }
+        network: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
+        phone: { type: string }
+        payerCountry: { $ref: "#/components/schemas/CountryCode" }
+        amount: { type: number, exclusiveMinimum: 0 }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    PaymentCheckoutInput:
+      type: object
+      required: [bookingId, network, phone]
+      properties:
+        bookingId: { type: string }
+        network: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
+        phone: { type: string }
+        payerCountry: { $ref: "#/components/schemas/CountryCode" }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    PaymentCheckout:
+      type: object
+      required: [bookingId, provider, mode, transactionReference, status]
+      properties:
+        bookingId: { type: string }
+        provider: { type: string, enum: [flutterwave] }
+        mode: { type: string, enum: [flutterwave, simulation] }
+        transactionReference: { type: string }
+        checkoutUrl: { type: string, nullable: true }
+        status: { type: string, enum: [PENDING, SIMULATION_PENDING] }
+    RefundInput:
+      type: object
+      required: [reason]
+      properties:
+        amount: { type: number, exclusiveMinimum: 0 }
+        reason: { type: string, minLength: 3, maxLength: 240 }
+    Refund:
+      type: object
+      required: [id, paymentId, bookingId, amount, currency, provider, status, reason, createdAt]
+      properties:
+        id: { type: string }
+        paymentId: { type: string }
+        bookingId: { type: string }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        provider: { type: string, enum: [flutterwave, simulation] }
+        providerRefundId: { type: string }
+        status: { type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED] }
+        reason: { type: string }
+        createdAt: { type: string }
+    Payment:
+      type: object
+      required: [id, bookingId, network, phone, payerCountry, payeeCountry, amount, currency, settlementAmount, settlementCurrency, exchangeRate, commissionAmount, carrierPayout, fee, reference, status, createdAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        network: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
+        phone: { type: string }
+        payerCountry: { $ref: "#/components/schemas/CountryCode" }
+        payeeCountry: { $ref: "#/components/schemas/CountryCode" }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        settlementAmount: { type: number }
+        settlementCurrency: { $ref: "#/components/schemas/CurrencyCode" }
+        exchangeRate: { type: number }
+        commissionAmount: { type: number }
+        carrierPayout: { type: number }
+        fee: { type: number }
+        reference: { type: string }
+        status: { type: string, enum: [Initiated, Held, Released, Refunded, Failed] }
+        createdAt: { type: string }
+    PaymentQuote:
+      type: object
+      required: [quoteId, payerCountry, payeeCountry, amount, currency, settlementAmount, settlementCurrency, exchangeRate, fee, commissionAmount, carrierPayout, commissionRate, carrierRate, expiresInSeconds, indicative]
+      properties:
+        quoteId: { type: string }
+        payerCountry: { $ref: "#/components/schemas/CountryCode" }
+        payeeCountry: { $ref: "#/components/schemas/CountryCode" }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        settlementAmount: { type: number }
+        settlementCurrency: { $ref: "#/components/schemas/CurrencyCode" }
+        exchangeRate: { type: number }
+        fee: { type: number }
+        commissionAmount: { type: number }
+        carrierPayout: { type: number }
+        commissionRate: { type: number }
+        carrierRate: { type: number }
+        expiresInSeconds: { type: integer }
+        indicative: { type: boolean }
+    FinanceOverview:
+      type: object
+      required: [currency, totalCollected, platformRevenue, providerFees, carrierFundsPendingRelease, payoutsDue, payoutsCompleted, refundsPending, reconciliationRequired, bookingsFunded]
+      properties:
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        totalCollected: { type: number }
+        platformRevenue: { type: number }
+        providerFees: { type: number }
+        carrierFundsPendingRelease: { type: number }
+        payoutsDue: { type: number }
+        payoutsCompleted: { type: number }
+        refundsPending: { type: number }
+        reconciliationRequired: { type: number }
+        bookingsFunded: { type: integer }
+    FinanceLedgerEntry:
+      type: object
+      required: [id, account, entryType, direction, amount, currency, reference, idempotencyKey, createdAt]
+      properties:
+        id: { type: string }
+        account: { type: string }
+        entryType: { type: string, enum: [CUSTOMER_PAYMENT, CARRIER_LIABILITY, PLATFORM_REVENUE, PROVIDER_FEE, TAX, REFUND, PAYOUT] }
+        direction: { type: string, enum: [debit, credit] }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        reference: { type: string }
+        idempotencyKey: { type: string }
+        createdAt: { type: string }
+    FinancePayout:
+      type: object
+      required: [id, bookingId, amount, currency, provider, status, createdAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        amount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        provider: { type: string, enum: [flutterwave, simulation] }
+        providerTransferId: { type: string }
+        status: { type: string, enum: [PENDING_RELEASE, PROCESSING, COMPLETED, FAILED, REVERSED] }
+        releaseReason: { type: string }
+        createdAt: { type: string }
+        completedAt: { type: string }
+    BookingFinance:
+      type: object
+      required: [bookingId, grossAmount, currency, platformFee, providerFee, carrierPayable, paymentState, escrowState, payoutState, ledgerEntries, payout, timeline]
+      properties:
+        bookingId: { type: string }
+        grossAmount: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+        platformFee: { type: number }
+        providerFee: { type: number }
+        carrierPayable: { type: number }
+        paymentState: { type: string, enum: [PAYMENT_PENDING, PAYMENT_VERIFIED, PAYMENT_FAILED, REFUND_PENDING, REFUNDED, DISPUTED] }
+        escrowState: { type: string, enum: [FUNDS_PENDING, FUNDS_HELD, RELEASE_ELIGIBLE, PAYOUT_PENDING, PAYOUT_PROCESSING, PAYOUT_COMPLETED, PAYOUT_FAILED, REFUND_PENDING, REFUNDED] }
+        payoutState: { type: string, enum: [NOT_DUE, PENDING_RELEASE, PROCESSING, COMPLETED, FAILED, REVERSED] }
+        ledgerEntries:
+          type: array
+          items: { $ref: "#/components/schemas/FinanceLedgerEntry" }
+        payout:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/FinancePayout"
+        timeline:
+          type: array
+          items:
+            type: object
+            required: [state, label, occurredAt]
+            properties:
+              state: { type: string }
+              label: { type: string }
+              occurredAt: { type: string }
+    ReleasePayoutInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 240 }
+    BorderMilestoneStatus:
+      type: string
+      enum: [Planned, "Documents Pending", Submitted, Cleared, Held, Crossed]
+    BorderMilestone:
+      type: object
+      required: [id, bookingId, sequence, checkpoint, country, border, requiredDocuments, status]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        sequence: { type: integer }
+        checkpoint: { type: string }
+        country: { $ref: "#/components/schemas/CountryCode" }
+        border: { type: string }
+        requiredDocuments:
+          type: array
+          items: { type: string }
+        status: { $ref: "#/components/schemas/BorderMilestoneStatus" }
+        completedAt: { type: string }
+    BorderMilestoneInput:
+      type: object
+      properties:
+        checkpoint: { type: string }
+        country: { $ref: "#/components/schemas/CountryCode" }
+        border: { type: string }
+        requiredDocuments:
+          type: array
+          items: { type: string }
+        status: { $ref: "#/components/schemas/BorderMilestoneStatus" }
+    StatusInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+    Message:
+      type: object
+      required: [id, sender, body, sentAt, read]
+      properties:
+        id: { type: string }
+        sender: { type: string }
+        body: { type: string }
+        sentAt: { type: string }
+        read: { type: boolean }
+    MessageInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+    Document:
+      type: object
+      required: [id, name, type, uploadedBy, uploadedAt, size, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string }
+        uploadedBy: { type: string }
+        uploadedAt: { type: string }
+        size: { type: string }
+        status: { type: string, enum: [Pending, Verified, Rejected] }
+    DocumentInput:
+      type: object
+      required: [name, type, size]
+      properties:
+        name: { type: string }
+        type: { type: string }
+        size: { type: string }
+    Dashboard:
+      type: object
+      required: [activeTrips, availableLoads, inTransit, delivered, totalEscrow, matchRate, recentActivity]
+      properties:
+        activeTrips: { type: number }
+        availableLoads: { type: number }
+        inTransit: { type: number }
+        delivered: { type: number }
+        totalEscrow: { type: number }
+        matchRate: { type: number }
+        recentActivity:
+          type: array
+          items:
+            type: object
+            required: [id, label, detail, time, tone]
+            properties:
+              id: { type: string }
+              label: { type: string }
+              detail: { type: string }
+              time: { type: string }
+              tone: { type: string }
+    CountryCode:
+      type: string
+      enum: [BI, CD, KE, RW, SO, SS, TZ, UG]
+    LocationPoint:
+      type: object
+      required: [city, countryCode, countryName, latitude, longitude]
+      properties:
+        city: { type: string }
+        countryCode: { $ref: "#/components/schemas/CountryCode" }
+        countryName: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+    CurrencyCode:
+      type: string
+      enum: [BIF, CDF, KES, RWF, SOS, SSP, TZS, UGX]
+    EacCountry:
+      type: object
+      required: [code, name, currency]
+      properties:
+        code: { $ref: "#/components/schemas/CountryCode" }
+        name: { type: string }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    EacCorridor:
+      type: object
+      required: [origin, originCountry, destination, destinationCountry, border]
+      properties:
+        origin: { type: string }
+        originCountry: { $ref: "#/components/schemas/CountryCode" }
+        destination: { type: string }
+        destinationCountry: { $ref: "#/components/schemas/CountryCode" }
+        border: { type: string }

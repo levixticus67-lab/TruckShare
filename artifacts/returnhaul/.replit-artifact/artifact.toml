@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ReturnHaul"
+description = "A cross-border backhaul freight matching platform that helps carriers fill empty return miles and shippers find reliable corridor-aligned capacity."
+version = "1.0.0"
+id = "artifacts/returnhaul"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24350
+
+[services.development]
+run = "pnpm --filter @workspace/returnhaul run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/returnhaul", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/returnhaul/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24350"
+BASE_PATH = "/"
