@@ -1742,8 +1742,6 @@ function FinanceOperationsPage() {
 
 function HomePage() {
   const role = useRole();
-  const bookings = useApi<Booking[]>("/bookings", []);
-  const activeBooking = bookings.data.find((booking) => booking.status !== "Delivered");
   const firstAction = role === "Shipper" ? { href: "/freight", title: "Post a load", detail: "Tell carriers what needs moving.", icon: PackageCheck } : { href: "/trips", title: "Post a trip", detail: "Tell shippers where you are going.", icon: Truck };
   const discoveryAction = role === "Shipper" ? { title: "Find a truck", detail: "Find capacity for your shipment." } : { title: "Find a load", detail: "Use your available space." };
   return <div className="home-page">
@@ -1797,16 +1795,6 @@ function HomePage() {
         <span className="home-foot-rule" />
         <span>East Africa · Live coordination</span>
       </div>
-    </section>
-
-    <section className="home-next-step" aria-labelledby="home-next-step-title">
-      <div className="home-next-step-mark" aria-hidden="true"><Clock3 size={18} /></div>
-      <div className="home-next-step-copy">
-        <p className="home-next-label">Your next step</p>
-        <h3 id="home-next-step-title" data-testid="text-home-next-step">{activeBooking ? activeBooking.corridor : "Nothing booked yet"}</h3>
-        {activeBooking ? <p>Your booking is {activeBooking.status.toLowerCase()}. Keep the handoff moving.</p> : <p>Start with a trip, a load, or a quick look at your matches.</p>}
-      </div>
-      {activeBooking ? <Link href="/tracking" data-testid="link-home-track" className="home-next-link">Track delivery <ArrowRight size={15} /></Link> : <Link href={firstAction.href} data-testid="link-home-get-started" className="home-next-link">Get started <ArrowRight size={15} /></Link>}
     </section>
   </div>;
 }

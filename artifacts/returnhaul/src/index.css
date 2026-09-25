@@ -1205,24 +1205,30 @@ textarea {
   --home-navy-deep: 225 56% 7%;
   --home-orange: 18 94% 59%;
   --home-cyan: 193 75% 68%;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: .5rem 0 2rem;
-}
-
-.home-hero {
-  position: relative;
-  min-height: 720px;
-  overflow: hidden;
-  border: 1px solid hsl(220 36% 100% / .12);
-  border-radius: 2rem;
-  padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 5vw, 4.5rem) 1.75rem;
-  isolation: isolate;
+  min-height: calc(100dvh - 64px);
+  margin: 0;
+  padding: 0;
   background:
     radial-gradient(circle at 50% 48%, hsl(212 45% 23% / .56), transparent 23rem),
     radial-gradient(circle at 85% 8%, hsl(var(--home-orange) / .16), transparent 22rem),
     linear-gradient(145deg, hsl(var(--home-navy-deep)), hsl(var(--home-navy)) 58%, hsl(225 45% 13%));
-  box-shadow: 0 26px 70px hsl(222 48% 8% / .27), 0 1px 0 hsl(0 0% 100% / .14) inset;
+}
+
+.app-content:has(.home-page) {
+  max-width: none;
+  padding: 0;
+}
+
+.home-hero {
+  position: relative;
+  min-height: calc(100dvh - 64px);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 7vw, 7rem) 1.75rem;
+  isolation: isolate;
+  background: transparent;
+  box-shadow: none;
 }
 
 .home-hero::before,
@@ -1327,15 +1333,15 @@ textarea {
   position: relative;
   z-index: 2;
   width: min(100%, 760px);
-  height: 435px;
-  margin: 1.9rem auto 0;
+  height: 455px;
+  margin: 2rem auto 0;
   isolation: isolate;
 }
 
 .home-road-image,
 .home-scene-shade {
   position: absolute;
-  inset: 6rem 7% 1rem;
+  inset: 4.2rem 7% .5rem;
   overflow: hidden;
   border: 1px solid hsl(0 0% 100% / .13);
   border-radius: 50% 50% 46% 46%;
@@ -1429,16 +1435,16 @@ textarea {
   position: absolute;
   z-index: 4;
   display: grid;
-  width: 13.5rem;
-  min-height: 8.1rem;
+  width: 13rem;
+  min-height: 7.6rem;
   grid-template-columns: 2.2rem 1fr auto;
   grid-template-rows: auto auto 1fr;
   column-gap: .72rem;
   align-content: center;
-  padding: 1rem 1.05rem;
+  padding: .95rem 1.1rem;
   overflow: hidden;
   border: 1px solid hsl(0 0% 100% / .18);
-  border-radius: 1.35rem;
+  border-radius: 48% 52% 56% 44% / 56% 43% 57% 44%;
   color: hsl(var(--home-ink));
   background: linear-gradient(135deg, hsl(223 37% 26% / .72), hsl(223 50% 14% / .65));
   box-shadow: 0 18px 35px hsl(224 60% 4% / .3), 0 1px 0 hsl(0 0% 100% / .12) inset;
@@ -1462,7 +1468,7 @@ textarea {
   border-color: hsl(var(--home-orange) / .62);
   background: linear-gradient(135deg, hsl(223 37% 30% / .84), hsl(223 50% 17% / .78));
   box-shadow: 0 24px 42px hsl(224 60% 4% / .42), 0 0 0 3px hsl(var(--home-orange) / .08);
-  transform: translateY(-5px);
+  transform: translateY(-5px) scale(1.02);
 }
 
 .home-orbit-action:active {
@@ -1475,11 +1481,15 @@ textarea {
   outline-offset: 4px;
 }
 
-.home-orbit-action-post { top: 4%; left: 0; animation-delay: .1s; }
-.home-orbit-action-find { top: 4%; right: 0; animation-delay: .2s; }
-.home-orbit-action-bookings { right: 50%; bottom: -1%; transform: translateX(50%); animation-delay: .3s; }
-.home-orbit-action-bookings:hover { transform: translateX(50%) translateY(-5px); }
-.home-orbit-action-bookings:active { transform: translateX(50%) translateY(-1px) scale(.98); }
+.home-orbit-action-post { top: 8%; left: 0; transform: rotate(-7deg); animation-delay: .1s; }
+.home-orbit-action-find { top: 8%; right: 0; transform: rotate(7deg); animation-delay: .2s; }
+.home-orbit-action-bookings { right: 50%; bottom: 0; transform: translateX(50%) rotate(-4deg); animation-delay: .3s; }
+.home-orbit-action-post:hover { transform: rotate(-7deg) translateY(-5px) scale(1.02); }
+.home-orbit-action-find:hover { transform: rotate(7deg) translateY(-5px) scale(1.02); }
+.home-orbit-action-bookings:hover { transform: translateX(50%) rotate(-4deg) translateY(-5px) scale(1.02); }
+.home-orbit-action-post:active { transform: rotate(-7deg) translateY(-1px) scale(.98); }
+.home-orbit-action-find:active { transform: rotate(7deg) translateY(-1px) scale(.98); }
+.home-orbit-action-bookings:active { transform: translateX(50%) rotate(-4deg) translateY(-1px) scale(.98); }
 
 .home-orbit-icon {
   display: flex;
@@ -1648,20 +1658,21 @@ textarea {
 @keyframes home-pulse { 0%, 100% { opacity: .25; transform: scale(.98); } 50% { opacity: .72; transform: scale(1.04); } }
 
 @media (max-width: 767px) {
-  .home-page { padding: 0 0 .75rem; }
-  .home-hero { min-height: 700px; border-radius: 1.45rem; padding: 1.7rem 1rem 1.2rem; }
+  .app-main:has(.home-page) .app-topbar { display: none; }
+  .home-page { min-height: 100dvh; }
+  .home-hero { min-height: 100dvh; padding: 1.7rem 1rem 5.9rem; }
   .home-hero-copy h2 { font-size: clamp(2.45rem, 12vw, 3.5rem); }
   .home-hero-copy p { margin-top: 1.15rem; font-size: .82rem; line-height: 1.55; }
   .home-route-scene { height: 465px; margin-top: 1.1rem; }
-  .home-road-image, .home-scene-shade { inset: 6.5rem 0 1rem; border-radius: 2rem; }
+  .home-road-image, .home-scene-shade { inset: 5.8rem 0 1rem; border-radius: 50% 50% 46% 46%; }
   .home-hub-orbit-outer { width: 15.5rem; height: 15.5rem; }
   .home-hub-orbit-inner { width: 9.5rem; height: 9.5rem; }
   .home-hub-center { width: 6.4rem; height: 6.4rem; }
   .home-hub-center svg { width: 18px; }
   .home-hub-center span { font-size: .4rem; }
-  .home-orbit-action { width: 10.8rem; min-height: 7.3rem; padding: .78rem; border-radius: 1.1rem; }
-  .home-orbit-action-post { top: 2%; left: 0; }
-  .home-orbit-action-find { top: 2%; right: 0; }
+  .home-orbit-action { width: 10.4rem; min-height: 7rem; padding: .78rem; }
+  .home-orbit-action-post { top: 2%; left: -.2rem; }
+  .home-orbit-action-find { top: 2%; right: -.2rem; }
   .home-orbit-action-bookings { bottom: 0; }
   .home-orbit-icon { width: 1.9rem; height: 1.9rem; border-radius: .62rem; }
   .home-orbit-icon svg { width: 18px; }
@@ -1670,13 +1681,10 @@ textarea {
   .home-route-signal { display: none; }
   .home-hero-foot { gap: .48rem; font-size: .45rem; letter-spacing: .08em; }
   .home-foot-rule { width: 1rem; }
-  .home-next-step { align-items: flex-start; flex-wrap: wrap; margin-top: .75rem; padding: 1rem; }
-  .home-next-step-copy { flex-basis: calc(100% - 3.6rem); }
-  .home-next-link { width: 100%; justify-content: center; margin-top: .15rem; }
 }
 
 @media (max-width: 390px) {
-  .home-hero { min-height: 675px; }
+  .home-hero { min-height: 100dvh; }
   .home-route-scene { height: 445px; }
   .home-orbit-action { width: 9.5rem; min-height: 6.9rem; padding: .68rem; }
   .home-orbit-action strong { font-size: .88rem; }
