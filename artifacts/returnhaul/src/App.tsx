@@ -278,7 +278,8 @@ function Shell({ children }: { children: ReactNode }) {
       : ["/", "/admin", "/bookings", "/messages"];
   const primaryNav = primaryHrefs.flatMap((href) => visibleNav.filter(([itemHref]) => itemHref === href));
   const moreNav = visibleNav.filter(([href]) => !primaryHrefs.includes(href));
-  const mobileNavItems = primaryNav.filter(([href]) => href !== "/").slice(0, 3);
+  const mobilePrimaryHrefs = location === "/" ? ["/trips", "/bookings", "/messages"] : primaryHrefs.filter((href) => href !== "/").slice(0, 3);
+  const mobileNavItems = mobilePrimaryHrefs.flatMap((href) => (location === "/" ? nav : visibleNav).filter(([itemHref]) => itemHref === href));
   const [moreOpen, setMoreOpen] = useState(false);
   const finishAuth = (user: AuthUser) => {
     setAuthUser(user);
@@ -1748,9 +1749,12 @@ function HomePage() {
     <section className="home-hero" aria-labelledby="home-title">
       <div className="home-hero-atmosphere" aria-hidden="true" />
       <div className="home-hero-copy">
-        <div className="home-kicker"><span className="home-kicker-dot" /> TruckShare EAC <span className="home-kicker-line" /> Home base</div>
-        <h2 id="home-title" data-testid="text-home-title">What do you need<br className="hidden sm:block" /> on the road today?</h2>
-        <p>Put your next move in motion. Post, match, or keep an eye on every booking from one connected place.</p>
+        <div className="home-home-pill">HOME</div>
+        <h2 id="home-title" data-testid="text-home-title">What do you<br />need today?</h2>
+        <div className="home-hero-support">
+          <p className="home-support-kicker">KEEP GOODS MOVING</p>
+          <p>One connected place for every trip,<br />load, and delivery.</p>
+        </div>
       </div>
 
       <div className="home-route-scene" aria-label="TruckShare quick actions">
