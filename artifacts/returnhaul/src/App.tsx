@@ -278,8 +278,7 @@ function Shell({ children }: { children: ReactNode }) {
       : ["/", "/admin", "/bookings", "/messages"];
   const primaryNav = primaryHrefs.flatMap((href) => visibleNav.filter(([itemHref]) => itemHref === href));
   const moreNav = visibleNav.filter(([href]) => !primaryHrefs.includes(href));
-  const mobilePrimaryHrefs = location === "/" ? ["/trips", "/bookings", "/messages"] : primaryHrefs.filter((href) => href !== "/").slice(0, 3);
-  const mobileNavItems = mobilePrimaryHrefs.flatMap((href) => (location === "/" ? nav : visibleNav).filter(([itemHref]) => itemHref === href));
+  const mobileNavItems = primaryNav.filter(([href]) => href !== "/").slice(0, 3);
   const [moreOpen, setMoreOpen] = useState(false);
   const finishAuth = (user: AuthUser) => {
     setAuthUser(user);
@@ -1743,18 +1742,17 @@ function FinanceOperationsPage() {
 
 function HomePage() {
   const role = useRole();
+  const bookings = useApi<Booking[]>("/bookings", []);
+  const activeBooking = bookings.data.find((booking) => booking.status !== "Delivered");
   const firstAction = role === "Shipper" ? { href: "/freight", title: "Post a load", detail: "Tell carriers what needs moving.", icon: PackageCheck } : { href: "/trips", title: "Post a trip", detail: "Tell shippers where you are going.", icon: Truck };
   const discoveryAction = role === "Shipper" ? { title: "Find a truck", detail: "Find capacity for your shipment." } : { title: "Find a load", detail: "Use your available space." };
   return <div className="home-page">
     <section className="home-hero" aria-labelledby="home-title">
       <div className="home-hero-atmosphere" aria-hidden="true" />
       <div className="home-hero-copy">
-        <div className="home-home-pill">HOME</div>
-        <h2 id="home-title" data-testid="text-home-title">What do you<br />need today?</h2>
-        <div className="home-hero-support">
-          <p className="home-support-kicker">KEEP GOODS MOVING</p>
-          <p>One connected place for every trip,<br />load, and delivery.</p>
-        </div>
+        <div className="home-kicker"><span className="home-kicker-dot" /> TruckShare EAC <span className="home-kicker-line" /> Home base</div>
+        <h2 id="home-title" data-testid="text-home-title">What do you need<br className="hidden sm:block" /> on the road today?</h2>
+        <p>Put your next move in motion. Post, match, or keep an eye on every booking from one connected place.</p>
       </div>
 
       <div className="home-route-scene" aria-label="TruckShare quick actions">
@@ -1799,6 +1797,16 @@ function HomePage() {
         <span className="home-foot-rule" />
         <span>East Africa · Live coordination</span>
       </div>
+    </section>
+
+    <section className="home-next-step" aria-labelledby="home-next-step-title">
+      <div className="home-next-step-mark" aria-hidden="true"><Clock3 size={18} /></div>
+      <div className="home-next-step-copy">
+        <p className="home-next-label">Your next step</p>
+        <h3 id="home-next-step-title" data-testid="text-home-next-step">{activeBooking ? activeBooking.corridor : "Nothing booked yet"}</h3>
+        {activeBooking ? <p>Your booking is {activeBooking.status.toLowerCase()}. Keep the handoff moving.</p> : <p>Start with a trip, a load, or a quick look at your matches.</p>}
+      </div>
+      {activeBooking ? <Link href="/tracking" data-testid="link-home-track" className="home-next-link">Track delivery <ArrowRight size={15} /></Link> : <Link href={firstAction.href} data-testid="link-home-get-started" className="home-next-link">Get started <ArrowRight size={15} /></Link>}
     </section>
   </div>;
 }
