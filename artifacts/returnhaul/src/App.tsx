@@ -1746,7 +1746,51 @@ function HomePage() {
   const activeBooking = bookings.data.find((booking) => booking.status !== "Delivered");
   const firstAction = role === "Shipper" ? { href: "/freight", title: "Post a load", detail: "Tell carriers what needs moving.", icon: PackageCheck } : { href: "/trips", title: "Post a trip", detail: "Tell shippers where you are going.", icon: Truck };
   const discoveryAction = role === "Shipper" ? { title: "Find a truck", detail: "Find capacity for your shipment." } : { title: "Find a load", detail: "Use your available space." };
-  return <div className="mx-auto max-w-4xl space-y-6"><div className="home-heading"><Header eyebrow="Home" title="What do you need today?" detail="Choose one thing to get started. You can always come back here." /></div><ContextImage src="/branding/story/home-road.jpg" alt="Truck travelling along a regional road at sunset" eyebrow="Keep goods moving" title="One connected place for every trip, load, and delivery." /><div className="home-action-grid grid gap-3 sm:grid-cols-3"><Link href={firstAction.href} className="rounded-xl border border-accent/40 bg-[#fff5e3] p-5 transition hover:-translate-y-0.5"><firstAction.icon size={20} className="text-[#9a641c]" /><p className="mt-5 text-base font-bold">{firstAction.title}</p><p className="mt-1 text-xs text-muted-foreground">{firstAction.detail}</p></Link><Link href="/matches" className="rounded-xl border border-border bg-card p-5 transition hover:-translate-y-0.5"><RouteIcon size={20} className="text-primary" /><p className="mt-5 text-base font-bold">{discoveryAction.title}</p><p className="mt-1 text-xs text-muted-foreground">{discoveryAction.detail}</p></Link><Link href="/bookings" className="rounded-xl border border-border bg-card p-5 transition hover:-translate-y-0.5"><LockKeyhole size={20} className="text-primary" /><p className="mt-5 text-base font-bold">My bookings</p><p className="mt-1 text-xs text-muted-foreground">See what needs your attention.</p></Link></div><Card><div className="flex items-center justify-between gap-4"><div><p className={labelClass}>Your next step</p><h3 className="mt-1 font-display text-xl font-semibold">{activeBooking ? activeBooking.corridor : "Nothing booked yet"}</h3>{activeBooking ? <p className="mt-1 text-sm text-muted-foreground">Your booking is {activeBooking.status.toLowerCase()}.</p> : <p className="mt-1 text-sm text-muted-foreground">Start by posting a trip or finding a truck.</p>}</div>{activeBooking ? <Link href="/tracking" className={secondaryButton}>Track delivery <ArrowRight size={14} /></Link> : <Link href={firstAction.href} className={button}>Get started <ArrowRight size={14} /></Link>}</div></Card></div>;
+  return <section className="home-hero" aria-labelledby="home-title">
+    <img className="home-hero-image" src="/branding/story/home-road.jpg" alt="Truck travelling along a regional road at sunset" />
+    <div className="home-hero-scrim" aria-hidden="true" />
+    <div className="home-hero-glow home-hero-glow-top" aria-hidden="true" />
+    <div className="home-hero-glow home-hero-glow-center" aria-hidden="true" />
+    <div className="home-hero-content">
+      <p className="home-hero-pill">Home</p>
+      <div className="home-hero-copy">
+        <h2 id="home-title">What do you<br />need today?</h2>
+        <p className="home-hero-kicker">Keep goods moving</p>
+        <p className="home-hero-detail">One connected place for every trip,<br className="max-[420px]:hidden" /> load, and delivery.</p>
+      </div>
+    </div>
+
+    <div className="home-orbit-stage" aria-label="TruckShare actions">
+      <div className="home-orbit-ring home-orbit-ring-outer" aria-hidden="true" />
+      <div className="home-orbit-ring home-orbit-ring-inner" aria-hidden="true" />
+      <Link href={firstAction.href} className="home-orbit-card home-orbit-card-post">
+        <span className="home-orbit-icon"><firstAction.icon size={20} /></span>
+        <span className="home-orbit-card-copy"><small>01 / Start</small><strong>{firstAction.title}</strong><em>{firstAction.detail}</em></span>
+      </Link>
+      <Link href="/bookings" className="home-orbit-card home-orbit-card-bookings">
+        <span className="home-orbit-icon"><LockKeyhole size={20} /></span>
+        <span className="home-orbit-card-copy"><small>03 / Watch</small><strong>My bookings</strong><em>See what needs your attention.</em></span>
+      </Link>
+      <Link href="/matches" className="home-orbit-card home-orbit-card-load">
+        <span className="home-orbit-icon"><RouteIcon size={20} /></span>
+        <span className="home-orbit-card-copy"><small>02 / Find</small><strong>{discoveryAction.title}</strong><em>{discoveryAction.detail}</em></span>
+      </Link>
+      <Link href={activeBooking ? "/tracking" : firstAction.href} className="home-orbit-center">
+        <RouteIcon size={20} />
+        <small>Your next move</small>
+        <strong>{activeBooking ? "Track it" : "Start here"}</strong>
+        <ArrowRight className="home-orbit-center-arrow" size={14} />
+      </Link>
+    </div>
+
+    <div className="home-hero-status">
+      <span className="home-status-dot" /> Network active <i /> East Africa <i /> Live coordination
+    </div>
+    <div className="home-next-step">
+      <div><p>{activeBooking ? "Your active booking" : "Ready when you are"}</p><strong>{activeBooking ? activeBooking.corridor : "Make the next move"}</strong></div>
+      <Link href={activeBooking ? "/tracking" : firstAction.href} aria-label={activeBooking ? "Track your active booking" : "Get started"}><ArrowRight size={17} /></Link>
+    </div>
+  </section>;
 }
 
 function AccountPage() {
