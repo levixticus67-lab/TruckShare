@@ -5,6 +5,7 @@ import {
   FilePlus2, FileText, Gauge, LayoutDashboard, LockKeyhole, MapPin, Menu, MessageSquare,
   PackageCheck, Phone, Plus, RefreshCw, Route as RouteIcon, Search, Send, ShieldCheck, Inbox, Filter,
   Truck, UploadCloud, UserRound, UsersRound, X, Moon, Sun, Globe2, LogOut, KeyRound, Save, Download,
+  type LucideIcon,
 } from "lucide-react";
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from "wouter";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -1740,12 +1741,62 @@ function FinanceOperationsPage() {
   </div>;
 }
 
+function annularSectorPath(cx: number, cy: number, innerRadius: number, outerRadius: number, startAngle: number, endAngle: number) {
+  const point = (radius: number, angle: number) => {
+    const radians = (angle * Math.PI) / 180;
+    return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) };
+  };
+  const outerStart = point(outerRadius, startAngle);
+  const outerEnd = point(outerRadius, endAngle);
+  const innerEnd = point(innerRadius, endAngle);
+  const innerStart = point(innerRadius, startAngle);
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  return [
+    `M ${outerStart.x.toFixed(2)} ${outerStart.y.toFixed(2)}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x.toFixed(2)} ${outerEnd.y.toFixed(2)}`,
+    `L ${innerEnd.x.toFixed(2)} ${innerEnd.y.toFixed(2)}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
+    "Z",
+  ].join(" ");
+}
+
+type HomeArcLinkProps = {
+  href: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  className: string;
+  icon: LucideIcon;
+  step: string;
+  title: string;
+  detail: string;
+};
+
+function HomeArcLink({ href, x, y, width, height, className, icon: Icon, step, title, detail }: HomeArcLinkProps) {
+  return <foreignObject x={x} y={y} width={width} height={height} className="home-arc-foreign">
+    <div className="home-arc-foreign-inner">
+      <Link href={href} className={`home-arc-link ${className}`}>
+        <span className="home-arc-icon"><Icon size={20} strokeWidth={1.7} /></span>
+        <span className="home-arc-copy">
+          <small>{step}</small>
+          <strong>{title}</strong>
+          <em>{detail}</em>
+        </span>
+      </Link>
+    </div>
+  </foreignObject>;
+}
+
 function HomePage() {
   const role = useRole();
   const bookings = useApi<Booking[]>("/bookings", []);
   const activeBooking = bookings.data.find((booking) => booking.status !== "Delivered");
   const firstAction = role === "Shipper" ? { href: "/freight", title: "Post a load", detail: "Tell carriers what needs moving.", icon: PackageCheck } : { href: "/trips", title: "Post a trip", detail: "Tell shippers where you are going.", icon: Truck };
   const discoveryAction = role === "Shipper" ? { title: "Find a truck", detail: "Find capacity for your shipment." } : { title: "Find a load", detail: "Use your available space." };
+  const postPath = annularSectorPath(300, 218, 106, 184, 272, 372);
+  const loadPath = annularSectorPath(300, 218, 106, 184, 12, 112);
+  const bookingsPath = annularSectorPath(300, 218, 106, 184, 132, 232);
   return <section className="home-hero" aria-labelledby="home-title">
     <img className="home-hero-image" src="/branding/story/home-road.jpg" alt="Truck travelling along a regional road at sunset" />
     <div className="home-hero-scrim" aria-hidden="true" />
@@ -1761,20 +1812,59 @@ function HomePage() {
     </div>
 
     <div className="home-orbit-stage" aria-label="TruckShare actions">
-      <div className="home-orbit-ring home-orbit-ring-outer" aria-hidden="true" />
-      <div className="home-orbit-ring home-orbit-ring-inner" aria-hidden="true" />
-      <Link href={firstAction.href} className="home-orbit-card home-orbit-card-post">
-        <span className="home-orbit-icon"><firstAction.icon size={20} /></span>
-        <span className="home-orbit-card-copy"><small>01 / Start</small><strong>{firstAction.title}</strong><em>{firstAction.detail}</em></span>
-      </Link>
-      <Link href="/bookings" className="home-orbit-card home-orbit-card-bookings">
-        <span className="home-orbit-icon"><LockKeyhole size={20} /></span>
-        <span className="home-orbit-card-copy"><small>03 / Watch</small><strong>My bookings</strong><em>See what needs your attention.</em></span>
-      </Link>
-      <Link href="/matches" className="home-orbit-card home-orbit-card-load">
-        <span className="home-orbit-icon"><RouteIcon size={20} /></span>
-        <span className="home-orbit-card-copy"><small>02 / Find</small><strong>{discoveryAction.title}</strong><em>{discoveryAction.detail}</em></span>
-      </Link>
+      <svg className="home-orbit-svg" viewBox="0 0 600 430" role="group" aria-label="Choose your next move">
+        <defs>
+          <linearGradient id="homeArcFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#253c68" stopOpacity=".92" />
+            <stop offset=".58" stopColor="#18263f" stopOpacity=".86" />
+            <stop offset="1" stopColor="#121a2d" stopOpacity=".91" />
+          </linearGradient>
+          <filter id="homeArcShadow" x="-20%" y="-30%" width="140%" height="170%">
+            <feDropShadow dx="0" dy="15" stdDeviation="13" floodColor="#050b1a" floodOpacity=".42" />
+          </filter>
+        </defs>
+        <circle className="home-orbit-guide home-orbit-guide-outer" cx="300" cy="218" r="184" />
+        <circle className="home-orbit-guide home-orbit-guide-inner" cx="300" cy="218" r="106" />
+        <path className="home-arc-path home-arc-path-post" d={postPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
+        <path className="home-arc-path home-arc-path-load" d={loadPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
+        <path className="home-arc-path home-arc-path-bookings" d={bookingsPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
+        <HomeArcLink
+          href={firstAction.href}
+          x={328}
+          y={42}
+          width={238}
+          height={142}
+          className="home-arc-link-post"
+          icon={firstAction.icon}
+          step="01 / Start"
+          title={firstAction.title}
+          detail={firstAction.detail}
+        />
+        <HomeArcLink
+          href="/matches"
+          x={326}
+          y={260}
+          width={234}
+          height={128}
+          className="home-arc-link-load"
+          icon={RouteIcon}
+          step="02 / Find"
+          title={discoveryAction.title}
+          detail={discoveryAction.detail}
+        />
+        <HomeArcLink
+          href="/bookings"
+          x={42}
+          y={202}
+          width={198}
+          height={168}
+          className="home-arc-link-bookings"
+          icon={LockKeyhole}
+          step="03 / Watch"
+          title="My bookings"
+          detail="See what needs your attention."
+        />
+      </svg>
       <Link href={activeBooking ? "/tracking" : firstAction.href} className="home-orbit-center">
         <RouteIcon size={20} />
         <small>Your next move</small>
