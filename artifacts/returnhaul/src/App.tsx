@@ -1760,12 +1760,29 @@ function annularSectorPath(cx: number, cy: number, innerRadius: number, outerRad
   ].join(" ");
 }
 
+function annularArcPath(cx: number, cy: number, radius: number, startAngle: number, endAngle: number) {
+  const point = (angle: number) => {
+    const radians = (angle * Math.PI) / 180;
+    return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) };
+  };
+  const start = point(startAngle);
+  const end = point(endAngle);
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+
+function radialDividerPath(cx: number, cy: number, innerRadius: number, outerRadius: number, angle: number) {
+  const radians = (angle * Math.PI) / 180;
+  const inner = { x: cx + innerRadius * Math.cos(radians), y: cy + innerRadius * Math.sin(radians) };
+  const outer = { x: cx + outerRadius * Math.cos(radians), y: cy + outerRadius * Math.sin(radians) };
+  return `M ${inner.x.toFixed(2)} ${inner.y.toFixed(2)} L ${outer.x.toFixed(2)} ${outer.y.toFixed(2)}`;
+}
+
 type HomeArcLinkProps = {
   href: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  pathId: string;
+  iconX: number;
+  iconY: number;
   className: string;
   icon: LucideIcon;
   step: string;
@@ -1773,19 +1790,24 @@ type HomeArcLinkProps = {
   detail: string;
 };
 
-function HomeArcLink({ href, x, y, width, height, className, icon: Icon, step, title, detail }: HomeArcLinkProps) {
-  return <foreignObject x={x} y={y} width={width} height={height} className="home-arc-foreign">
-    <div className="home-arc-foreign-inner">
-      <Link href={href} className={`home-arc-link ${className}`}>
+function HomeArcLink({ href, pathId, iconX, iconY, className, icon: Icon, step, title, detail }: HomeArcLinkProps) {
+  return <Link href={href} className={`home-arc-link ${className}`} aria-label={`${title}. ${detail}`}>
+    <title>{`${step}: ${title}. ${detail}`}</title>
+    <foreignObject x={iconX} y={iconY} width={48} height={48} className="home-arc-icon-foreign">
+      <div className="home-arc-icon-wrap">
         <span className="home-arc-icon"><Icon size={20} strokeWidth={1.7} /></span>
-        <span className="home-arc-copy">
-          <small>{step}</small>
-          <strong>{title}</strong>
-          <em>{detail}</em>
-        </span>
-      </Link>
-    </div>
-  </foreignObject>;
+      </div>
+    </foreignObject>
+    <text className="home-arc-text home-arc-text-step">
+      <textPath href={`#${pathId}-step`} startOffset="24%" textAnchor="middle">{step}</textPath>
+    </text>
+    <text className="home-arc-text home-arc-text-title">
+      <textPath href={`#${pathId}-title`} startOffset="50%" textAnchor="middle">{title}</textPath>
+    </text>
+    <text className="home-arc-text home-arc-text-detail">
+      <textPath href={`#${pathId}-detail`} startOffset="68%" textAnchor="middle">{detail}</textPath>
+    </text>
+  </Link>;
 }
 
 function HomePage() {
@@ -1794,9 +1816,32 @@ function HomePage() {
   const activeBooking = bookings.data.find((booking) => booking.status !== "Delivered");
   const firstAction = role === "Shipper" ? { href: "/freight", title: "Post a load", detail: "Tell carriers what needs moving.", icon: PackageCheck } : { href: "/trips", title: "Post a trip", detail: "Tell shippers where you are going.", icon: Truck };
   const discoveryAction = role === "Shipper" ? { title: "Find a truck", detail: "Find capacity for your shipment." } : { title: "Find a load", detail: "Use your available space." };
-  const postPath = annularSectorPath(300, 218, 106, 184, 272, 372);
-  const loadPath = annularSectorPath(300, 218, 106, 184, 12, 112);
-  const bookingsPath = annularSectorPath(300, 218, 106, 184, 132, 232);
+  const orbit = { cx: 300, cy: 218, innerRadius: 108, outerRadius: 202 };
+  const postAngles = { start: 270, end: 370 };
+  const loadAngles = { start: 28, end: 128 };
+  const bookingsAngles = { start: 148, end: 248 };
+  const postPath = annularSectorPath(orbit.cx, orbit.cy, orbit.innerRadius, orbit.outerRadius, postAngles.start, postAngles.end);
+  const loadPath = annularSectorPath(orbit.cx, orbit.cy, orbit.innerRadius, orbit.outerRadius, loadAngles.start, loadAngles.end);
+  const bookingsPath = annularSectorPath(orbit.cx, orbit.cy, orbit.innerRadius, orbit.outerRadius, bookingsAngles.start, bookingsAngles.end);
+  const textRadii = { step: 182, title: 158, detail: 136 };
+  const textPaths = {
+    post: {
+      step: annularArcPath(orbit.cx, orbit.cy, textRadii.step, postAngles.start, postAngles.end),
+      title: annularArcPath(orbit.cx, orbit.cy, textRadii.title, postAngles.start, postAngles.end),
+      detail: annularArcPath(orbit.cx, orbit.cy, textRadii.detail, postAngles.start, postAngles.end),
+    },
+    load: {
+      step: annularArcPath(orbit.cx, orbit.cy, textRadii.step, loadAngles.start, loadAngles.end),
+      title: annularArcPath(orbit.cx, orbit.cy, textRadii.title, loadAngles.start, loadAngles.end),
+      detail: annularArcPath(orbit.cx, orbit.cy, textRadii.detail, loadAngles.start, loadAngles.end),
+    },
+    bookings: {
+      step: annularArcPath(orbit.cx, orbit.cy, textRadii.step, bookingsAngles.start, bookingsAngles.end),
+      title: annularArcPath(orbit.cx, orbit.cy, textRadii.title, bookingsAngles.start, bookingsAngles.end),
+      detail: annularArcPath(orbit.cx, orbit.cy, textRadii.detail, bookingsAngles.start, bookingsAngles.end),
+    },
+  };
+  const dividerAngles = [postAngles.start, postAngles.end, loadAngles.start, loadAngles.end, bookingsAngles.start, bookingsAngles.end];
   return <section className="home-hero" aria-labelledby="home-title">
     <img className="home-hero-image" src="/branding/story/home-road.jpg" alt="Truck travelling along a regional road at sunset" />
     <div className="home-hero-scrim" aria-hidden="true" />
@@ -1822,18 +1867,19 @@ function HomePage() {
           <filter id="homeArcShadow" x="-20%" y="-30%" width="140%" height="170%">
             <feDropShadow dx="0" dy="15" stdDeviation="13" floodColor="#050b1a" floodOpacity=".42" />
           </filter>
+          {Object.entries(textPaths).flatMap(([key, paths]) => Object.entries(paths).map(([part, d]) => <path key={`${key}-${part}`} id={`homeArc-${key}-${part}`} d={d} />))}
         </defs>
-        <circle className="home-orbit-guide home-orbit-guide-outer" cx="300" cy="218" r="184" />
-        <circle className="home-orbit-guide home-orbit-guide-inner" cx="300" cy="218" r="106" />
+        <circle className="home-orbit-guide home-orbit-guide-outer" cx={orbit.cx} cy={orbit.cy} r={orbit.outerRadius} />
+        <circle className="home-orbit-guide home-orbit-guide-inner" cx={orbit.cx} cy={orbit.cy} r={orbit.innerRadius} />
+        {dividerAngles.map((angle) => <path key={angle} className="home-orbit-divider" d={radialDividerPath(orbit.cx, orbit.cy, orbit.innerRadius, orbit.outerRadius, angle)} />)}
         <path className="home-arc-path home-arc-path-post" d={postPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
         <path className="home-arc-path home-arc-path-load" d={loadPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
         <path className="home-arc-path home-arc-path-bookings" d={bookingsPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
         <HomeArcLink
           href={firstAction.href}
-          x={328}
-          y={42}
-          width={238}
-          height={142}
+          pathId="homeArc-post"
+          iconX={328}
+          iconY={58}
           className="home-arc-link-post"
           icon={firstAction.icon}
           step="01 / Start"
@@ -1842,10 +1888,9 @@ function HomePage() {
         />
         <HomeArcLink
           href="/matches"
-          x={326}
-          y={260}
-          width={234}
-          height={128}
+          pathId="homeArc-load"
+          iconX={350}
+          iconY={300}
           className="home-arc-link-load"
           icon={RouteIcon}
           step="02 / Find"
@@ -1854,10 +1899,9 @@ function HomePage() {
         />
         <HomeArcLink
           href="/bookings"
-          x={42}
-          y={202}
-          width={198}
-          height={168}
+          pathId="homeArc-bookings"
+          iconX={84}
+          iconY={270}
           className="home-arc-link-bookings"
           icon={LockKeyhole}
           step="03 / Watch"
