@@ -1851,8 +1851,6 @@ function HomePage() {
       <p className="home-hero-pill">Home</p>
       <div className="home-hero-copy">
         <h2 id="home-title">What do you<br />need today?</h2>
-        <p className="home-hero-kicker">Keep goods moving</p>
-        <p className="home-hero-detail">One connected place for every trip,<br className="max-[420px]:hidden" /> load, and delivery.</p>
       </div>
     </div>
 
@@ -1900,8 +1898,8 @@ function HomePage() {
         <HomeArcLink
           href="/bookings"
           pathId="homeArc-bookings"
-          iconX={84}
-          iconY={270}
+          iconX={120}
+          iconY={242}
           className="home-arc-link-bookings"
           icon={LockKeyhole}
           step="03 / Watch"
@@ -1917,6 +1915,10 @@ function HomePage() {
       </Link>
     </div>
 
+    <div className="home-hero-support">
+      <p className="home-hero-kicker">Keep goods moving</p>
+      <p className="home-hero-detail">One connected place for every trip,<br className="max-[420px]:hidden" /> load, and delivery.</p>
+    </div>
     <div className="home-hero-status">
       <span className="home-status-dot" /> Network active <i /> East Africa <i /> Live coordination
     </div>
