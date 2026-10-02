@@ -318,7 +318,7 @@ textarea {
   z-index: 2;
   top: 50%;
   left: 50%;
-  width: min(44rem, 94vw);
+  width: min(50rem, 100vw);
   aspect-ratio: 600 / 430;
   transform: translate(-50%, -50%);
 }
@@ -591,7 +591,7 @@ textarea {
 
   .home-orbit-stage {
     top: 50%;
-    width: min(40rem, 120vw);
+    width: min(42rem, 136vw);
   }
 
   .home-arc-text-step {
@@ -656,7 +656,7 @@ textarea {
   }
 
   .home-orbit-stage {
-    width: 124vw;
+    width: 140vw;
   }
 
   .home-hero-status {
