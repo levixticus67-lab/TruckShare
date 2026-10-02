@@ -371,32 +371,6 @@ textarea {
   filter: brightness(1.15);
 }
 
-.home-arc-icon-foreign {
-  overflow: visible;
-  pointer-events: none;
-}
-
-.home-arc-icon-wrap {
-  display: flex;
-  width: 48px;
-  height: 48px;
-  align-items: center;
-  justify-content: center;
-}
-
-.home-arc-icon {
-  display: flex;
-  width: 2.7rem;
-  height: 2.7rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(240, 137, 102, .3);
-  border-radius: .78rem;
-  background: rgba(143, 66, 64, .38);
-  color: #ed9675;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
-}
-
 .home-arc-text {
   fill: #f5f1ee;
   pointer-events: none;
@@ -616,12 +590,6 @@ textarea {
 
   .home-arc-link-bookings .home-arc-text-title {
     font-size: 1.05rem;
-  }
-
-  .home-arc-icon {
-    width: 2.3rem;
-    height: 2.3rem;
-    flex-basis: 2.3rem;
   }
 
   .home-orbit-center {

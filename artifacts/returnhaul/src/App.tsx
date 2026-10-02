@@ -1779,33 +1779,24 @@ type HomeArcLinkProps = {
   pathId: string;
   arcPath: string;
   arcPathClass: string;
-  iconX: number;
-  iconY: number;
-  textOffset: string;
   className: string;
-  icon: LucideIcon;
   step: string;
   title: string;
   detail: string;
 };
 
-function HomeArcLink({ href, pathId, arcPath, arcPathClass, iconX, iconY, textOffset, className, icon: Icon, step, title, detail }: HomeArcLinkProps) {
+function HomeArcLink({ href, pathId, arcPath, arcPathClass, className, step, title, detail }: HomeArcLinkProps) {
   return <Link href={href} className={`home-arc-link ${className}`} aria-label={`${title}. ${detail}`}>
     <path className={`home-arc-path ${arcPathClass}`} d={arcPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
     <title>{`${step}: ${title}. ${detail}`}</title>
-    <foreignObject x={iconX} y={iconY} width={48} height={48} className="home-arc-icon-foreign">
-      <div className="home-arc-icon-wrap">
-        <span className="home-arc-icon"><Icon size={20} strokeWidth={1.7} /></span>
-      </div>
-    </foreignObject>
     <text className="home-arc-text home-arc-text-step">
-      <textPath href={`#${pathId}-step`} startOffset={textOffset} textAnchor="middle">{step}</textPath>
+      <textPath href={`#${pathId}-step`} startOffset="50%" textAnchor="middle">{step}</textPath>
     </text>
     <text className="home-arc-text home-arc-text-title">
-      <textPath href={`#${pathId}-title`} startOffset={textOffset} textAnchor="middle">{title}</textPath>
+      <textPath href={`#${pathId}-title`} startOffset="50%" textAnchor="middle">{title}</textPath>
     </text>
     <text className="home-arc-text home-arc-text-detail">
-      <textPath href={`#${pathId}-detail`} startOffset={textOffset} textAnchor="middle">{detail}</textPath>
+      <textPath href={`#${pathId}-detail`} startOffset="50%" textAnchor="middle">{detail}</textPath>
     </text>
   </Link>;
 }
@@ -1814,7 +1805,7 @@ function HomePage() {
   const role = useRole();
   const bookings = useApi<Booking[]>("/bookings", []);
   const activeBooking = bookings.data.find((booking) => booking.status !== "Delivered");
-  const firstAction = role === "Shipper" ? { href: "/freight", title: "Post a load", detail: "Tell carriers what needs moving.", icon: PackageCheck } : { href: "/trips", title: "Post a trip", detail: "Tell shippers where you are going.", icon: Truck };
+  const firstAction = role === "Shipper" ? { href: "/freight", title: "Post a load", detail: "Tell carriers what needs moving." } : { href: "/trips", title: "Post a trip", detail: "Tell shippers where you are going." };
   const discoveryAction = role === "Shipper" ? { title: "Find a truck", detail: "Find capacity for your shipment." } : { title: "Find a load", detail: "Use your available space." };
   const orbit = { cx: 300, cy: 218, innerRadius: 120, outerRadius: 202 };
   const postAngles = { start: 280, end: 360 };
@@ -1873,11 +1864,7 @@ function HomePage() {
           pathId="homeArc-post"
           arcPath={postPath}
           arcPathClass="home-arc-path-post"
-          iconX={331}
-          iconY={50}
-          textOffset="70%"
           className="home-arc-link-post"
-          icon={firstAction.icon}
           step="01 / Start"
           title={firstAction.title}
           detail={firstAction.detail}
@@ -1887,11 +1874,7 @@ function HomePage() {
           pathId="homeArc-load"
           arcPath={loadPath}
           arcPathClass="home-arc-path-load"
-          iconX={365}
-          iconY={321}
-          textOffset="20%"
           className="home-arc-link-load"
-          icon={RouteIcon}
           step="02 / Find"
           title={discoveryAction.title}
           detail={discoveryAction.detail}
@@ -1901,11 +1884,7 @@ function HomePage() {
           pathId="homeArc-bookings"
           arcPath={bookingsPath}
           arcPathClass="home-arc-path-bookings"
-          iconX={124}
-          iconY={223}
-          textOffset="70%"
           className="home-arc-link-bookings"
-          icon={LockKeyhole}
           step="03 / Watch"
           title="My bookings"
           detail="See what needs your attention."
