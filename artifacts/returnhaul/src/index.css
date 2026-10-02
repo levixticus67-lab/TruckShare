@@ -286,8 +286,11 @@ textarea {
   position: absolute;
   z-index: 2;
   bottom: 7.6rem;
-  left: clamp(1.35rem, 5vw, 4.5rem);
+  left: 50%;
+  width: min(34rem, calc(100% - 2.7rem));
   max-width: 34rem;
+  text-align: center;
+  transform: translateX(-50%);
 }
 
 .home-hero-copy h2 {
@@ -295,6 +298,7 @@ textarea {
   color: #fbf7f1;
   font: 600 clamp(3.25rem, 7vw, 6rem)/.88 var(--app-font-serif);
   letter-spacing: -.075em;
+  text-align: center;
   text-wrap: balance;
 }
 
@@ -303,6 +307,7 @@ textarea {
   color: rgba(218, 218, 219, .62);
   font: 700 11px var(--app-font-mono);
   letter-spacing: .2em;
+  text-align: center;
   text-transform: uppercase;
 }
 
@@ -311,6 +316,7 @@ textarea {
   color: rgba(253, 249, 244, .9);
   font: 600 clamp(1.1rem, 2.2vw, 1.45rem)/1.12 var(--app-font-sans);
   letter-spacing: -.025em;
+  text-align: center;
 }
 
 .home-orbit-stage {
@@ -396,24 +402,25 @@ textarea {
 }
 
 .home-arc-text-step {
-  fill: rgba(229, 225, 224, .62);
-  font: 700 9px var(--app-font-mono);
-  letter-spacing: .14em;
+  fill: rgba(248, 246, 244, .9);
+  font: 800 10px var(--app-font-mono);
+  letter-spacing: .12em;
   text-transform: uppercase;
 }
 
 .home-arc-text-title {
-  font: 600 1.18rem/1 var(--app-font-serif);
+  fill: #fffaf6;
+  font: 700 1.3rem/1 var(--app-font-serif);
   letter-spacing: -.035em;
 }
 
 .home-arc-text-detail {
-  fill: rgba(230, 228, 227, .68);
-  font: 500 10px/1.2 var(--app-font-sans);
+  fill: rgba(250, 248, 246, .9);
+  font: 600 11px/1.2 var(--app-font-sans);
 }
 
 .home-arc-link-bookings .home-arc-text-title {
-  font-size: 1.08rem;
+  font-size: 1.2rem;
 }
 
 .home-orbit-center {
@@ -475,14 +482,17 @@ textarea {
   position: absolute;
   z-index: 2;
   bottom: 4.3rem;
-  left: clamp(1.35rem, 5vw, 4.5rem);
+  left: 50%;
   display: flex;
+  width: max-content;
   align-items: center;
+  justify-content: center;
   gap: .55rem;
   color: rgba(224, 225, 226, .58);
   font: 700 9px var(--app-font-mono);
   letter-spacing: .09em;
   text-transform: uppercase;
+  transform: translateX(-50%);
 }
 
 .home-hero-status i {
@@ -521,6 +531,10 @@ textarea {
   font: 700 8px var(--app-font-mono);
   letter-spacing: .12em;
   text-transform: uppercase;
+}
+
+.home-next-step > div {
+  text-align: center;
 }
 
 .home-next-step strong {
@@ -562,9 +576,11 @@ textarea {
   }
 
   .home-hero-support {
-    right: 2rem;
+    right: auto;
     bottom: 7.4rem;
-    left: 2rem;
+    left: 50%;
+    width: calc(100% - 4rem);
+    transform: translateX(-50%);
   }
 
   .home-hero-copy h2 {
@@ -586,15 +602,19 @@ textarea {
   }
 
   .home-arc-text-step {
-    font-size: 8px;
+    font-size: 9.5px;
   }
 
   .home-arc-text-title {
-    font-size: 1rem;
+    font-size: 1.1rem;
   }
 
   .home-arc-text-detail {
-    font-size: 8.5px;
+    font-size: 9.5px;
+  }
+
+  .home-arc-link-bookings .home-arc-text-title {
+    font-size: 1.05rem;
   }
 
   .home-arc-icon {
@@ -622,14 +642,15 @@ textarea {
   }
 
   .home-hero-status {
-    right: 1.4rem;
+    right: auto;
     bottom: 5rem;
-    left: 1.4rem;
+    left: 50%;
     justify-content: center;
     gap: .4rem;
     font-size: 7px;
     letter-spacing: .06em;
     white-space: nowrap;
+    transform: translateX(-50%);
   }
 
   .home-hero-status i {

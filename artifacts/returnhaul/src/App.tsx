@@ -1762,15 +1762,16 @@ function annularSectorPath(cx: number, cy: number, innerRadius: number, outerRad
   ].join(" ");
 }
 
-function annularArcPath(cx: number, cy: number, radius: number, startAngle: number, endAngle: number) {
+function annularArcPath(cx: number, cy: number, radius: number, startAngle: number, endAngle: number, reverse = false) {
   const point = (angle: number) => {
     const radians = (angle * Math.PI) / 180;
     return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) };
   };
-  const start = point(startAngle);
-  const end = point(endAngle);
-  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+  const start = point(reverse ? endAngle : startAngle);
+  const end = point(reverse ? startAngle : endAngle);
+  const largeArc = Math.abs(endAngle - startAngle) > 180 ? 1 : 0;
+  const sweep = reverse ? 0 : 1;
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
 }
 
 type HomeArcLinkProps = {
@@ -1794,13 +1795,13 @@ function HomeArcLink({ href, pathId, iconX, iconY, className, icon: Icon, step, 
       </div>
     </foreignObject>
     <text className="home-arc-text home-arc-text-step">
-      <textPath href={`#${pathId}-step`} startOffset="24%" textAnchor="middle">{step}</textPath>
+      <textPath href={`#${pathId}-step`} startOffset="50%" textAnchor="middle">{step}</textPath>
     </text>
     <text className="home-arc-text home-arc-text-title">
       <textPath href={`#${pathId}-title`} startOffset="50%" textAnchor="middle">{title}</textPath>
     </text>
     <text className="home-arc-text home-arc-text-detail">
-      <textPath href={`#${pathId}-detail`} startOffset="68%" textAnchor="middle">{detail}</textPath>
+      <textPath href={`#${pathId}-detail`} startOffset="50%" textAnchor="middle">{detail}</textPath>
     </text>
   </Link>;
 }
@@ -1826,9 +1827,9 @@ function HomePage() {
       detail: annularArcPath(orbit.cx, orbit.cy, textRadii.detail, postAngles.start, postAngles.end),
     },
     load: {
-      step: annularArcPath(orbit.cx, orbit.cy, textRadii.step, loadAngles.start, loadAngles.end),
-      title: annularArcPath(orbit.cx, orbit.cy, textRadii.title, loadAngles.start, loadAngles.end),
-      detail: annularArcPath(orbit.cx, orbit.cy, textRadii.detail, loadAngles.start, loadAngles.end),
+      step: annularArcPath(orbit.cx, orbit.cy, textRadii.step, loadAngles.start, loadAngles.end, true),
+      title: annularArcPath(orbit.cx, orbit.cy, textRadii.title, loadAngles.start, loadAngles.end, true),
+      detail: annularArcPath(orbit.cx, orbit.cy, textRadii.detail, loadAngles.start, loadAngles.end, true),
     },
     bookings: {
       step: annularArcPath(orbit.cx, orbit.cy, textRadii.step, bookingsAngles.start, bookingsAngles.end),
