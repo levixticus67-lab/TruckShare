@@ -206,8 +206,35 @@ textarea {
   margin: -2rem;
   overflow: hidden;
   border-radius: 2rem;
-  background: #17233b;
-  color: #fbf6f1;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  --home-hero-image-filter: saturate(.9) contrast(.96) brightness(.96);
+  --home-hero-scrim:
+    linear-gradient(180deg, hsl(var(--background) / .48) 0%, hsl(var(--background) / .28) 30%, hsl(var(--background) / .2) 58%, hsl(var(--background) / .68) 100%),
+    linear-gradient(90deg, hsl(var(--background) / .16), transparent 58%, hsl(var(--background) / .14));
+  --home-hero-top-glow: hsl(var(--primary) / .16);
+  --home-hero-center-glow: radial-gradient(ellipse, hsl(var(--primary) / .28), hsl(var(--primary) / .1) 48%, transparent 73%);
+  --home-orbit-card: hsl(var(--card) / .88);
+  --home-orbit-card-border: hsl(var(--border) / .9);
+  --home-orbit-guide: hsl(var(--primary) / .3);
+  --home-orbit-center:
+    radial-gradient(circle at 35% 22%, hsl(var(--primary) / .2), transparent 52%),
+    linear-gradient(145deg, hsl(var(--card) / .98), hsl(var(--secondary) / .96));
+}
+
+.dark .home-hero {
+  --home-hero-image-filter: saturate(.82) contrast(.96) brightness(.68);
+  --home-hero-scrim:
+    linear-gradient(180deg, rgba(11, 17, 34, .72) 0%, rgba(11, 17, 34, .54) 28%, rgba(11, 17, 34, .28) 58%, rgba(8, 14, 28, .84) 100%),
+    linear-gradient(90deg, rgba(10, 17, 34, .2), transparent 58%, rgba(16, 18, 34, .18));
+  --home-hero-top-glow: hsl(var(--primary) / .22);
+  --home-hero-center-glow: radial-gradient(ellipse, hsl(var(--primary) / .42), hsl(var(--primary) / .16) 48%, transparent 73%);
+  --home-orbit-card: hsl(var(--card) / .92);
+  --home-orbit-card-border: hsl(var(--border) / .9);
+  --home-orbit-guide: hsl(var(--primary) / .32);
+  --home-orbit-center:
+    radial-gradient(circle at 35% 22%, rgba(87, 112, 175, .72), transparent 52%),
+    linear-gradient(145deg, hsl(var(--card) / .98), hsl(var(--background) / .98));
 }
 
 .home-hero-image,
@@ -222,15 +249,13 @@ textarea {
   z-index: -3;
   object-fit: cover;
   object-position: 55% 78%;
-  filter: saturate(.72) contrast(.92) brightness(.7);
+  filter: var(--home-hero-image-filter);
   transform: scale(1.055);
 }
 
 .home-hero-scrim {
   z-index: -2;
-  background:
-    linear-gradient(180deg, rgba(17, 22, 42, .95) 0%, rgba(23, 31, 55, .78) 24%, rgba(19, 33, 54, .35) 54%, rgba(8, 16, 29, .84) 100%),
-    linear-gradient(90deg, rgba(10, 17, 34, .26), transparent 58%, rgba(16, 18, 34, .2));
+  background: var(--home-hero-scrim);
 }
 
 .home-hero-glow {
@@ -247,7 +272,7 @@ textarea {
   right: -10rem;
   width: 44rem;
   height: 44rem;
-  background: rgba(160, 74, 61, .3);
+  background: var(--home-hero-top-glow);
 }
 
 .home-hero-glow-center {
@@ -256,7 +281,7 @@ textarea {
   width: 28rem;
   height: 18rem;
   transform: translate(-50%, -50%);
-  background: radial-gradient(ellipse, rgba(243, 139, 67, .58), rgba(197, 89, 61, .18) 48%, transparent 73%);
+  background: var(--home-hero-center-glow);
 }
 
 .home-hero-content {
@@ -268,11 +293,11 @@ textarea {
 .home-hero-pill {
   width: fit-content;
   margin: 0 auto;
-  border: 1px solid rgba(224, 116, 82, .25);
+  border: 1px solid hsl(var(--primary) / .32);
   border-radius: 999px;
   padding: .45rem .95rem;
-  background: rgba(160, 74, 61, .24);
-  color: rgba(234, 143, 112, .9);
+  background: hsl(var(--primary) / .12);
+  color: hsl(var(--primary));
   font: 700 10px var(--app-font-mono);
   letter-spacing: .2em;
   text-transform: uppercase;
@@ -295,7 +320,7 @@ textarea {
 
 .home-hero-copy h2 {
   max-width: 39rem;
-  color: #fbf7f1;
+  color: hsl(var(--foreground));
   font: 600 clamp(3.25rem, 7vw, 6rem)/.88 var(--app-font-serif);
   letter-spacing: -.075em;
   text-align: center;
@@ -304,7 +329,7 @@ textarea {
 
 .home-hero-kicker {
   margin-top: 0;
-  color: rgba(218, 218, 219, .62);
+  color: hsl(var(--muted-foreground));
   font: 700 11px var(--app-font-mono);
   letter-spacing: .2em;
   text-align: center;
@@ -313,7 +338,7 @@ textarea {
 
 .home-hero-detail {
   margin-top: .65rem;
-  color: rgba(253, 249, 244, .9);
+  color: hsl(var(--foreground) / .92);
   font: 600 clamp(1.1rem, 2.2vw, 1.45rem)/1.12 var(--app-font-sans);
   letter-spacing: -.025em;
   text-align: center;
@@ -338,22 +363,22 @@ textarea {
 
 .home-orbit-guide {
   fill: none;
-  stroke: rgba(240, 187, 147, .24);
+  stroke: var(--home-orbit-guide);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .home-orbit-guide-outer {
-  stroke: rgba(240, 187, 147, .29);
+  stroke: var(--home-orbit-guide);
 }
 
 .home-orbit-guide-inner {
-  stroke: rgba(245, 173, 123, .2);
+  stroke: hsl(var(--primary) / .2);
 }
 
 .home-arc-path {
-  fill: rgba(22, 30, 46, .82);
-  stroke: rgba(153, 193, 233, .38);
+  fill: var(--home-orbit-card);
+  stroke: var(--home-orbit-card-border);
   stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
   cursor: pointer;
@@ -361,7 +386,7 @@ textarea {
 }
 
 .home-arc-link {
-  color: #f5f1ee;
+  color: hsl(var(--foreground));
   text-decoration: none;
   transition: filter 180ms ease;
   pointer-events: auto;
@@ -372,25 +397,25 @@ textarea {
 }
 
 .home-arc-text {
-  fill: #f5f1ee;
+  fill: hsl(var(--foreground));
   pointer-events: none;
 }
 
 .home-arc-text-step {
-  fill: rgba(248, 246, 244, .9);
+  fill: hsl(var(--muted-foreground));
   font: 800 10px var(--app-font-mono);
   letter-spacing: .12em;
   text-transform: uppercase;
 }
 
 .home-arc-text-title {
-  fill: #fffaf6;
+  fill: hsl(var(--foreground));
   font: 700 1.3rem/1 var(--app-font-serif);
   letter-spacing: -.035em;
 }
 
 .home-arc-text-detail {
-  fill: rgba(250, 248, 246, .9);
+  fill: hsl(var(--muted-foreground));
   font: 600 11px/1.2 var(--app-font-sans);
 }
 
@@ -408,16 +433,14 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(159, 192, 237, .42);
+  border: 1px solid hsl(var(--primary) / .38);
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 22%, rgba(87, 112, 175, .85), transparent 52%),
-    linear-gradient(145deg, rgba(35, 62, 116, .96), rgba(24, 32, 77, .98));
-  color: #f5ede8;
+  background: var(--home-orbit-center);
+  color: hsl(var(--foreground));
   box-shadow:
-    0 0 0 10px rgba(17, 33, 71, .28),
-    0 0 0 11px rgba(236, 161, 113, .17),
-    0 19px 32px rgba(4, 11, 31, .42),
+    0 0 0 10px hsl(var(--background) / .36),
+    0 0 0 11px hsl(var(--primary) / .2),
+    0 19px 32px hsl(var(--foreground) / .22),
     inset 0 1px 0 rgba(255, 255, 255, .22);
   transform: translate(-50%, -50%);
   transition: transform 180ms ease, filter 180ms ease;
@@ -430,11 +453,11 @@ textarea {
 
 .home-orbit-center > svg {
   margin-bottom: .65rem;
-  color: #ec9273;
+  color: hsl(var(--primary));
 }
 
 .home-orbit-center small {
-  color: rgba(235, 231, 231, .65);
+  color: hsl(var(--muted-foreground));
   font: 700 8px var(--app-font-mono);
   letter-spacing: .16em;
   text-transform: uppercase;
@@ -450,7 +473,7 @@ textarea {
   position: absolute;
   right: 1.15rem;
   bottom: 1.2rem;
-  color: rgba(240, 153, 118, .88);
+  color: hsl(var(--primary));
 }
 
 .home-hero-status {
@@ -463,7 +486,7 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: .55rem;
-  color: rgba(224, 225, 226, .58);
+  color: hsl(var(--foreground) / .72);
   font: 700 9px var(--app-font-mono);
   letter-spacing: .09em;
   text-transform: uppercase;
@@ -474,7 +497,7 @@ textarea {
   display: block;
   width: 1.6rem;
   height: 1px;
-  background: rgba(220, 222, 225, .3);
+  background: hsl(var(--foreground) / .28);
 }
 
 .home-status-dot {
@@ -539,7 +562,6 @@ textarea {
 
   .home-hero-image {
     object-position: 53% 83%;
-    filter: saturate(.7) contrast(.94) brightness(.58);
   }
 
   .home-hero-content {
