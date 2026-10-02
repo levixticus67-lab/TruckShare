@@ -1777,8 +1777,11 @@ function annularArcPath(cx: number, cy: number, radius: number, startAngle: numb
 type HomeArcLinkProps = {
   href: string;
   pathId: string;
+  arcPath: string;
+  arcPathClass: string;
   iconX: number;
   iconY: number;
+  textOffset: string;
   className: string;
   icon: LucideIcon;
   step: string;
@@ -1786,8 +1789,9 @@ type HomeArcLinkProps = {
   detail: string;
 };
 
-function HomeArcLink({ href, pathId, iconX, iconY, className, icon: Icon, step, title, detail }: HomeArcLinkProps) {
+function HomeArcLink({ href, pathId, arcPath, arcPathClass, iconX, iconY, textOffset, className, icon: Icon, step, title, detail }: HomeArcLinkProps) {
   return <Link href={href} className={`home-arc-link ${className}`} aria-label={`${title}. ${detail}`}>
+    <path className={`home-arc-path ${arcPathClass}`} d={arcPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
     <title>{`${step}: ${title}. ${detail}`}</title>
     <foreignObject x={iconX} y={iconY} width={48} height={48} className="home-arc-icon-foreign">
       <div className="home-arc-icon-wrap">
@@ -1795,13 +1799,13 @@ function HomeArcLink({ href, pathId, iconX, iconY, className, icon: Icon, step, 
       </div>
     </foreignObject>
     <text className="home-arc-text home-arc-text-step">
-      <textPath href={`#${pathId}-step`} startOffset="50%" textAnchor="middle">{step}</textPath>
+      <textPath href={`#${pathId}-step`} startOffset={textOffset} textAnchor="middle">{step}</textPath>
     </text>
     <text className="home-arc-text home-arc-text-title">
-      <textPath href={`#${pathId}-title`} startOffset="50%" textAnchor="middle">{title}</textPath>
+      <textPath href={`#${pathId}-title`} startOffset={textOffset} textAnchor="middle">{title}</textPath>
     </text>
     <text className="home-arc-text home-arc-text-detail">
-      <textPath href={`#${pathId}-detail`} startOffset="50%" textAnchor="middle">{detail}</textPath>
+      <textPath href={`#${pathId}-detail`} startOffset={textOffset} textAnchor="middle">{detail}</textPath>
     </text>
   </Link>;
 }
@@ -1812,14 +1816,14 @@ function HomePage() {
   const activeBooking = bookings.data.find((booking) => booking.status !== "Delivered");
   const firstAction = role === "Shipper" ? { href: "/freight", title: "Post a load", detail: "Tell carriers what needs moving.", icon: PackageCheck } : { href: "/trips", title: "Post a trip", detail: "Tell shippers where you are going.", icon: Truck };
   const discoveryAction = role === "Shipper" ? { title: "Find a truck", detail: "Find capacity for your shipment." } : { title: "Find a load", detail: "Use your available space." };
-  const orbit = { cx: 300, cy: 218, innerRadius: 108, outerRadius: 202 };
-  const postAngles = { start: 270, end: 370 };
-  const loadAngles = { start: 28, end: 128 };
-  const bookingsAngles = { start: 148, end: 248 };
+  const orbit = { cx: 300, cy: 218, innerRadius: 120, outerRadius: 202 };
+  const postAngles = { start: 280, end: 360 };
+  const loadAngles = { start: 38, end: 118 };
+  const bookingsAngles = { start: 158, end: 238 };
   const postPath = annularSectorPath(orbit.cx, orbit.cy, orbit.innerRadius, orbit.outerRadius, postAngles.start, postAngles.end);
   const loadPath = annularSectorPath(orbit.cx, orbit.cy, orbit.innerRadius, orbit.outerRadius, loadAngles.start, loadAngles.end);
   const bookingsPath = annularSectorPath(orbit.cx, orbit.cy, orbit.innerRadius, orbit.outerRadius, bookingsAngles.start, bookingsAngles.end);
-  const textRadii = { step: 182, title: 158, detail: 136 };
+  const textRadii = { step: 184, title: 161, detail: 138 };
   const textPaths = {
     post: {
       step: annularArcPath(orbit.cx, orbit.cy, textRadii.step, postAngles.start, postAngles.end),
@@ -1864,14 +1868,14 @@ function HomePage() {
         </defs>
         <circle className="home-orbit-guide home-orbit-guide-outer" cx={orbit.cx} cy={orbit.cy} r={orbit.outerRadius} />
         <circle className="home-orbit-guide home-orbit-guide-inner" cx={orbit.cx} cy={orbit.cy} r={orbit.innerRadius} />
-        <path className="home-arc-path home-arc-path-post" d={postPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
-        <path className="home-arc-path home-arc-path-load" d={loadPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
-        <path className="home-arc-path home-arc-path-bookings" d={bookingsPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
         <HomeArcLink
           href={firstAction.href}
           pathId="homeArc-post"
-          iconX={328}
-          iconY={58}
+          arcPath={postPath}
+          arcPathClass="home-arc-path-post"
+          iconX={331}
+          iconY={50}
+          textOffset="70%"
           className="home-arc-link-post"
           icon={firstAction.icon}
           step="01 / Start"
@@ -1881,8 +1885,11 @@ function HomePage() {
         <HomeArcLink
           href="/matches"
           pathId="homeArc-load"
-          iconX={350}
-          iconY={300}
+          arcPath={loadPath}
+          arcPathClass="home-arc-path-load"
+          iconX={365}
+          iconY={321}
+          textOffset="20%"
           className="home-arc-link-load"
           icon={RouteIcon}
           step="02 / Find"
@@ -1892,8 +1899,11 @@ function HomePage() {
         <HomeArcLink
           href="/bookings"
           pathId="homeArc-bookings"
-          iconX={120}
-          iconY={242}
+          arcPath={bookingsPath}
+          arcPathClass="home-arc-path-bookings"
+          iconX={124}
+          iconY={223}
+          textOffset="70%"
           className="home-arc-link-bookings"
           icon={LockKeyhole}
           step="03 / Watch"
