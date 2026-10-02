@@ -345,15 +345,6 @@ textarea {
   stroke: rgba(245, 173, 123, .2);
 }
 
-.home-orbit-divider {
-  fill: none;
-  stroke: rgba(246, 184, 143, .38);
-  stroke-width: 1;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-
 .home-arc-path {
   fill: rgba(22, 30, 46, .82);
   stroke: rgba(153, 193, 233, .38);

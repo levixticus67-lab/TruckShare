@@ -1750,12 +1750,14 @@ function annularSectorPath(cx: number, cy: number, innerRadius: number, outerRad
   const outerEnd = point(outerRadius, endAngle);
   const innerEnd = point(innerRadius, endAngle);
   const innerStart = point(innerRadius, startAngle);
+  const capRadius = (outerRadius - innerRadius) / 2;
   const largeArc = endAngle - startAngle > 180 ? 1 : 0;
   return [
     `M ${outerStart.x.toFixed(2)} ${outerStart.y.toFixed(2)}`,
     `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x.toFixed(2)} ${outerEnd.y.toFixed(2)}`,
-    `L ${innerEnd.x.toFixed(2)} ${innerEnd.y.toFixed(2)}`,
+    `A ${capRadius} ${capRadius} 0 0 1 ${innerEnd.x.toFixed(2)} ${innerEnd.y.toFixed(2)}`,
     `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
+    `A ${capRadius} ${capRadius} 0 0 1 ${outerStart.x.toFixed(2)} ${outerStart.y.toFixed(2)}`,
     "Z",
   ].join(" ");
 }
@@ -1769,13 +1771,6 @@ function annularArcPath(cx: number, cy: number, radius: number, startAngle: numb
   const end = point(endAngle);
   const largeArc = endAngle - startAngle > 180 ? 1 : 0;
   return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
-}
-
-function radialDividerPath(cx: number, cy: number, innerRadius: number, outerRadius: number, angle: number) {
-  const radians = (angle * Math.PI) / 180;
-  const inner = { x: cx + innerRadius * Math.cos(radians), y: cy + innerRadius * Math.sin(radians) };
-  const outer = { x: cx + outerRadius * Math.cos(radians), y: cy + outerRadius * Math.sin(radians) };
-  return `M ${inner.x.toFixed(2)} ${inner.y.toFixed(2)} L ${outer.x.toFixed(2)} ${outer.y.toFixed(2)}`;
 }
 
 type HomeArcLinkProps = {
@@ -1841,7 +1836,6 @@ function HomePage() {
       detail: annularArcPath(orbit.cx, orbit.cy, textRadii.detail, bookingsAngles.start, bookingsAngles.end),
     },
   };
-  const dividerAngles = [postAngles.start, postAngles.end, loadAngles.start, loadAngles.end, bookingsAngles.start, bookingsAngles.end];
   return <section className="home-hero" aria-labelledby="home-title">
     <img className="home-hero-image" src="/branding/story/home-road.jpg" alt="Truck travelling along a regional road at sunset" />
     <div className="home-hero-scrim" aria-hidden="true" />
@@ -1869,7 +1863,6 @@ function HomePage() {
         </defs>
         <circle className="home-orbit-guide home-orbit-guide-outer" cx={orbit.cx} cy={orbit.cy} r={orbit.outerRadius} />
         <circle className="home-orbit-guide home-orbit-guide-inner" cx={orbit.cx} cy={orbit.cy} r={orbit.innerRadius} />
-        {dividerAngles.map((angle) => <path key={angle} className="home-orbit-divider" d={radialDividerPath(orbit.cx, orbit.cy, orbit.innerRadius, orbit.outerRadius, angle)} />)}
         <path className="home-arc-path home-arc-path-post" d={postPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
         <path className="home-arc-path home-arc-path-load" d={loadPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
         <path className="home-arc-path home-arc-path-bookings" d={bookingsPath} fill="url(#homeArcFill)" filter="url(#homeArcShadow)" />
