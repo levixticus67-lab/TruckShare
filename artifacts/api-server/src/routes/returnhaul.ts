@@ -25,6 +25,8 @@ import {
   ListTripsResponse,
   GetDashboardResponse,
   GetFinanceOverviewResponse,
+  GetFinanceSettingsResponse,
+  UpdateFinanceSettingsBody,
   GetBookingFinanceResponse,
   ReleaseBookingPayoutBody,
   CreatePaymentCheckoutBody,
@@ -38,6 +40,9 @@ import {
 import {
   getBookingFinance,
   getFinanceOverview,
+  getFinanceSettings,
+  getPlatformFeeRate,
+  setPlatformFeeRate,
   hydrateFinanceState,
   markReleaseEligible,
   recordPayment,
@@ -398,21 +403,21 @@ function freightWithLocations(load: Freight) {
 }
 
 const trips: Trip[] = [
-  { id: "trip-1", carrier: "Moses K.", carrierRating: 4.9, origin: "Kampala", originCountry: "UG", destination: "Mbale", destinationCountry: "UG", corridor: "Kampala → Mbale", departureDate: "2026-08-28", departureTime: "07:30", vehicleType: "Fuso", capacityTons: 8, capacityM3: 42, price: 680000, currency: "UGX", priceType: "Fixed", status: "Available" },
-  { id: "trip-2", carrier: "Amina Logistics", carrierRating: 4.8, origin: "Kampala", originCountry: "UG", destination: "Mbarara", destinationCountry: "UG", corridor: "Kampala → Mbarara", departureDate: "2026-08-30", departureTime: "06:00", vehicleType: "Canter", capacityTons: 6, capacityM3: 30, price: 520000, currency: "UGX", priceType: "Per Ton", status: "Available" },
-  { id: "trip-3", carrier: "Thabo Transport", carrierRating: 4.7, origin: "Malaba", originCountry: "UG", destination: "Kampala", destinationCountry: "UG", corridor: "Malaba → Kampala", departureDate: "2026-09-02", departureTime: "09:15", vehicleType: "Trailer", capacityTons: 18, capacityM3: 70, price: 1560000, currency: "UGX", priceType: "Fixed", status: "Booked" },
-  { id: "trip-4", carrier: "Gulu North Haulage", carrierRating: 4.6, origin: "Kampala", originCountry: "UG", destination: "Gulu", destinationCountry: "UG", corridor: "Kampala → Gulu", departureDate: "2026-09-04", departureTime: "05:45", vehicleType: "Flatbed", capacityTons: 14, capacityM3: 62, price: 980000, currency: "UGX", priceType: "Fixed", status: "Available" },
+  { id: "trip-1", carrier: "Moses K.", carrierRating: 4.9, origin: "Kampala", originCountry: "UG", destination: "Mbale", destinationCountry: "UG", corridor: "Kampala â Mbale", departureDate: "2026-08-28", departureTime: "07:30", vehicleType: "Fuso", capacityTons: 8, capacityM3: 42, price: 680000, currency: "UGX", priceType: "Fixed", status: "Available" },
+  { id: "trip-2", carrier: "Amina Logistics", carrierRating: 4.8, origin: "Kampala", originCountry: "UG", destination: "Mbarara", destinationCountry: "UG", corridor: "Kampala â Mbarara", departureDate: "2026-08-30", departureTime: "06:00", vehicleType: "Canter", capacityTons: 6, capacityM3: 30, price: 520000, currency: "UGX", priceType: "Per Ton", status: "Available" },
+  { id: "trip-3", carrier: "Thabo Transport", carrierRating: 4.7, origin: "Malaba", originCountry: "UG", destination: "Kampala", destinationCountry: "UG", corridor: "Malaba â Kampala", departureDate: "2026-09-02", departureTime: "09:15", vehicleType: "Trailer", capacityTons: 18, capacityM3: 70, price: 1560000, currency: "UGX", priceType: "Fixed", status: "Booked" },
+  { id: "trip-4", carrier: "Gulu North Haulage", carrierRating: 4.6, origin: "Kampala", originCountry: "UG", destination: "Gulu", destinationCountry: "UG", corridor: "Kampala â Gulu", departureDate: "2026-09-04", departureTime: "05:45", vehicleType: "Flatbed", capacityTons: 14, capacityM3: 62, price: 980000, currency: "UGX", priceType: "Fixed", status: "Available" },
 ];
 
 const freight: Freight[] = [
-  { id: "load-1", shipper: "Kampala Grain Co.", pickup: "Kampala", pickupCountry: "UG", dropoff: "Mbale", dropoffCountry: "UG", corridor: "Kampala → Mbale", description: "Bagged grain and packaged food", cargoType: "Food & agriculture", weightTons: 4.5, volumeM3: 18, dimensions: "12 pallets", pickupDate: "2026-08-28", price: 540000, currency: "UGX", status: "Pending" },
-  { id: "load-2", shipper: "Mara Pharma", pickup: "Kampala", pickupCountry: "UG", dropoff: "Mbarara", dropoffCountry: "UG", corridor: "Kampala → Mbarara", description: "Temperature-sensitive pharmaceuticals", cargoType: "Pharmaceuticals", weightTons: 3, volumeM3: 12, dimensions: "8 crates", pickupDate: "2026-08-30", price: 420000, currency: "UGX", status: "Matched" },
-  { id: "load-3", shipper: "Eastline Hardware", pickup: "Malaba", pickupCountry: "UG", dropoff: "Kampala", dropoffCountry: "UG", corridor: "Malaba → Kampala", description: "Hardware and steel components", cargoType: "Construction", weightTons: 14, volumeM3: 48, dimensions: "Oversize", pickupDate: "2026-09-02", price: 1320000, currency: "UGX", status: "In-Transit" },
-  { id: "load-4", shipper: "Northern Fresh", pickup: "Kampala", pickupCountry: "UG", dropoff: "Gulu", dropoffCountry: "UG", corridor: "Kampala → Gulu", description: "Fresh produce and cold-chain cartons", cargoType: "Food & agriculture", weightTons: 9, volumeM3: 40, dimensions: "20 pallets", pickupDate: "2026-09-04", price: 860000, currency: "UGX", status: "Pending" },
+  { id: "load-1", shipper: "Kampala Grain Co.", pickup: "Kampala", pickupCountry: "UG", dropoff: "Mbale", dropoffCountry: "UG", corridor: "Kampala â Mbale", description: "Bagged grain and packaged food", cargoType: "Food & agriculture", weightTons: 4.5, volumeM3: 18, dimensions: "12 pallets", pickupDate: "2026-08-28", price: 540000, currency: "UGX", status: "Pending" },
+  { id: "load-2", shipper: "Mara Pharma", pickup: "Kampala", pickupCountry: "UG", dropoff: "Mbarara", dropoffCountry: "UG", corridor: "Kampala â Mbarara", description: "Temperature-sensitive pharmaceuticals", cargoType: "Pharmaceuticals", weightTons: 3, volumeM3: 12, dimensions: "8 crates", pickupDate: "2026-08-30", price: 420000, currency: "UGX", status: "Matched" },
+  { id: "load-3", shipper: "Eastline Hardware", pickup: "Malaba", pickupCountry: "UG", dropoff: "Kampala", dropoffCountry: "UG", corridor: "Malaba â Kampala", description: "Hardware and steel components", cargoType: "Construction", weightTons: 14, volumeM3: 48, dimensions: "Oversize", pickupDate: "2026-09-02", price: 1320000, currency: "UGX", status: "In-Transit" },
+  { id: "load-4", shipper: "Northern Fresh", pickup: "Kampala", pickupCountry: "UG", dropoff: "Gulu", dropoffCountry: "UG", corridor: "Kampala â Gulu", description: "Fresh produce and cold-chain cartons", cargoType: "Food & agriculture", weightTons: 9, volumeM3: 40, dimensions: "20 pallets", pickupDate: "2026-09-04", price: 860000, currency: "UGX", status: "Pending" },
 ];
 
 const bookings: Booking[] = [
-  { id: "booking-1", tripId: "trip-3", freightId: "load-3", corridor: "Malaba → Kampala", originCountry: "UG", destinationCountry: "UG", amount: 1320000, currency: "UGX", commissionAmount: 158400, carrierPayout: 1161600, paymentNetwork: "MTN MoMo", paymentStatus: "Paid", escrowStatus: "Held", status: "At Border", bookedAt: "2026-08-22", podStatus: "Not requested", podOtp: "4312" },
+  { id: "booking-1", tripId: "trip-3", freightId: "load-3", corridor: "Malaba â Kampala", originCountry: "UG", destinationCountry: "UG", amount: 1320000, currency: "UGX", commissionAmount: 158400, carrierPayout: 1161600, paymentNetwork: "MTN MoMo", paymentStatus: "Paid", escrowStatus: "Held", status: "At Border", bookedAt: "2026-08-22", podStatus: "Not requested", podOtp: "4312" },
 ];
 
 const payments: Payment[] = [
@@ -427,13 +432,13 @@ const borderMilestones: BorderMilestone[] = [
 
 const messages = [
   { id: "msg-1", sender: "Kivu Foods", body: "Hi Moses, can you confirm the pickup window at our Kampala warehouse?", sentAt: "09:42", read: true },
-  { id: "msg-2", sender: "You", body: "Confirmed. I’ll be there between 08:00 and 09:00 on Friday.", sentAt: "09:47", read: true },
+  { id: "msg-2", sender: "You", body: "Confirmed. Iâll be there between 08:00 and 09:00 on Friday.", sentAt: "09:47", read: true },
   { id: "msg-3", sender: "Kivu Foods", body: "Perfect. The consignment note is ready in the documents hub.", sentAt: "09:49", read: false },
 ];
 
 const documents = [
-  { id: "doc-1", name: "Consignment note — Eastline Hardware", type: "Consignment note", uploadedBy: "Eastline Hardware", uploadedAt: "Aug 22, 2026", size: "1.8 MB", status: "Verified" },
-  { id: "doc-2", name: "Customs clearance — Malaba", type: "Customs form", uploadedBy: "Thabo Transport", uploadedAt: "Aug 22, 2026", size: "842 KB", status: "Pending" },
+  { id: "doc-1", name: "Consignment note â Eastline Hardware", type: "Consignment note", uploadedBy: "Eastline Hardware", uploadedAt: "Aug 22, 2026", size: "1.8 MB", status: "Verified" },
+  { id: "doc-2", name: "Customs clearance â Malaba", type: "Customs form", uploadedBy: "Thabo Transport", uploadedAt: "Aug 22, 2026", size: "842 KB", status: "Pending" },
 ];
 
 const users: User[] = [
@@ -443,18 +448,18 @@ const users: User[] = [
 ];
 
 const verifications: Verification[] = [
-  { id: "verification-1", userId: "user-3", name: "Thabo Transport", phone: "+256 781 333 444", nin: "CM9000••••", licenseNumber: "DL-UG-20481", logbookNumber: "LB-77821", logbookPhotoName: "thabo-logbook.jpg", status: "Pending", submittedAt: "2026-08-26" },
+  { id: "verification-1", userId: "user-3", name: "Thabo Transport", phone: "+256 781 333 444", nin: "CM9000â¢â¢â¢â¢", licenseNumber: "DL-UG-20481", logbookNumber: "LB-77821", logbookPhotoName: "thabo-logbook.jpg", status: "Pending", submittedAt: "2026-08-26" },
 ];
 
 const brokerRequests: BrokerRequest[] = [
-  { id: "request-load-1", kind: "Load", entityId: "load-1", title: "Bagged grain and packaged food", counterpart: "Kampala Grain Co.", corridor: "Kampala → Mbale", date: "2026-08-28", priority: "High", status: "New", notes: ["Confirm loading window and final pallet count."], createdAt: "2026-08-26T08:42:00.000Z", updatedAt: "2026-08-26T08:42:00.000Z" },
-  { id: "request-trip-1", kind: "Trip", entityId: "trip-1", title: "Fuso · 8 tons available", counterpart: "Moses K.", corridor: "Kampala → Mbale", date: "2026-08-28", priority: "Normal", status: "Matching", notes: ["Return capacity needs a compatible load."], createdAt: "2026-08-25T14:10:00.000Z", updatedAt: "2026-08-26T09:12:00.000Z" },
-  { id: "request-load-2", kind: "Load", entityId: "load-2", title: "Temperature-sensitive pharmaceuticals", counterpart: "Mara Pharma", corridor: "Kampala → Mbarara", date: "2026-08-30", priority: "Urgent", status: "Offer sent", proposedMatchId: "trip-2", notes: ["Carrier must confirm cold-chain handling before assignment."], createdAt: "2026-08-25T11:30:00.000Z", updatedAt: "2026-08-26T10:04:00.000Z" },
-  { id: "request-trip-2", kind: "Trip", entityId: "trip-2", title: "Canter · 6 tons available", counterpart: "Amina Logistics", corridor: "Kampala → Mbarara", date: "2026-08-30", priority: "High", status: "Offer sent", proposedMatchId: "load-2", notes: ["Awaiting carrier confirmation on temperature controls."], createdAt: "2026-08-25T12:05:00.000Z", updatedAt: "2026-08-26T10:04:00.000Z" },
-  { id: "request-load-3", kind: "Load", entityId: "load-3", title: "Hardware and steel components", counterpart: "Eastline Hardware", corridor: "Malaba → Kampala", date: "2026-09-02", priority: "Normal", status: "In progress", notes: ["Border documents are being checked at Malaba."], createdAt: "2026-08-22T07:25:00.000Z", updatedAt: "2026-08-26T08:20:00.000Z" },
-  { id: "request-trip-3", kind: "Trip", entityId: "trip-3", title: "Trailer · 18 tons available", counterpart: "Thabo Transport", corridor: "Malaba → Kampala", date: "2026-09-02", priority: "Normal", status: "Assigned", proposedMatchId: "load-3", notes: ["Assigned to Eastline Hardware booking."], createdAt: "2026-08-22T07:40:00.000Z", updatedAt: "2026-08-22T09:00:00.000Z" },
-  { id: "request-load-4", kind: "Load", entityId: "load-4", title: "Fresh produce and cold-chain cartons", counterpart: "Northern Fresh", corridor: "Kampala → Gulu", date: "2026-09-04", priority: "High", status: "New", notes: ["Confirm cold-chain equipment and pickup window."], createdAt: "2026-08-26T07:05:00.000Z", updatedAt: "2026-08-26T07:05:00.000Z" },
-  { id: "request-trip-4", kind: "Trip", entityId: "trip-4", title: "Flatbed · 14 tons available", counterpart: "Gulu North Haulage", corridor: "Kampala → Gulu", date: "2026-09-04", priority: "Normal", status: "Matching", notes: ["Available for a suitable northbound load."], createdAt: "2026-08-26T07:30:00.000Z", updatedAt: "2026-08-26T07:30:00.000Z" },
+  { id: "request-load-1", kind: "Load", entityId: "load-1", title: "Bagged grain and packaged food", counterpart: "Kampala Grain Co.", corridor: "Kampala â Mbale", date: "2026-08-28", priority: "High", status: "New", notes: ["Confirm loading window and final pallet count."], createdAt: "2026-08-26T08:42:00.000Z", updatedAt: "2026-08-26T08:42:00.000Z" },
+  { id: "request-trip-1", kind: "Trip", entityId: "trip-1", title: "Fuso Â· 8 tons available", counterpart: "Moses K.", corridor: "Kampala â Mbale", date: "2026-08-28", priority: "Normal", status: "Matching", notes: ["Return capacity needs a compatible load."], createdAt: "2026-08-25T14:10:00.000Z", updatedAt: "2026-08-26T09:12:00.000Z" },
+  { id: "request-load-2", kind: "Load", entityId: "load-2", title: "Temperature-sensitive pharmaceuticals", counterpart: "Mara Pharma", corridor: "Kampala â Mbarara", date: "2026-08-30", priority: "Urgent", status: "Offer sent", proposedMatchId: "trip-2", notes: ["Carrier must confirm cold-chain handling before assignment."], createdAt: "2026-08-25T11:30:00.000Z", updatedAt: "2026-08-26T10:04:00.000Z" },
+  { id: "request-trip-2", kind: "Trip", entityId: "trip-2", title: "Canter Â· 6 tons available", counterpart: "Amina Logistics", corridor: "Kampala â Mbarara", date: "2026-08-30", priority: "High", status: "Offer sent", proposedMatchId: "load-2", notes: ["Awaiting carrier confirmation on temperature controls."], createdAt: "2026-08-25T12:05:00.000Z", updatedAt: "2026-08-26T10:04:00.000Z" },
+  { id: "request-load-3", kind: "Load", entityId: "load-3", title: "Hardware and steel components", counterpart: "Eastline Hardware", corridor: "Malaba â Kampala", date: "2026-09-02", priority: "Normal", status: "In progress", notes: ["Border documents are being checked at Malaba."], createdAt: "2026-08-22T07:25:00.000Z", updatedAt: "2026-08-26T08:20:00.000Z" },
+  { id: "request-trip-3", kind: "Trip", entityId: "trip-3", title: "Trailer Â· 18 tons available", counterpart: "Thabo Transport", corridor: "Malaba â Kampala", date: "2026-09-02", priority: "Normal", status: "Assigned", proposedMatchId: "load-3", notes: ["Assigned to Eastline Hardware booking."], createdAt: "2026-08-22T07:40:00.000Z", updatedAt: "2026-08-22T09:00:00.000Z" },
+  { id: "request-load-4", kind: "Load", entityId: "load-4", title: "Fresh produce and cold-chain cartons", counterpart: "Northern Fresh", corridor: "Kampala â Gulu", date: "2026-09-04", priority: "High", status: "New", notes: ["Confirm cold-chain equipment and pickup window."], createdAt: "2026-08-26T07:05:00.000Z", updatedAt: "2026-08-26T07:05:00.000Z" },
+  { id: "request-trip-4", kind: "Trip", entityId: "trip-4", title: "Flatbed Â· 14 tons available", counterpart: "Gulu North Haulage", corridor: "Kampala â Gulu", date: "2026-09-04", priority: "Normal", status: "Matching", notes: ["Available for a suitable northbound load."], createdAt: "2026-08-26T07:30:00.000Z", updatedAt: "2026-08-26T07:30:00.000Z" },
 ];
 
 const adminActivities: AdminActivity[] = [
@@ -475,6 +480,7 @@ const id = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const nowDate = () => new Date().toISOString().slice(0, 10);
 const number = (value: unknown) => typeof value === "number" ? value : Number(value);
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const platformCommissionAmount = (amount: number) => Math.round(amount * getPlatformFeeRate() / 100);
 const stateKeys = ["trips", "freight", "bookings", "payments", "finance", "borderMilestones", "messages", "documents", "users", "verifications", "brokerRequests", "adminActivities"] as const;
 type StateKey = (typeof stateKeys)[number];
 let stateReady: Promise<void> | undefined;
@@ -867,7 +873,7 @@ function brokerMatchSuggestions(request: BrokerRequest) {
       .map((trip) => ({
         id: trip.id,
         kind: "Trip" as const,
-        title: `${trip.vehicleType} · ${trip.capacityTons} tons available`,
+        title: `${trip.vehicleType} Â· ${trip.capacityTons} tons available`,
         counterpart: trip.carrier,
         corridor: trip.corridor,
         date: trip.departureDate,
@@ -929,11 +935,30 @@ router.get("/dashboard", (_req, res) => {
     totalEscrow,
     matchRate: 87,
     recentActivity: [
-      { id: "activity-1", label: "New match found", detail: "Kampala → Mbale · 92% compatible", time: "12 min ago", tone: "amber" },
-      { id: "activity-2", label: "Mobile money held", detail: "Eastline Hardware · UGX 1,320,000", time: "1 hr ago", tone: "green" },
-      { id: "activity-3", label: "Verification submitted", detail: "Thabo Transport · Driver documents", time: "3 hrs ago", tone: "amber" },
+      { id: "activity-1", label: "New match found", detail: "Kampala â Mbale Â· 92% compatible", time: "12 min ago", tone: "amber" },
+      { id: "activity-2", label: "Mobile money held", detail: "Eastline Hardware Â· UGX 1,320,000", time: "1 hr ago", tone: "green" },
+      { id: "activity-3", label: "Verification submitted", detail: "Thabo Transport Â· Driver documents", time: "3 hrs ago", tone: "amber" },
     ],
   }));
+});
+
+router.get("/finance/settings", (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  res.json(GetFinanceSettingsResponse.parse(getFinanceSettings()));
+});
+
+router.patch("/finance/settings", async (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  const data = UpdateFinanceSettingsBody.parse(req.body);
+  const previousRate = getPlatformFeeRate();
+  const settings = setPlatformFeeRate(data.platformFeeRate);
+  if (settings.platformFeeRate !== previousRate) {
+    recordAdminActivity(undefined, "Platform fee rate changed", "Platform commission changed from " + previousRate + "% to " + settings.platformFeeRate + "%.", user.name);
+  }
+  await persistDatabaseState();
+  res.json(GetFinanceSettingsResponse.parse(settings));
 });
 
 router.get("/finance/overview", (req, res) => {
@@ -975,6 +1000,10 @@ router.post("/finance/bookings/:id/release", async (req, res) => {
   const user = authenticatedUser(req);
   if (!user || user.role !== "Admin") {
     res.status(403).json({ error: "Only finance administrators can release carrier payouts." });
+    return;
+  }
+  if (process.env.NODE_ENV === "production") {
+    res.status(501).json({ error: "Live carrier transfers are not integrated yet; payout remains held." });
     return;
   }
   const booking = bookings.find((item) => item.id === text(req.params.id));
@@ -1518,7 +1547,7 @@ router.post("/trips", async (req, res) => {
     destinationCountry,
     destinationLocation: submittedLocation(data.destinationLocation, data.destination, destinationCountry),
     departureTime: text(req.body?.departureTime) || "07:00",
-    corridor: `${data.origin.split(",")[0]} → ${data.destination.split(",")[0]}`,
+    corridor: `${data.origin.split(",")[0]} â ${data.destination.split(",")[0]}`,
     currency: currencyCode(req.body?.currency, currencyForCountry(originCountry)),
     priceType: data.priceType as Trip["priceType"],
     vehicleType: data.vehicleType,
@@ -1528,7 +1557,7 @@ router.post("/trips", async (req, res) => {
   createBrokerRequest({
     kind: "Trip",
     entityId: trip.id,
-    title: `${trip.vehicleType} · ${trip.capacityTons} tons available`,
+    title: `${trip.vehicleType} Â· ${trip.capacityTons} tons available`,
     counterpart: user.name || trip.carrier,
     ownerUserId: user.id,
     corridor: trip.corridor,
@@ -1557,7 +1586,7 @@ router.patch("/trips/:id", async (req, res) => {
   Object.assign(trip, data);
   trip.originLocation = submittedLocation(data.originLocation, trip.origin, trip.originCountry);
   trip.destinationLocation = submittedLocation(data.destinationLocation, trip.destination, trip.destinationCountry);
-  trip.corridor = `${trip.origin.split(",")[0]} → ${trip.destination.split(",")[0]}`;
+  trip.corridor = `${trip.origin.split(",")[0]} â ${trip.destination.split(",")[0]}`;
   await persistDatabaseState();
   res.json(UpdateTripResponse.parse(tripWithLocations(trip)));
 });
@@ -1600,7 +1629,7 @@ router.post("/freight", async (req, res) => {
     dropoffLocation: submittedLocation(data.dropoffLocation, data.dropoff, dropoffCountry),
     cargoType: text(req.body?.cargoType) || "General cargo",
     volumeM3: number(req.body?.volumeM3) || 0,
-    corridor: `${data.pickup.split(",")[0]} → ${data.dropoff.split(",")[0]}`,
+    corridor: `${data.pickup.split(",")[0]} â ${data.dropoff.split(",")[0]}`,
     currency: currencyCode(req.body?.currency, currencyForCountry(pickupCountry)),
     status: "Pending",
   };
@@ -1637,7 +1666,7 @@ router.patch("/freight/:id", async (req, res) => {
   Object.assign(load, data);
   load.pickupLocation = submittedLocation(data.pickupLocation, load.pickup, load.pickupCountry);
   load.dropoffLocation = submittedLocation(data.dropoffLocation, load.dropoff, load.dropoffCountry);
-  load.corridor = `${load.pickup.split(",")[0]} → ${load.dropoff.split(",")[0]}`;
+  load.corridor = `${load.pickup.split(",")[0]} â ${load.dropoff.split(",")[0]}`;
   await persistDatabaseState();
   res.json(UpdateFreightResponse.parse(freightWithLocations(load)));
 });
@@ -1656,8 +1685,8 @@ router.get("/matches", (req, res) => {
     return Boolean(request && ["Offer sent", "Confirmed", "Assigned", "In progress"].includes(request.status));
   };
   const result = query.mode === "carrier"
-    ? freight.filter((load) => approvedRequest("Load", load.id) && (!corridor || load.corridor.toLowerCase().includes(corridor))).map((load) => ({ id: load.id, type: "freight", title: load.description, corridor: load.corridor, date: load.pickupDate, capacity: `${load.weightTons} tons · ${load.volumeM3} m³`, price: load.price, compatibility: 87, counterpart: load.shipper }))
-    : trips.filter((trip) => approvedRequest("Trip", trip.id) && (!corridor || trip.corridor.toLowerCase().includes(corridor))).map((trip) => ({ id: trip.id, type: "trip", title: `${trip.vehicleType} · ${trip.capacityTons} tons available`, corridor: trip.corridor, date: trip.departureDate, capacity: `${trip.capacityTons} tons · ${trip.capacityM3} m³`, price: trip.price, compatibility: 92, counterpart: trip.carrier }));
+    ? freight.filter((load) => approvedRequest("Load", load.id) && (!corridor || load.corridor.toLowerCase().includes(corridor))).map((load) => ({ id: load.id, type: "freight", title: load.description, corridor: load.corridor, date: load.pickupDate, capacity: `${load.weightTons} tons Â· ${load.volumeM3} mÂ³`, price: load.price, compatibility: 87, counterpart: load.shipper }))
+    : trips.filter((trip) => approvedRequest("Trip", trip.id) && (!corridor || trip.corridor.toLowerCase().includes(corridor))).map((trip) => ({ id: trip.id, type: "trip", title: `${trip.vehicleType} Â· ${trip.capacityTons} tons available`, corridor: trip.corridor, date: trip.departureDate, capacity: `${trip.capacityTons} tons Â· ${trip.capacityM3} mÂ³`, price: trip.price, compatibility: 92, counterpart: trip.carrier }));
   res.json(ListMatchesResponse.parse(result));
 });
 
@@ -1735,6 +1764,7 @@ router.post("/bookings", async (req, res) => {
   if (!user) return;
   const data = CreateBookingBody.parse(req.body);
   const amount = number(data.amount);
+  const commissionAmount = platformCommissionAmount(amount);
   const trip = trips.find((item) => item.id === data.tripId);
   const load = freight.find((item) => item.id === data.freightId);
   const booking: Booking = {
@@ -1744,8 +1774,8 @@ router.post("/bookings", async (req, res) => {
     destinationCountry: countryCode(data.destinationCountry || load?.dropoffCountry),
     amount,
     currency: currencyCode(data.currency || load?.currency || trip?.currency),
-    commissionAmount: Math.round(amount * 0.12),
-    carrierPayout: Math.round(amount * 0.88),
+    commissionAmount,
+    carrierPayout: amount - commissionAmount,
     paymentStatus: "Unpaid",
     escrowStatus: "Pending",
     status: "En Route to Pickup",
@@ -1872,7 +1902,9 @@ router.post("/bookings/:id/complete-delivery", async (req, res) => {
   res.json({ booking, payoutUnlocked: false, releaseEligible: true });
 });
 
-router.get("/payments", (_req, res) => {
+router.get("/payments", (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
   res.json(payments);
 });
 
@@ -1884,7 +1916,8 @@ router.get("/payments/quote", (req, res) => {
   const rate = exchangeRate(fromCurrency, toCurrency);
   const payerAmount = convertedAmount(settlementAmount, toCurrency, fromCurrency);
   const fee = Math.round(settlementAmount * 0.015);
-  const commissionAmount = Math.round(settlementAmount * 0.12);
+  const commissionRate = getPlatformFeeRate();
+  const commissionAmount = platformCommissionAmount(settlementAmount);
   res.json({
     quoteId: id("quote"),
     payerCountry: countryCode(req.query.payerCountry),
@@ -1898,8 +1931,8 @@ router.get("/payments/quote", (req, res) => {
     fee,
     commissionAmount,
     carrierPayout: settlementAmount - fee - commissionAmount,
-    commissionRate: 12,
-    carrierRate: 88,
+    commissionRate,
+    carrierRate: 100 - commissionRate,
     expiresInSeconds: 300,
     indicative: true,
   });
@@ -1912,6 +1945,10 @@ router.post("/payments/checkout", async (req, res) => {
     return;
   }
   const data = CreatePaymentCheckoutBody.parse(req.body);
+  if (process.env.NODE_ENV === "production" && (!process.env.FLW_SECRET_KEY || !process.env.FLW_SECRET_HASH)) {
+    res.status(503).json({ error: "Live Flutterwave checkout is unavailable until FLW_SECRET_KEY and FLW_SECRET_HASH are configured." });
+    return;
+  }
   const booking = bookings.find((item) => item.id === data.bookingId);
   if (!booking) {
     res.status(404).json({ error: "Booking not found." });
@@ -1935,7 +1972,7 @@ router.post("/payments/checkout", async (req, res) => {
   const settlementAmount = booking.amount;
   const payerCurrency = data.currency ?? settlementCurrency;
   const fee = Math.round(settlementAmount * 0.015);
-  const commissionAmount = Math.round(settlementAmount * 0.12);
+  const commissionAmount = platformCommissionAmount(settlementAmount);
   const existingPayment = payments.find((item) => item.bookingId === booking.id && item.status === "Initiated");
   if (existingPayment) {
     res.status(201).json(CreatePaymentCheckoutResponse.parse({
@@ -1983,6 +2020,8 @@ router.post("/payments/checkout", async (req, res) => {
       createdAt: nowDate(),
     };
     payments.unshift(payment);
+    booking.commissionAmount = commissionAmount;
+    booking.carrierPayout = settlementAmount - fee - commissionAmount;
     await persistDatabaseState();
     res.status(201).json(CreatePaymentCheckoutResponse.parse({
       bookingId: booking.id,
@@ -2112,6 +2151,10 @@ router.post("/webhooks/flutterwave", async (req, res) => {
 });
 
 router.post("/payments/simulate", async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(403).json({ error: "Simulated payments are disabled in production. Use Flutterwave checkout." });
+    return;
+  }
   const booking = bookings.find((item) => item.id === text(req.body?.bookingId));
   const network = text(req.body?.network) as PaymentNetwork;
   const phone = text(req.body?.phone);
@@ -2135,7 +2178,7 @@ router.post("/payments/simulate", async (req, res) => {
   const settlementAmount = number(req.body?.settlementAmount) > 0 ? number(req.body?.settlementAmount) : booking.amount;
   const amount = convertedAmount(settlementAmount, settlementCurrency, payerCurrency);
   const fee = Math.round(settlementAmount * 0.015);
-  const commissionAmount = Math.round(settlementAmount * 0.12);
+  const commissionAmount = platformCommissionAmount(settlementAmount);
   const payment: Payment = {
     id: id("payment"),
     bookingId: booking.id,
@@ -2156,6 +2199,8 @@ router.post("/payments/simulate", async (req, res) => {
     createdAt: nowDate(),
   };
   payments.unshift(payment);
+  booking.commissionAmount = commissionAmount;
+  booking.carrierPayout = settlementAmount - fee - commissionAmount;
   booking.paymentNetwork = network as Booking["paymentNetwork"];
   booking.paymentStatus = "Paid";
   booking.escrowStatus = "Held";
@@ -2397,6 +2442,7 @@ router.post("/admin/requests/:id/assign", async (req, res) => {
     return;
   }
   const amount = number(req.body?.amount) > 0 ? number(req.body.amount) : load.price || trip.price;
+  const commissionAmount = platformCommissionAmount(amount);
   const booking: Booking = {
     id: id("booking"),
     tripId: trip.id,
@@ -2406,8 +2452,8 @@ router.post("/admin/requests/:id/assign", async (req, res) => {
     destinationCountry: load.dropoffCountry,
     amount,
     currency: currencyCode(req.body?.currency || load.currency || trip.currency),
-    commissionAmount: Math.round(amount * 0.12),
-    carrierPayout: Math.round(amount * 0.88),
+    commissionAmount,
+    carrierPayout: amount - commissionAmount,
     paymentStatus: "Unpaid",
     escrowStatus: "Pending",
     status: "En Route to Pickup",
@@ -2444,7 +2490,7 @@ router.get("/admin/summary", (req, res) => {
   res.json({
     users,
     verifications,
-    revenue: Math.round(gross * 0.12),
+    revenue: platformCommissionAmount(gross),
     grossVolume: gross,
     activeBookings: bookings.filter((booking) => booking.status !== "Delivered").length,
     routes,

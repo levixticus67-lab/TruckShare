@@ -365,7 +365,7 @@ paths:
     get:
       operationId: listPayments
       tags: [payments]
-      summary: List payment settlement records
+      summary: List payment settlement records (admin only)
       responses:
         "200":
           description: Payment records
@@ -408,7 +408,7 @@ paths:
     post:
       operationId: simulatePayment
       tags: [payments]
-      summary: Simulate a payment and hold its settlement amount
+      summary: Simulate a payment and hold its settlement amount (non-production only)
       requestBody:
         required: true
         content:
@@ -494,6 +494,35 @@ paths:
                   duplicate: { type: boolean }
         "401":
           description: Invalid webhook signature
+  /finance/settings:
+    get:
+      operationId: getFinanceSettings
+      tags: [finance]
+      summary: Read the admin-controlled platform fee percentage
+      responses:
+        "200":
+          description: Current finance settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinanceSettings"
+    patch:
+      operationId: updateFinanceSettings
+      tags: [finance]
+      summary: Update the platform fee percentage (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFinanceSettingsInput"
+      responses:
+        "200":
+          description: Updated finance settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinanceSettings"
   /finance/overview:
     get:
       operationId: getFinanceOverview
@@ -896,6 +925,16 @@ components:
         carrierRate: { type: number }
         expiresInSeconds: { type: integer }
         indicative: { type: boolean }
+    FinanceSettings:
+      type: object
+      required: [platformFeeRate]
+      properties:
+        platformFeeRate: { type: number, minimum: 0, maximum: 98 }
+    UpdateFinanceSettingsInput:
+      type: object
+      required: [platformFeeRate]
+      properties:
+        platformFeeRate: { type: number, minimum: 0, maximum: 98 }
     FinanceOverview:
       type: object
       required: [currency, totalCollected, platformRevenue, providerFees, carrierFundsPendingRelease, payoutsDue, payoutsCompleted, refundsPending, reconciliationRequired, bookingsFunded]

@@ -95,13 +95,16 @@ type FinanceBookingState = {
   timeline: FinanceTimelineItem[];
 };
 
+export type FinanceSettings = { platformFeeRate: number };
+
 export type FinanceState = {
   bookings: FinanceBookingState[];
   webhookEvents: FinanceWebhookEvent[];
   refunds: FinanceRefund[];
+  settings: FinanceSettings;
 };
 
-const state: FinanceState = { bookings: [], webhookEvents: [], refunds: [] };
+const state: FinanceState = { bookings: [], webhookEvents: [], refunds: [], settings: { platformFeeRate: 12 } };
 
 function view(current: FinanceBookingState) {
   return { ...current, payout: current.payout ?? null };
@@ -390,6 +393,22 @@ export function completeWebhookEvent(providerEventId: string, status: "Processed
   return event;
 }
 
+export function getFinanceSettings(): FinanceSettings {
+  return { ...state.settings };
+}
+
+export function getPlatformFeeRate() {
+  return state.settings.platformFeeRate;
+}
+
+export function setPlatformFeeRate(platformFeeRate: number): FinanceSettings {
+  if (!Number.isFinite(platformFeeRate) || platformFeeRate < 0 || platformFeeRate > 98) {
+    throw new Error("Platform fee rate must be between 0 and 98.");
+  }
+  state.settings.platformFeeRate = platformFeeRate;
+  return getFinanceSettings();
+}
+
 export function serializeFinanceState() {
   return JSON.stringify(state);
 }
@@ -400,6 +419,10 @@ export function hydrateFinanceState(value: string) {
     if (Array.isArray(parsed.bookings)) state.bookings.splice(0, state.bookings.length, ...parsed.bookings);
     if (Array.isArray(parsed.webhookEvents)) state.webhookEvents.splice(0, state.webhookEvents.length, ...parsed.webhookEvents);
     if (Array.isArray(parsed.refunds)) state.refunds.splice(0, state.refunds.length, ...parsed.refunds);
+    const platformFeeRate = parsed.settings?.platformFeeRate;
+    if (typeof platformFeeRate === "number" && Number.isFinite(platformFeeRate) && platformFeeRate >= 0 && platformFeeRate <= 98) {
+      state.settings.platformFeeRate = platformFeeRate;
+    }
   } catch {
     // Invalid persisted finance state should not prevent the app from starting.
   }
