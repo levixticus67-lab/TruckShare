@@ -12,6 +12,12 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: FLW_SECRET_KEY
+        sync: false
+      - key: FLW_SECRET_HASH
+        sync: false
+      - key: FLW_REDIRECT_URL
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
