@@ -294,6 +294,14 @@ export function getBookingFinance(bookingId: string) {
   return current ? view(current) : undefined;
 }
 
+export function removeBookingFinance(bookingId: string, paymentIds: string[] = []) {
+  const bookingCount = state.bookings.length;
+  const refundCount = state.refunds.length;
+  state.bookings.splice(0, state.bookings.length, ...state.bookings.filter((item) => item.bookingId !== bookingId));
+  state.refunds.splice(0, state.refunds.length, ...state.refunds.filter((item) => item.bookingId !== bookingId && !paymentIds.includes(item.paymentId)));
+  return bookingCount !== state.bookings.length || refundCount !== state.refunds.length;
+}
+
 export function getFinanceOverview() {
   const overview = {
     currency: "UGX",

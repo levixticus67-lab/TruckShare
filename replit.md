@@ -41,7 +41,8 @@ Cross-border and regional freight matching that turns carrier backhaul capacity 
 - The client and API remain separate workspace artifacts so Vercel and Render can deploy independently.
 - The API contract is OpenAPI-first and generates both React Query hooks and Zod validators.
 - Calendar-only pickup and departure dates use `YYYY-MM-DD` strings to avoid timezone drift.
-- Preview mode seeds realistic corridor data in the API process; Neon schema is ready for persistent deployment data.
+- The API initializes transactional collections empty. On startup, it removes only the exact known legacy demo IDs from persisted state and keeps unrelated user records.
+- Country, currency, location, and supported-corridor lists are configuration/reference data, not sample transactions.
 
 ## Product
 
@@ -56,7 +57,7 @@ Cross-border and regional freight matching that turns carrier backhaul capacity 
 - Escrow state machine: Pending → Held → Released, gated by payment and delivery proof
 - Customs and border milestones with required-document tracking
 - Negotiation messages, call links, and logistics document hub
-- Uganda seed corridors: Kampala–Mbale, Kampala–Mbarara, Kampala–Gulu, Malaba–Kampala
+- Uganda corridor options are configuration data; trips, freight, bookings, payments, messages, and documents come from user actions.
 
 ## User preferences
 
