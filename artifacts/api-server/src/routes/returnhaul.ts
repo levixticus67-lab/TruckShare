@@ -1,6 +1,6 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { createHmac, randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, databaseConfigured, runtimeStateTable } from "@workspace/db";
 import {
   CreateBookingBody,
@@ -441,6 +441,7 @@ const platformCommissionAmount = (amount: number) => Math.round(amount * getPlat
 const stateKeys = ["trips", "freight", "bookings", "payments", "finance", "borderMilestones", "messages", "documents", "users", "verifications", "brokerRequests", "adminActivities"] as const;
 type StateKey = (typeof stateKeys)[number];
 let stateReady: Promise<void> | undefined;
+let stateRevisions = Object.fromEntries(stateKeys.map((key) => [key, 0])) as Record<StateKey, number>;
 
 function stateValue(key: StateKey) {
   if (key === "finance") return serializeFinanceState();
@@ -565,16 +566,27 @@ async function ensureDatabaseState() {
     stateReady = (async () => {
       const rows = await db.select().from(runtimeStateTable);
       if (rows.length === 0) {
-        await db.insert(runtimeStateTable).values(stateKeys.map((key) => ({ key, value: stateValue(key) })));
-        return;
+        await db.insert(runtimeStateTable)
+          .values(stateKeys.map((key) => ({ key, value: stateValue(key) })))
+          .onConflictDoNothing();
       }
-      for (const row of rows) applyState(row.key, row.value);
-      const existingKeys = new Set(rows.map((row) => row.key));
+      const loadedRows = await db.select().from(runtimeStateTable);
+      for (const row of loadedRows) {
+        if (!stateKeys.includes(row.key as StateKey)) continue;
+        const key = row.key as StateKey;
+        stateRevisions[key] = row.revision;
+        applyState(key, row.value);
+      }
+      const existingKeys = new Set(loadedRows.map((row) => row.key));
       const missingKeys = stateKeys.filter((key) => !existingKeys.has(key));
       if (missingKeys.length > 0) {
         await db.insert(runtimeStateTable)
           .values(missingKeys.map((key) => ({ key, value: stateValue(key) })))
           .onConflictDoNothing();
+        const refreshedRows = await db.select({ key: runtimeStateTable.key, revision: runtimeStateTable.revision }).from(runtimeStateTable);
+        for (const row of refreshedRows) {
+          if (stateKeys.includes(row.key as StateKey)) stateRevisions[row.key as StateKey] = row.revision;
+        }
       }
     })();
   }
@@ -589,16 +601,40 @@ async function ensureDatabaseState() {
   }
 }
 
+class StateConflictError extends Error {
+  constructor() {
+    super("Data changed during this request. Reload and retry.");
+    this.name = "StateConflictError";
+  }
+}
+
 async function persistDatabaseState() {
   if (!databaseConfigured) return;
-  await Promise.all(stateKeys.map((key) =>
-    db.insert(runtimeStateTable)
-      .values({ key, value: stateValue(key) })
-      .onConflictDoUpdate({
-        target: runtimeStateTable.key,
-        set: { value: stateValue(key), updatedAt: new Date() },
-      }),
-  ));
+  const expectedRevisions = { ...stateRevisions };
+  let committedRevisions: Record<StateKey, number>;
+  try {
+    committedRevisions = await db.transaction(async (tx) => {
+      const nextRevisions = { ...expectedRevisions };
+      for (const key of stateKeys) {
+        const [updated] = await tx
+          .update(runtimeStateTable)
+          .set({
+            value: stateValue(key),
+            revision: sql`${runtimeStateTable.revision} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(runtimeStateTable.key, key), eq(runtimeStateTable.revision, expectedRevisions[key])))
+          .returning({ revision: runtimeStateTable.revision });
+        if (!updated) throw new StateConflictError();
+        nextRevisions[key] = updated.revision;
+      }
+      return nextRevisions;
+    });
+  } catch (error) {
+    if (error instanceof StateConflictError) stateReady = undefined;
+    throw error;
+  }
+  stateRevisions = committedRevisions;
 }
 
 function issueToken(user: User) {
@@ -2499,6 +2535,14 @@ router.get("/admin/summary", (req, res) => {
     activeBookings: bookings.filter((booking) => booking.status !== "Delivered").length,
     routes,
   });
+});
+
+router.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+  if (error instanceof StateConflictError) {
+    res.status(409).json({ error: error.message });
+    return;
+  }
+  next(error);
 });
 
 export default router;

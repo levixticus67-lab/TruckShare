@@ -261,6 +261,7 @@ export const documentsTable = pgTable("returnhaul_documents", {
 export const runtimeStateTable = pgTable("returnhaul_runtime_state", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+  revision: integer("revision").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

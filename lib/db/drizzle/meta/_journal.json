@@ -50,6 +50,13 @@
       "when": 1788510000003,
       "tag": "0006_eac_user_phone_country",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791437500000,
+      "tag": "0007_runtime_state_revision",
+      "breakpoints": true
     }
   ]
 }
