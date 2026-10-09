@@ -812,12 +812,24 @@ async function sendVerificationPhone(phone: string, code: string) {
   return sendPhoneOtp(phone, code);
 }
 
-function configuredAdminPhones() {
-  return (process.env.ADMIN_PHONES || "").split(",").map((phone) => phone.replace(/\s+/g, "")).filter(Boolean);
+function configuredAdminContacts() {
+  return (process.env.ADMIN_PHONES || "").split(",").map((contact) => contact.trim()).filter(Boolean);
 }
 
 function isAdminPhone(phone: string) {
-  return configuredAdminPhones().includes(phone);
+  const normalizedPhone = normalizePhone(phone);
+  return configuredAdminContacts().some((contact) => !contact.includes("@") && normalizePhone(contact) === normalizedPhone);
+}
+
+function isAdminEmail(email: string) {
+  const normalizedEmail = normalizeEmail(email);
+  return configuredAdminContacts().some((contact) => contact.includes("@") && normalizeEmail(contact) === normalizedEmail);
+}
+
+function applyConfiguredAdminRole(user: User) {
+  const verifiedEmailMatches = Boolean(user.emailVerifiedAt && user.email && isAdminEmail(user.email));
+  const verifiedPhoneMatches = Boolean(user.phoneVerifiedAt && user.phone && isAdminPhone(user.phone));
+  if (verifiedEmailMatches || verifiedPhoneMatches) user.role = "Admin";
 }
 
 function developmentAdminAccessEnabled() {
@@ -1283,6 +1295,7 @@ router.post("/auth/verify-email-otp", async (req, res) => {
   };
   user.email = challenge.email;
   user.emailVerifiedAt = user.emailVerifiedAt || new Date().toISOString();
+  applyConfiguredAdminRole(user);
   if (!existingUser) users.push(user);
   const token = issueToken(user);
   sessions.set(token, user);
@@ -1365,6 +1378,7 @@ router.post("/auth/verify-phone-otp", async (req, res) => {
   user.country = challenge.country;
   user.phoneVerifiedAt = new Date().toISOString();
   user.phoneChangedAt = user.phoneVerifiedAt;
+  applyConfiguredAdminRole(user);
   await persistDatabaseState();
   res.json({ user: publicUser(user), phoneVerified: true });
 });
@@ -1480,6 +1494,7 @@ router.get("/auth/google/callback", async (req, res) => {
     user.googleId = googleId;
     user.email = email;
     user.emailVerifiedAt = user.emailVerifiedAt || new Date().toISOString();
+    applyConfiguredAdminRole(user);
     if (!existingUser) users.push(user);
     const sessionToken = issueToken(user);
     sessions.set(sessionToken, user);
