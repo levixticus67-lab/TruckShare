@@ -829,7 +829,11 @@ function isAdminEmail(email: string) {
 function applyConfiguredAdminRole(user: User) {
   const verifiedEmailMatches = Boolean(user.emailVerifiedAt && user.email && isAdminEmail(user.email));
   const verifiedPhoneMatches = Boolean(user.phoneVerifiedAt && user.phone && isAdminPhone(user.phone));
-  if (verifiedEmailMatches || verifiedPhoneMatches) user.role = "Admin";
+  if (verifiedEmailMatches || verifiedPhoneMatches) {
+    user.role = "Admin";
+  } else if (user.role === "Admin") {
+    user.role = user.roles?.[0] || "Carrier";
+  }
 }
 
 function developmentAdminAccessEnabled() {
