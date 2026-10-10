@@ -2087,5 +2087,32 @@ function AccountPage() {
   </div>;
 }
 
-function Router() { return <ErrorBoundary resetKey={useLocation()[0]}><Shell><Switch><Route path="/" component={HomePage} /><Route path="/trips" component={TripsPage} /><Route path="/freight" component={FreightPage} /><Route path="/matches" component={MatchesPage} /><Route path="/bookings" component={BookingsPage} /><Route path="/tracking" component={TrackingPage} /><Route path="/messages" component={MessagesPage} /><Route path="/account" component={AccountPage} /><Route path="/documents" component={DocumentsPage} /><Route path="/verification" component={VerificationPage} /><Route path="/admin/:section" component={AdminPage} /><Route path="/admin" component={AdminPage} /><Route path="/finance" component={FinanceOperationsPage} /><Route path="/payments" component={RegionalPaymentsPage} /><Route path="/regional" component={EacNetworkPage} /><Route component={NotFound} /></Switch></Shell></ErrorBoundary>; }
+function Router() {
+  return <ErrorBoundary resetKey={useLocation()[0]}>
+    <Switch>
+      <Route path="/admin/:section" component={AdminPage} />
+      <Route path="/admin" component={AdminPage} />
+      <Route>
+        <Shell>
+          <Switch>
+            <Route path="/" component={HomePage} />
+            <Route path="/trips" component={TripsPage} />
+            <Route path="/freight" component={FreightPage} />
+            <Route path="/matches" component={MatchesPage} />
+            <Route path="/bookings" component={BookingsPage} />
+            <Route path="/tracking" component={TrackingPage} />
+            <Route path="/messages" component={MessagesPage} />
+            <Route path="/account" component={AccountPage} />
+            <Route path="/documents" component={DocumentsPage} />
+            <Route path="/verification" component={VerificationPage} />
+            <Route path="/finance" component={FinanceOperationsPage} />
+            <Route path="/payments" component={RegionalPaymentsPage} />
+            <Route path="/regional" component={EacNetworkPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </Shell>
+      </Route>
+    </Switch>
+  </ErrorBoundary>;
+}
 export default function App() { return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /><InstallPrompt /></WouterRouter>; }
