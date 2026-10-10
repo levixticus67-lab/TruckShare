@@ -197,6 +197,222 @@ textarea {
   }
 }
 
+/* Admin desk refinements: keep actions legible and usable across themes and screens. */
+.admin-intro .page-header h2 {
+  color: var(--admin-ink);
+}
+
+.dark .admin-intro {
+  border-color: var(--admin-line);
+  background:
+    radial-gradient(ellipse at 92% 0%, hsl(20 88% 59% / .12), transparent 25rem),
+    linear-gradient(125deg, hsl(221 35% 20%), hsl(221 39% 14%));
+  box-shadow: 0 15px 36px hsl(0 0% 0% / .2), inset 0 1px 0 hsl(0 0% 100% / .06);
+}
+
+.admin-positive-badge {
+  border: 1px solid hsl(151 36% 46% / .24);
+  background: hsl(151 42% 94%);
+  color: hsl(154 51% 29%);
+}
+
+.dark .admin-positive-badge {
+  border-color: hsl(151 36% 52% / .28);
+  background: hsl(151 34% 18%);
+  color: hsl(150 54% 72%);
+}
+
+.admin-urgent-badge {
+  border: 1px solid hsl(9 45% 58% / .24);
+  background: hsl(9 70% 96%);
+  color: hsl(7 52% 42%);
+}
+
+.dark .admin-urgent-badge {
+  border-color: hsl(9 60% 62% / .28);
+  background: hsl(9 40% 20%);
+  color: hsl(10 80% 78%);
+}
+
+.admin-inline-error {
+  border: 1px solid hsl(var(--destructive) / .3);
+  border-radius: .75rem;
+  padding: .75rem;
+  background: hsl(var(--destructive) / .08);
+  color: hsl(var(--destructive));
+  font-size: .875rem;
+}
+
+.admin-toast {
+  position: fixed;
+  z-index: 70;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  width: min(28rem, calc(100vw - 2rem));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  padding: .9rem 1rem;
+  background: hsl(var(--card) / .98);
+  color: hsl(var(--card-foreground));
+  box-shadow: 0 18px 48px hsl(222 42% 10% / .24);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  animation: admin-toast-enter 180ms ease-out both;
+}
+
+.admin-toast p {
+  flex: 1;
+  margin: .05rem 0 0;
+  font-size: .875rem;
+  line-height: 1.45;
+}
+
+.admin-toast-icon {
+  display: inline-flex;
+  flex: none;
+  margin-top: .08rem;
+}
+
+.admin-toast.is-success .admin-toast-icon {
+  color: hsl(151 44% 40%);
+}
+
+.admin-toast.is-error .admin-toast-icon {
+  color: hsl(var(--destructive));
+}
+
+.admin-toast > button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: .5rem;
+  padding: .25rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.admin-toast > button:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.admin-action-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  align-self: center;
+  color: hsl(var(--muted-foreground));
+  font-size: .75rem;
+  font-weight: 600;
+}
+
+.admin-request-workspace {
+  scroll-margin-top: 6rem;
+}
+
+.admin-dashboard button:not(:disabled) {
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.admin-dashboard button:disabled {
+  cursor: not-allowed;
+}
+
+.admin-dashboard button:focus-visible,
+.admin-dashboard select:focus-visible,
+.admin-dashboard input:focus-visible {
+  outline: 2px solid hsl(var(--ring) / .7);
+  outline-offset: 2px;
+}
+
+.admin-dashboard button:not(:disabled):active {
+  transform: scale(.98);
+}
+
+.admin-dashboard .recharts-default-tooltip {
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: .75rem !important;
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  box-shadow: 0 12px 30px hsl(222 48% 18% / .12) !important;
+}
+
+.admin-dashboard .recharts-tooltip-label,
+.admin-dashboard .recharts-tooltip-item {
+  color: hsl(var(--card-foreground)) !important;
+}
+
+@keyframes admin-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(.5rem) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-dashboard button:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+  }
+
+  .admin-dashboard > :not(:first-child) {
+    margin-top: 0 !important;
+  }
+
+  .admin-dashboard > .admin-workspace {
+    order: 1;
+    width: 100%;
+  }
+
+  .admin-dashboard > .admin-primary-stats {
+    order: 2;
+  }
+
+  .admin-dashboard > .admin-analytics-grid {
+    order: 3;
+  }
+
+  .admin-dashboard > .admin-finance-stats {
+    order: 4;
+  }
+
+  .admin-request-workspace {
+    scroll-margin-top: 5.5rem;
+  }
+
+  .admin-toast {
+    right: .75rem;
+    bottom: calc(70px + max(.75rem, env(safe-area-inset-bottom)) + .75rem);
+    left: .75rem;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-dashboard button:not(:disabled),
+  .admin-toast {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* Home reference treatment: a dark road canvas with warm haze and orbiting
    glass actions. The rest of the workspace keeps its dashboard layout. */
 .home-hero {
