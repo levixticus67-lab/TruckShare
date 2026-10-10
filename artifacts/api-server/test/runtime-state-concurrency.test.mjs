@@ -105,8 +105,10 @@ test("a stale API instance gets a conflict instead of overwriting newer state", 
   const conflict = attempts.find((attempt) => attempt.status === 409);
   assert.match(conflict.body.error, /Data changed during this request/);
 
-  const listings = await Promise.all(baseUrls.map(async (baseUrl) => {
-    const response = await fetch(baseUrl + "/api/trips");
+  const listings = await Promise.all(baseUrls.map(async (baseUrl, index) => {
+    const response = await fetch(baseUrl + "/api/trips", {
+      headers: { authorization: "Bearer " + logins[index].token },
+    });
     assert.equal(response.status, 200);
     return response.json();
   }));
