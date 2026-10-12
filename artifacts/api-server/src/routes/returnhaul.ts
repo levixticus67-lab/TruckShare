@@ -1123,11 +1123,11 @@ router.get("/finance/bookings/:id", (req, res) => {
 router.post("/finance/bookings/:id/release", async (req, res) => {
   const user = authenticatedUser(req);
   if (!user || user.role !== "Admin") {
-    res.status(403).json({ error: "Only finance administrators can release carrier payouts." });
+    res.status(403).json({ error: "Only finance administrators can release transporter payouts." });
     return;
   }
   if (process.env.NODE_ENV === "production") {
-    res.status(501).json({ error: "Live carrier transfers are not integrated yet; payout remains held." });
+    res.status(501).json({ error: "Live transporter transfers are not integrated yet; payout remains held." });
     return;
   }
   const booking = bookings.find((item) => item.id === text(req.params.id));
@@ -1898,7 +1898,7 @@ router.post("/requests/:id/cancel", async (req, res) => {
     return;
   }
   if (user.role === "Admin" || request.ownerUserId !== user.id) {
-    res.status(403).json({ error: "Only the shipper who submitted this load can request its cancellation." });
+    res.status(403).json({ error: "Only the cargo owner who submitted this load can request its cancellation." });
     return;
   }
   if (["Closed", "Rejected", "Cancelled"].includes(request.status)) {
@@ -1925,7 +1925,7 @@ router.post("/requests/:id/cancel", async (req, res) => {
   request.cancellationResolvedAt = undefined;
   request.cancellationResolvedBy = undefined;
   request.cancellationResolutionNote = undefined;
-  request.notes.unshift("Shipper requested cancellation: " + reason);
+  request.notes.unshift("Cargo owner requested cancellation: " + reason);
   request.updatedAt = now;
   recordAdminActivity(request, "Cancellation requested", request.counterpart + " requested cancellation: " + reason, user.name);
   await persistDatabaseState();
@@ -2021,7 +2021,7 @@ router.post("/bookings/:id/border-milestones", async (req, res) => {
   if (!user) { res.status(401).json({ error: "Log in before adding a border milestone." }); return; }
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
-  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can update border milestones." }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned transporter or an admin can update border milestones." }); return; }
   const status = text(req.body?.status) as BorderMilestoneStatus || "Planned";
   const validStatuses: BorderMilestoneStatus[] = ["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"];
   if (!validStatuses.includes(status)) { res.status(400).json({ error: "Invalid border milestone status." }); return; }
@@ -2048,7 +2048,7 @@ router.patch("/bookings/:id/border-milestones/:milestoneId", async (req, res) =>
   const milestone = borderMilestones.find((item) => item.id === text(req.params.milestoneId) && item.bookingId === text(req.params.id));
   if (!user) { res.status(401).json({ error: "Log in before updating a border milestone." }); return; }
   if (!booking || !milestone) { res.status(404).json({ error: "Border milestone not found." }); return; }
-  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can update border milestones." }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned transporter or an admin can update border milestones." }); return; }
   const status = text(req.body?.status) as BorderMilestoneStatus;
   const validStatuses: BorderMilestoneStatus[] = ["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"];
   if (!validStatuses.includes(status)) { res.status(400).json({ error: "Invalid border milestone status." }); return; }
@@ -2067,7 +2067,7 @@ router.patch("/bookings/:id/status", async (req, res) => {
   const booking = bookings.find((item) => item.id === params.id);
   if (!user) { res.status(401).json({ error: "Log in before updating a booking status." }); return; }
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
-  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can update booking status." }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned transporter or an admin can update booking status." }); return; }
   const nextStatuses = bookingStatusTransitions[booking.status] || [];
   if (!nextStatuses.includes(data.status)) {
     res.status(400).json({ error: `Cannot move a booking from ${booking.status} to ${data.status}.` });
@@ -2092,7 +2092,7 @@ router.post("/bookings/:id/request-pod", async (req, res) => {
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!user) { res.status(401).json({ error: "Log in before requesting delivery confirmation." }); return; }
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
-  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can request delivery confirmation." }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned transporter or an admin can request delivery confirmation." }); return; }
   booking.podStatus = "OTP sent";
   await persistDatabaseState();
   res.json({ bookingId: booking.id, message: "Mock receiver OTP sent.", devOtp: process.env.NODE_ENV === "production" ? undefined : booking.podOtp });
@@ -2103,7 +2103,7 @@ router.post("/bookings/:id/complete-delivery", async (req, res) => {
   const booking = bookings.find((item) => item.id === text(req.params.id));
   if (!user) { res.status(401).json({ error: "Log in before confirming delivery." }); return; }
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
-  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned carrier or an admin can confirm delivery." }); return; }
+  if (!canManageBookingOperations(user, booking)) { res.status(403).json({ error: "Only the assigned transporter or an admin can confirm delivery." }); return; }
   if (booking.paymentStatus !== "Paid" || booking.escrowStatus !== "Held") {
     res.status(409).json({ error: "Payment must be held before delivery can release escrow." });
     return;
@@ -2687,7 +2687,7 @@ router.post("/admin/requests/:id/cancellation", async (req, res) => {
       return;
     }
     if (releasedFunds) {
-      res.status(409).json({ error: "Funds have already been released. Finance must resolve the carrier payment before this booking can be cancelled." });
+      res.status(409).json({ error: "Funds have already been released. Finance must resolve the transporter payment before this booking can be cancelled." });
       return;
     }
     if (hasFunding && !fullyRefunded) {
@@ -2711,7 +2711,7 @@ router.post("/admin/requests/:id/cancellation", async (req, res) => {
     for (const item of linked) {
       item.status = "Cancelled";
       item.updatedAt = now;
-      if (item.id !== request.id) item.notes.unshift("The linked load was cancelled by the shipper and approved by operations.");
+      if (item.id !== request.id) item.notes.unshift("The linked load was cancelled by the cargo owner and approved by operations.");
       recordAdminActivity(item, item.id === request.id ? "Cancellation approved" : "Linked booking cancelled", item.id === request.id ? request.cancellationResolutionNote : "The linked load and booking were cancelled by operations.", user.name);
     }
   } else {
@@ -2722,7 +2722,7 @@ router.post("/admin/requests/:id/cancellation", async (req, res) => {
       if (["Offer sent", "Confirmed"].includes(other.status)) other.status = "Matching";
       other.updatedAt = now;
       other.notes.unshift("The proposed load was cancelled. Operations must choose another match.");
-      recordAdminActivity(other, "Proposed load cancelled", "The shipper's load cancellation was approved.", user.name);
+      recordAdminActivity(other, "Proposed load cancelled", "The cargo owner's load cancellation was approved.", user.name);
     }
   }
   await persistDatabaseState();
