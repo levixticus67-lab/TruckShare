@@ -21,10 +21,22 @@ export interface Freight {
   dropoffLocation?: LocationPoint;
   corridor: string;
   description: string;
+  cargoType?: string;
   weightTons: number;
+  volumeM3?: number;
   dimensions: string;
   pickupDate: string;
   price: number;
   currency: CurrencyCode;
   status: FreightStatus;
+  requestId?: string;
+  requestStatus?: 'New' | 'Needs information' | 'Approved' | 'Matching' | 'Offer sent' | 'Confirmed' | 'Assigned' | 'In progress' | 'On hold' | 'Closed' | 'Rejected' | 'Cancelled';
+  submittedAt?: string;
+  editableUntil?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canRequestCancellation?: boolean;
+  cancellationStatus?: 'Requested' | 'Approved' | 'Declined';
+  cancellationReason?: string;
+  cancellationResolutionNote?: string;
 }

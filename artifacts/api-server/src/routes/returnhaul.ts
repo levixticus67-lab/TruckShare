@@ -112,7 +112,7 @@ type Freight = {
   pickupDate: string;
   price: number;
   currency: CurrencyCode;
-  status: "Pending" | "Matched" | "In-Transit" | "Delivered";
+  status: "Pending" | "Matched" | "In-Transit" | "Delivered" | "Cancelled";
 };
 
 type Booking = {
@@ -187,7 +187,8 @@ type Verification = {
 };
 
 type BrokerRequestKind = "Load" | "Trip";
-type BrokerRequestStatus = "New" | "Needs information" | "Approved" | "Matching" | "Offer sent" | "Confirmed" | "Assigned" | "In progress" | "On hold" | "Closed" | "Rejected";
+type BrokerRequestStatus = "New" | "Needs information" | "Approved" | "Matching" | "Offer sent" | "Confirmed" | "Assigned" | "In progress" | "On hold" | "Closed" | "Rejected" | "Cancelled";
+type CancellationStatus = "Requested" | "Approved" | "Declined";
 type BrokerPriority = "Low" | "Normal" | "High" | "Urgent";
 type BrokerRequest = {
   id: string;
@@ -206,6 +207,12 @@ type BrokerRequest = {
   notes: string[];
   createdAt: string;
   updatedAt: string;
+  cancellationStatus?: CancellationStatus;
+  cancellationReason?: string;
+  cancellationRequestedAt?: string;
+  cancellationResolvedAt?: string;
+  cancellationResolvedBy?: string;
+  cancellationResolutionNote?: string;
 };
 type AdminActivity = {
   id: string;
@@ -891,6 +898,65 @@ function brokerRequestForEntity(kind: BrokerRequestKind, entityId: string) {
   return brokerRequests.find((request) => request.kind === kind && request.entityId === entityId);
 }
 
+const FREIGHT_EDIT_WINDOW_MS = 20 * 60 * 1000;
+
+function hasActiveLoadProposal(loadId: string) {
+  return brokerRequests.some((request) => request.kind === "Trip" && request.proposedMatchId === loadId && !["Rejected", "Cancelled"].includes(request.status));
+}
+
+function loadIsUnprocessed(loadId: string) {
+  const request = brokerRequestForEntity("Load", loadId);
+  return Boolean(request && request.status === "New" && !request.cancellationStatus && !hasActiveLoadProposal(loadId) && !bookings.some((booking) => booking.freightId === loadId));
+}
+
+function requestHasPendingLoadCancellation(request: BrokerRequest) {
+  const loadId = request.kind === "Load" ? request.entityId : request.proposedMatchId;
+  return Boolean(loadId && brokerRequestForEntity("Load", loadId)?.cancellationStatus === "Requested");
+}
+
+function freightSubmissionMetadata(user: User, load: Freight) {
+  const request = brokerRequestForEntity("Load", load.id);
+  const createdAt = request ? Date.parse(request.createdAt) : Number.NaN;
+  const age = Date.now() - createdAt;
+  const editableUntil = Number.isFinite(createdAt) ? new Date(createdAt + FREIGHT_EDIT_WINDOW_MS).toISOString() : undefined;
+  const ownerCanManage = user.role !== "Admin" && load.ownerUserId === user.id;
+  const isUnprocessed = loadIsUnprocessed(load.id);
+  const terminal = request ? ["Closed", "Rejected", "Cancelled"].includes(request.status) : true;
+  return {
+    requestId: request?.id,
+    requestStatus: request?.status,
+    submittedAt: request?.createdAt,
+    editableUntil,
+    canEdit: ownerCanManage && isUnprocessed && request?.status === "New" && age >= 0 && age < FREIGHT_EDIT_WINDOW_MS,
+    canDelete: ownerCanManage && isUnprocessed,
+    canRequestCancellation: ownerCanManage && Boolean(request) && !isUnprocessed && !terminal && request?.cancellationStatus !== "Requested" && request?.cancellationStatus !== "Approved",
+    cancellationStatus: request?.cancellationStatus,
+    cancellationReason: request?.cancellationReason,
+    cancellationResolutionNote: request?.cancellationResolutionNote,
+  };
+}
+
+function removeLoadSubmission(load: Freight, actor: string, activityLabel: string) {
+  const request = brokerRequestForEntity("Load", load.id);
+  recordAdminActivity(undefined, activityLabel, load.description + " (" + load.id + ") was removed by " + actor + ".", actor);
+  if (request) {
+    brokerRequests.splice(brokerRequests.indexOf(request), 1);
+    for (let index = adminActivities.length - 1; index >= 0; index -= 1) {
+      if (adminActivities[index].requestId === request.id) adminActivities.splice(index, 1);
+    }
+  }
+  for (const other of brokerRequests) {
+    if (other.kind !== "Trip" || other.proposedMatchId !== load.id) continue;
+    other.proposedMatchId = undefined;
+    if (["Offer sent", "Confirmed"].includes(other.status)) other.status = "Matching";
+    other.updatedAt = new Date().toISOString();
+    other.notes.unshift("The proposed load was removed. Operations must choose another match.");
+    recordAdminActivity(other, "Proposed load removed", load.description + " was removed from this request's proposed matches.", actor);
+  }
+  const loadIndex = freight.findIndex((item) => item.id === load.id);
+  if (loadIndex >= 0) freight.splice(loadIndex, 1);
+}
+
 function recordAdminActivity(request: BrokerRequest | undefined, label: string, detail: string, actor: string) {
   adminActivities.unshift({
     id: id("activity"),
@@ -917,6 +983,7 @@ function createBrokerRequest(input: Omit<BrokerRequest, "id" | "createdAt" | "up
 }
 
 function brokerMatchSuggestions(request: BrokerRequest) {
+  if (request.status === "Cancelled" || request.cancellationStatus === "Requested") return [];
   if (request.kind === "Load") {
     const load = freight.find((item) => item.id === request.entityId);
     if (!load) return [];
@@ -938,7 +1005,7 @@ function brokerMatchSuggestions(request: BrokerRequest) {
   const trip = trips.find((item) => item.id === request.entityId);
   if (!trip) return [];
   return freight
-    .filter((load) => ["Pending", "Matched"].includes(load.status) && load.weightTons <= trip.capacityTons && load.volumeM3 <= trip.capacityM3)
+    .filter((load) => ["Pending", "Matched"].includes(load.status) && brokerRequestForEntity("Load", load.id)?.cancellationStatus !== "Requested" && load.weightTons <= trip.capacityTons && load.volumeM3 <= trip.capacityM3)
     .map((load) => ({
       id: load.id,
       kind: "Load" as const,
@@ -1657,11 +1724,12 @@ router.get("/freight", (req, res) => {
     return;
   }
   const query = ListFreightQueryParams.parse(req.query);
-  res.json(ListFreightResponse.parse(freight.filter((load) =>
+  const visible = freight.filter((load) =>
     (user.role === "Admin" || load.ownerUserId === user.id) &&
     (!query.corridor || load.corridor.toLowerCase().includes(query.corridor.toLowerCase())) &&
     (!query.date || load.pickupDate === query.date),
-  ).map(freightWithLocations)));
+  ).map((load) => ({ ...freightWithLocations(load), ...freightSubmissionMetadata(user, load) }));
+  res.json(ListFreightResponse.parse(visible));
 });
 
 router.post("/freight", async (req, res) => {
@@ -1715,19 +1783,56 @@ router.patch("/freight/:id", async (req, res) => {
     return;
   }
   const params = UpdateFreightParams.parse(req.params);
-  const data = UpdateFreightBody.parse(req.body);
   const load = freight.find((item) => item.id === params.id);
-  if (!load) { res.status(404).json({ error: "Freight request not found" }); return; }
+  if (!load) { res.status(404).json({ error: "Freight request not found." }); return; }
   if (user.role !== "Admin" && load.ownerUserId !== user.id) {
     res.status(403).json({ error: "You can only edit your own load submissions." });
     return;
   }
+  const request = brokerRequestForEntity("Load", load.id);
+  if (user.role !== "Admin") {
+    const age = request ? Date.now() - Date.parse(request.createdAt) : Number.NaN;
+    if (!request || !loadIsUnprocessed(load.id) || age < 0 || age >= FREIGHT_EDIT_WINDOW_MS) {
+      res.status(409).json({ error: "Loads can only be edited during the first 20 minutes, before broker review begins." });
+      return;
+    }
+  }
+  const data = UpdateFreightBody.parse(req.body);
   Object.assign(load, data);
   load.pickupLocation = submittedLocation(data.pickupLocation, load.pickup, load.pickupCountry);
   load.dropoffLocation = submittedLocation(data.dropoffLocation, load.dropoff, load.dropoffCountry);
-  load.corridor = `${load.pickup.split(",")[0]} → ${load.dropoff.split(",")[0]}`;
+  load.corridor = load.pickup.split(",")[0] + " → " + load.dropoff.split(",")[0];
+  if (request) {
+    request.title = load.description;
+    request.corridor = load.corridor;
+    request.date = load.pickupDate;
+    request.updatedAt = new Date().toISOString();
+    recordAdminActivity(request, "Submission updated", request.counterpart + " updated the load details.", user.name);
+  }
   await persistDatabaseState();
   res.json(UpdateFreightResponse.parse(freightWithLocations(load)));
+});
+
+router.delete("/freight/:id", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in before deleting a load request." });
+    return;
+  }
+  const params = UpdateFreightParams.parse(req.params);
+  const load = freight.find((item) => item.id === params.id);
+  if (!load) { res.status(404).json({ error: "Freight request not found." }); return; }
+  if (user.role === "Admin" || load.ownerUserId !== user.id) {
+    res.status(403).json({ error: "You can only delete your own unprocessed load submission." });
+    return;
+  }
+  if (!loadIsUnprocessed(load.id)) {
+    res.status(409).json({ error: "This load has entered broker review or has a proposed match. Request cancellation instead of deleting it." });
+    return;
+  }
+  removeLoadSubmission(load, user.name, "Unprocessed load deleted");
+  await persistDatabaseState();
+  res.status(204).end();
 });
 
 router.get("/matches", (req, res) => {
@@ -1760,6 +1865,7 @@ router.get("/requests", (req, res) => {
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
     .map((request) => ({
       id: request.id,
+      entityId: request.entityId,
       kind: request.kind,
       title: request.title,
       counterpart: request.counterpart,
@@ -1772,8 +1878,58 @@ router.get("/requests", (req, res) => {
       notes: request.notes,
       createdAt: request.createdAt,
       updatedAt: request.updatedAt,
+      cancellationStatus: request.cancellationStatus,
+      cancellationReason: request.cancellationReason,
+      cancellationRequestedAt: request.cancellationRequestedAt,
+      cancellationResolutionNote: request.cancellationResolutionNote,
     }));
   res.json(visible);
+});
+
+router.post("/requests/:id/cancel", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Log in before requesting cancellation." });
+    return;
+  }
+  const request = brokerRequests.find((item) => item.id === text(req.params.id));
+  if (!request || request.kind !== "Load") {
+    res.status(404).json({ error: "Load request not found." });
+    return;
+  }
+  if (user.role === "Admin" || request.ownerUserId !== user.id) {
+    res.status(403).json({ error: "Only the shipper who submitted this load can request its cancellation." });
+    return;
+  }
+  if (["Closed", "Rejected", "Cancelled"].includes(request.status)) {
+    res.status(409).json({ error: "This request is already closed and cannot be cancelled through the active workflow." });
+    return;
+  }
+  if (loadIsUnprocessed(request.entityId)) {
+    res.status(409).json({ error: "This load has not entered review yet. Delete the submission instead." });
+    return;
+  }
+  if (request.cancellationStatus === "Requested" || request.cancellationStatus === "Approved") {
+    res.status(409).json({ error: "A cancellation request is already active or has been approved." });
+    return;
+  }
+  const reason = text(req.body?.reason).trim();
+  if (reason.length < 5 || reason.length > 500) {
+    res.status(400).json({ error: "Give a cancellation reason of at least 5 characters." });
+    return;
+  }
+  const now = new Date().toISOString();
+  request.cancellationStatus = "Requested";
+  request.cancellationReason = reason;
+  request.cancellationRequestedAt = now;
+  request.cancellationResolvedAt = undefined;
+  request.cancellationResolvedBy = undefined;
+  request.cancellationResolutionNote = undefined;
+  request.notes.unshift("Shipper requested cancellation: " + reason);
+  request.updatedAt = now;
+  recordAdminActivity(request, "Cancellation requested", request.counterpart + " requested cancellation: " + reason, user.name);
+  await persistDatabaseState();
+  res.status(202).json(request);
 });
 
 router.post("/requests/:id/confirm", async (req, res) => {
@@ -1789,6 +1945,10 @@ router.post("/requests/:id/confirm", async (req, res) => {
   }
   if (user.role !== "Admin" && request.ownerUserId !== user.id) {
     res.status(403).json({ error: "You can only confirm your own broker request." });
+    return;
+  }
+  if (requestHasPendingLoadCancellation(request)) {
+    res.status(409).json({ error: "This load has a cancellation request pending with operations." });
     return;
   }
   if (request.status !== "Offer sent") {
@@ -2327,7 +2487,7 @@ router.patch("/verification/:id/review", async (req, res) => {
   res.json(verification);
 });
 
-const brokerRequestStatuses: BrokerRequestStatus[] = ["New", "Needs information", "Approved", "Matching", "Offer sent", "Confirmed", "Assigned", "In progress", "On hold", "Closed", "Rejected"];
+const brokerRequestStatuses: BrokerRequestStatus[] = ["New", "Needs information", "Approved", "Matching", "Offer sent", "Confirmed", "Assigned", "In progress", "On hold", "Closed", "Rejected", "Cancelled"];
 const brokerPriorities: BrokerPriority[] = ["Low", "Normal", "High", "Urgent"];
 const brokerRequestTransitions: Record<BrokerRequestStatus, BrokerRequestStatus[]> = {
   New: ["Needs information", "Approved", "On hold", "Rejected"],
@@ -2341,6 +2501,7 @@ const brokerRequestTransitions: Record<BrokerRequestStatus, BrokerRequestStatus[
   "On hold": ["New", "Needs information", "Approved", "Matching", "Rejected"],
   Closed: [],
   Rejected: [],
+  Cancelled: [],
 };
 
 router.get("/admin/operations", (req, res) => {
@@ -2371,14 +2532,28 @@ router.get("/admin/operations", (req, res) => {
       matching: brokerRequests.filter((request) => ["Approved", "Matching", "Offer sent"].includes(request.status)).length,
       activeOperations: brokerRequests.filter((request) => ["Confirmed", "Assigned", "In progress"].includes(request.status)).length,
       pendingVerifications: verifications.filter((item) => item.status === "Pending").length,
-      activeBookings: bookings.filter((booking) => booking.status !== "Delivered").length,
+      activeBookings: bookings.filter((booking) => !["Delivered", "Cancelled"].includes(booking.status)).length,
       grossVolume: bookings.reduce((sum, booking) => sum + booking.amount, 0),
       commissionValue: bookings.reduce((sum, booking) => sum + booking.commissionAmount, 0),
-      unpaidBookings: bookings.filter((booking) => booking.paymentStatus !== "Paid" && booking.status !== "Delivered").length,
+      unpaidBookings: bookings.filter((booking) => booking.paymentStatus !== "Paid" && !["Delivered", "Cancelled"].includes(booking.status)).length,
       borderIssues: bookings.filter((booking) => booking.status === "At Border").length,
     },
     actor: publicUser(user),
   });
+});
+
+router.delete("/admin/freight/:id", async (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  const load = freight.find((item) => item.id === text(req.params.id));
+  if (!load) { res.status(404).json({ error: "Freight request not found." }); return; }
+  if (bookings.some((booking) => booking.freightId === load.id)) {
+    res.status(409).json({ error: "A booked load cannot be deleted. Review its cancellation request instead." });
+    return;
+  }
+  removeLoadSubmission(load, user.name, "Load submission deleted by admin");
+  await persistDatabaseState();
+  res.status(204).end();
 });
 
 router.patch("/admin/requests/:id", async (req, res) => {
@@ -2393,6 +2568,10 @@ router.patch("/admin/requests/:id", async (req, res) => {
   const requestedPriority = text(req.body?.priority) as BrokerPriority;
   const note = text(req.body?.note);
   const assignedTo = text(req.body?.assignedTo);
+  if (requestHasPendingLoadCancellation(request) && requestedStatus && requestedStatus !== request.status) {
+    res.status(409).json({ error: "Resolve the pending load cancellation before changing its workflow status." });
+    return;
+  }
   if (requestedStatus && !brokerRequestStatuses.includes(requestedStatus)) {
     res.status(400).json({ error: "Invalid broker request status." });
     return;
@@ -2439,6 +2618,117 @@ router.patch("/admin/requests/:id", async (req, res) => {
   res.json(request);
 });
 
+router.post("/admin/requests/:id/cancellation", async (req, res) => {
+  const user = adminUser(req, res);
+  if (!user) return;
+  const request = brokerRequests.find((item) => item.id === text(req.params.id));
+  if (!request || request.kind !== "Load") {
+    res.status(404).json({ error: "Load request not found." });
+    return;
+  }
+  if (request.cancellationStatus !== "Requested") {
+    res.status(409).json({ error: "There is no pending cancellation request to resolve." });
+    return;
+  }
+  const decision = text(req.body?.decision);
+  const note = text(req.body?.note).trim();
+  if (!["approve", "decline"].includes(decision)) {
+    res.status(400).json({ error: "Choose approve or decline for this cancellation request." });
+    return;
+  }
+  if (note.length > 500 || (decision === "decline" && note.length < 3)) {
+    res.status(400).json({ error: "A decline needs an explanation of 3 to 500 characters." });
+    return;
+  }
+  const load = freight.find((item) => item.id === request.entityId);
+  if (!load) { res.status(404).json({ error: "The submitted load no longer exists." }); return; }
+  const now = new Date().toISOString();
+  if (decision === "decline") {
+    request.cancellationStatus = "Declined";
+    request.cancellationResolvedAt = now;
+    request.cancellationResolvedBy = user.name;
+    request.cancellationResolutionNote = note;
+    request.notes.unshift("Cancellation declined: " + note);
+    request.updatedAt = now;
+    recordAdminActivity(request, "Cancellation declined", note, user.name);
+    await persistDatabaseState();
+    res.json(request);
+    return;
+  }
+  const booking = bookings.find((item) => item.id === request.bookingId || item.freightId === load.id);
+  if (booking) {
+    if (booking.status !== "En Route to Pickup") {
+      res.status(409).json({ error: "This shipment has been picked up or is in transit. Do not auto-cancel it; operations must resolve the active transport issue." });
+      return;
+    }
+    const finance = getBookingFinance(booking.id);
+    const refundEntries = finance?.ledgerEntries.filter((entry) => entry.entryType === "REFUND" && entry.direction === "debit") || [];
+    const refundedAmount = refundEntries.reduce((sum, entry) => sum + entry.amount, 0);
+    const bookingPayments = payments.filter((payment) => payment.bookingId === booking.id);
+    const settledPayments = bookingPayments.filter((payment) => ["Held", "Released", "Refunded"].includes(payment.status));
+    const pendingPayment = bookingPayments.some((payment) => payment.status === "Initiated");
+    const releasedFunds = booking.escrowStatus === "Released" || bookingPayments.some((payment) => payment.status === "Released") || finance?.payoutState === "COMPLETED";
+    const payoutInProgress = finance && (["PENDING_RELEASE", "PROCESSING"].includes(finance.payoutState) || ["PAYOUT_PENDING", "PAYOUT_PROCESSING"].includes(finance.escrowState));
+    const refundPending = finance?.paymentState === "REFUND_PENDING" || finance?.escrowState === "REFUND_PENDING";
+    const hasFunding = booking.paymentStatus === "Paid" || booking.escrowStatus === "Held" || finance?.paymentState === "PAYMENT_VERIFIED" || finance?.escrowState === "FUNDS_HELD" || settledPayments.length > 0 || refundedAmount > 0;
+    const requiredRefundsByCurrency = new Map<string, number>();
+    for (const payment of settledPayments) {
+      requiredRefundsByCurrency.set(payment.settlementCurrency, (requiredRefundsByCurrency.get(payment.settlementCurrency) || 0) + payment.settlementAmount);
+    }
+    const completedRefundsByCurrency = new Map<string, number>();
+    for (const entry of refundEntries) {
+      completedRefundsByCurrency.set(entry.currency, (completedRefundsByCurrency.get(entry.currency) || 0) + entry.amount);
+    }
+    const fullyRefunded = requiredRefundsByCurrency.size > 0
+      ? Array.from(requiredRefundsByCurrency.entries()).every(([currency, amount]) => (completedRefundsByCurrency.get(currency) || 0) + 0.005 >= amount)
+      : refundedAmount + 0.005 >= booking.amount;
+    if (pendingPayment || payoutInProgress || refundPending) {
+      res.status(409).json({ error: "A payment, refund, or payout is still processing. Wait for finance to settle it before approving cancellation." });
+      return;
+    }
+    if (releasedFunds) {
+      res.status(409).json({ error: "Funds have already been released. Finance must resolve the carrier payment before this booking can be cancelled." });
+      return;
+    }
+    if (hasFunding && !fullyRefunded) {
+      res.status(409).json({ error: "The full amount of every settled payment must be refunded and the refunds completed before approving cancellation." });
+      return;
+    }
+  }
+  request.cancellationStatus = "Approved";
+  request.cancellationResolvedAt = now;
+  request.cancellationResolvedBy = user.name;
+  request.cancellationResolutionNote = note || "Cancellation approved by operations.";
+  request.status = "Cancelled";
+  request.updatedAt = now;
+  load.status = "Cancelled";
+  request.notes.unshift("Cancellation approved by operations.");
+  if (booking) {
+    booking.status = "Cancelled";
+    const trip = trips.find((item) => item.id === booking.tripId);
+    if (trip?.status === "Booked") trip.status = "Available";
+    const linked = brokerRequests.filter((item) => item.id === request.id || item.bookingId === booking.id || (item.kind === "Trip" && item.entityId === booking.tripId) || (item.kind === "Load" && item.entityId === booking.freightId));
+    for (const item of linked) {
+      item.status = "Cancelled";
+      item.updatedAt = now;
+      if (item.id !== request.id) item.notes.unshift("The linked load was cancelled by the shipper and approved by operations.");
+      recordAdminActivity(item, item.id === request.id ? "Cancellation approved" : "Linked booking cancelled", item.id === request.id ? request.cancellationResolutionNote : "The linked load and booking were cancelled by operations.", user.name);
+    }
+  } else {
+    recordAdminActivity(request, "Cancellation approved", request.cancellationResolutionNote, user.name);
+    for (const other of brokerRequests) {
+      if (other.id === request.id || other.kind !== "Trip" || other.proposedMatchId !== load.id) continue;
+      other.proposedMatchId = undefined;
+      if (["Offer sent", "Confirmed"].includes(other.status)) other.status = "Matching";
+      other.updatedAt = now;
+      other.notes.unshift("The proposed load was cancelled. Operations must choose another match.");
+      recordAdminActivity(other, "Proposed load cancelled", "The shipper's load cancellation was approved.", user.name);
+    }
+  }
+  await persistDatabaseState();
+  res.json(request);
+});
+
 router.post("/admin/requests/:id/offer", async (req, res) => {
   const user = adminUser(req, res);
   if (!user) return;
@@ -2446,6 +2736,10 @@ router.post("/admin/requests/:id/offer", async (req, res) => {
   const matchId = text(req.body?.matchId);
   if (!request || !matchId) {
     res.status(400).json({ error: "Choose a broker request and a suggested match." });
+    return;
+  }
+  if (requestHasPendingLoadCancellation(request)) {
+    res.status(409).json({ error: "Resolve the pending load cancellation before sending an offer." });
     return;
   }
   if (!["Approved", "Matching", "Offer sent"].includes(request.status)) {
@@ -2471,6 +2765,10 @@ router.post("/admin/requests/:id/assign", async (req, res) => {
   const request = brokerRequests.find((item) => item.id === text(req.params.id));
   if (!request) {
     res.status(404).json({ error: "Broker request not found." });
+    return;
+  }
+  if (requestHasPendingLoadCancellation(request)) {
+    res.status(409).json({ error: "Resolve the pending load cancellation before creating a booking." });
     return;
   }
   if (!["Offer sent", "Confirmed"].includes(request.status)) {
@@ -2551,7 +2849,7 @@ router.get("/admin/summary", (req, res) => {
     verifications,
     revenue: platformCommissionAmount(gross),
     grossVolume: gross,
-    activeBookings: bookings.filter((booking) => booking.status !== "Delivered").length,
+    activeBookings: bookings.filter((booking) => !["Delivered", "Cancelled"].includes(booking.status)).length,
     routes,
   });
 });

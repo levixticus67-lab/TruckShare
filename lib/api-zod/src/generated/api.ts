@@ -275,12 +275,24 @@ export const ListFreightResponseItem = zod.object({
 }).optional(),
   "corridor": zod.string(),
   "description": zod.string(),
+  "cargoType": zod.string().optional(),
   "weightTons": zod.number(),
+  "volumeM3": zod.number().optional(),
   "dimensions": zod.string(),
   "pickupDate": zod.string(),
   "price": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered'])
+  "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered', 'Cancelled']),
+  "requestId": zod.string().optional(),
+  "requestStatus": zod.enum(['New', 'Needs information', 'Approved', 'Matching', 'Offer sent', 'Confirmed', 'Assigned', 'In progress', 'On hold', 'Closed', 'Rejected', 'Cancelled']).optional(),
+  "submittedAt": zod.string().optional(),
+  "editableUntil": zod.string().optional(),
+  "canEdit": zod.boolean().optional(),
+  "canDelete": zod.boolean().optional(),
+  "canRequestCancellation": zod.boolean().optional(),
+  "cancellationStatus": zod.enum(['Requested', 'Approved', 'Declined']).optional(),
+  "cancellationReason": zod.string().optional(),
+  "cancellationResolutionNote": zod.string().optional()
 })
 export const ListFreightResponse = zod.array(ListFreightResponseItem)
 
@@ -308,7 +320,9 @@ export const CreateFreightBody = zod.object({
   "longitude": zod.number()
 }).optional(),
   "description": zod.string(),
+  "cargoType": zod.string().optional(),
   "weightTons": zod.number(),
+  "volumeM3": zod.number().optional(),
   "dimensions": zod.string(),
   "pickupDate": zod.string(),
   "price": zod.number(),
@@ -338,12 +352,24 @@ export const CreateFreightResponse = zod.object({
 }).optional(),
   "corridor": zod.string(),
   "description": zod.string(),
+  "cargoType": zod.string().optional(),
   "weightTons": zod.number(),
+  "volumeM3": zod.number().optional(),
   "dimensions": zod.string(),
   "pickupDate": zod.string(),
   "price": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered'])
+  "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered', 'Cancelled']),
+  "requestId": zod.string().optional(),
+  "requestStatus": zod.enum(['New', 'Needs information', 'Approved', 'Matching', 'Offer sent', 'Confirmed', 'Assigned', 'In progress', 'On hold', 'Closed', 'Rejected', 'Cancelled']).optional(),
+  "submittedAt": zod.string().optional(),
+  "editableUntil": zod.string().optional(),
+  "canEdit": zod.boolean().optional(),
+  "canDelete": zod.boolean().optional(),
+  "canRequestCancellation": zod.boolean().optional(),
+  "cancellationStatus": zod.enum(['Requested', 'Approved', 'Declined']).optional(),
+  "cancellationReason": zod.string().optional(),
+  "cancellationResolutionNote": zod.string().optional()
 })
 
 
@@ -374,10 +400,13 @@ export const UpdateFreightBody = zod.object({
   "longitude": zod.number()
 }).optional(),
   "description": zod.string().optional(),
+  "cargoType": zod.string().optional(),
   "weightTons": zod.number().optional(),
+  "volumeM3": zod.number().optional(),
   "dimensions": zod.string().optional(),
   "pickupDate": zod.string().optional(),
-  "price": zod.number().optional()
+  "price": zod.number().optional(),
+  "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional()
 })
 
 export const UpdateFreightResponse = zod.object({
@@ -403,12 +432,24 @@ export const UpdateFreightResponse = zod.object({
 }).optional(),
   "corridor": zod.string(),
   "description": zod.string(),
+  "cargoType": zod.string().optional(),
   "weightTons": zod.number(),
+  "volumeM3": zod.number().optional(),
   "dimensions": zod.string(),
   "pickupDate": zod.string(),
   "price": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered'])
+  "status": zod.enum(['Pending', 'Matched', 'In-Transit', 'Delivered', 'Cancelled']),
+  "requestId": zod.string().optional(),
+  "requestStatus": zod.enum(['New', 'Needs information', 'Approved', 'Matching', 'Offer sent', 'Confirmed', 'Assigned', 'In progress', 'On hold', 'Closed', 'Rejected', 'Cancelled']).optional(),
+  "submittedAt": zod.string().optional(),
+  "editableUntil": zod.string().optional(),
+  "canEdit": zod.boolean().optional(),
+  "canDelete": zod.boolean().optional(),
+  "canRequestCancellation": zod.boolean().optional(),
+  "cancellationStatus": zod.enum(['Requested', 'Approved', 'Declined']).optional(),
+  "cancellationReason": zod.string().optional(),
+  "cancellationResolutionNote": zod.string().optional()
 })
 
 

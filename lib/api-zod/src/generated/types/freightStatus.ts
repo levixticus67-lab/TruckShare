@@ -14,4 +14,5 @@ export const FreightStatus = {
   Matched: 'Matched',
   'In-Transit': 'In-Transit',
   Delivered: 'Delivered',
+  Cancelled: 'Cancelled',
 } as const;

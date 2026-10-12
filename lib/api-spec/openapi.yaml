@@ -187,7 +187,7 @@ paths:
     patch:
       operationId: updateFreight
       tags: [freight]
-      summary: Edit a freight request
+      summary: Edit a freight request during its first 20 minutes and before broker review
       parameters:
         - $ref: "#/components/parameters/Id"
       requestBody:
@@ -203,6 +203,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Freight"
+        "409":
+          description: Edit window expired or review already started
+    delete:
+      operationId: deleteFreight
+      tags: [freight]
+      summary: Delete an unprocessed load submission
+      description: Only its submitter may delete it, and only before broker review, a proposal, or a booking.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Load submission deleted
+        "409":
+          description: Load is already being processed; request cancellation instead
+  /requests/{id}/cancel:
+    post:
+      operationId: requestFreightCancellation
+      tags: [freight]
+      summary: Request cancellation after broker processing begins
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreightCancellationRequest"
+      responses:
+        "202":
+          description: Cancellation sent to operations for review
+        "409":
+          description: Submission is unprocessed, closed, or already has a pending decision
+  /admin/freight/{id}:
+    delete:
+      operationId: adminDeleteFreight
+      tags: [admin]
+      summary: Delete a load submission as an administrator
+      description: Administrators may remove unbooked loads; booked loads must use the cancellation workflow.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Load submission deleted
+        "409":
+          description: A booking exists for this load
+  /admin/requests/{id}/cancellation:
+    post:
+      operationId: resolveFreightCancellation
+      tags: [admin]
+      summary: Approve or decline a shipper cancellation request
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreightCancellationDecision"
+      responses:
+        "200":
+          description: Cancellation decision saved
+        "409":
+          description: Refund incomplete or shipment no longer eligible for automatic cancellation
   /matches:
     get:
       operationId: listMatches
@@ -742,12 +805,24 @@ components:
         dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
         corridor: { type: string }
         description: { type: string }
+        cargoType: { type: string }
         weightTons: { type: number }
+        volumeM3: { type: number }
         dimensions: { type: string }
         pickupDate: { type: string }
         price: { type: number }
         currency: { $ref: "#/components/schemas/CurrencyCode" }
-        status: { type: string, enum: [Pending, Matched, "In-Transit", Delivered] }
+        status: { type: string, enum: [Pending, Matched, "In-Transit", Delivered, Cancelled] }
+        requestId: { type: string }
+        requestStatus: { type: string, enum: [New, "Needs information", Approved, Matching, "Offer sent", Confirmed, Assigned, "In progress", "On hold", Closed, Rejected, Cancelled] }
+        submittedAt: { type: string, format: date-time }
+        editableUntil: { type: string, format: date-time }
+        canEdit: { type: boolean }
+        canDelete: { type: boolean }
+        canRequestCancellation: { type: boolean }
+        cancellationStatus: { type: string, enum: [Requested, Approved, Declined] }
+        cancellationReason: { type: string }
+        cancellationResolutionNote: { type: string }
     FreightInput:
       type: object
       required: [pickup, dropoff, description, weightTons, dimensions, pickupDate, price]
@@ -759,7 +834,9 @@ components:
         dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
         dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
         description: { type: string }
+        cargoType: { type: string }
         weightTons: { type: number }
+        volumeM3: { type: number }
         dimensions: { type: string }
         pickupDate: { type: string }
         price: { type: number }
@@ -774,10 +851,24 @@ components:
         dropoffCountry: { $ref: "#/components/schemas/CountryCode" }
         dropoffLocation: { $ref: "#/components/schemas/LocationPoint" }
         description: { type: string }
+        cargoType: { type: string }
         weightTons: { type: number }
+        volumeM3: { type: number }
         dimensions: { type: string }
         pickupDate: { type: string }
         price: { type: number }
+        currency: { $ref: "#/components/schemas/CurrencyCode" }
+    FreightCancellationRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 5, maxLength: 500 }
+    FreightCancellationDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approve, decline] }
+        note: { type: string, maxLength: 500 }
     Match:
       type: object
       required: [id, type, title, corridor, date, capacity, price, compatibility]
