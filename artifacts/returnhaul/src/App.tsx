@@ -1,20 +1,21 @@
 import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, ArrowLeft, ArrowRight, BadgeCheck, Banknote, BarChart3, Bell, Box, CalendarDays,
-  Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, ClipboardCheck, Clock3, FileCheck2,
+  Check, ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Clock3, FileCheck2,
   FilePlus2, FileText, Gauge, LayoutDashboard, LockKeyhole, MapPin, Menu, MessageSquare,
   PackageCheck, Phone, Plus, RefreshCw, Route as RouteIcon, Search, Send, ShieldCheck, Inbox, Filter,
   Truck, UploadCloud, UserRound, UsersRound, X, Moon, Sun, Globe2, LogOut, KeyRound, Save, Download,
   type LucideIcon,
 } from "lucide-react";
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from "wouter";
-import { createPortal } from "react-dom";
 import { Area, AreaChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { Toaster } from "@/components/ui/sonner";
 import { LocationPicker } from "@/components/LocationPicker";
 import { EacNetworkMap, RouteMap, type RouteStop } from "@/components/RouteMap";
 import { EAC_LOCATIONS, findLocation, routeStopsFor, type LocationPoint } from "@/lib/locations";
 import NotFound from "@/pages/not-found";
+import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
 
 const API_ROOT = (() => {
@@ -139,6 +140,9 @@ const button = "inline-flex items-center justify-center gap-2 rounded-full bg-pr
 const secondaryButton = "inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card/70 px-4 py-2.5 text-xs font-bold shadow-sm transition hover:-translate-y-0.5 hover:bg-card disabled:opacity-50";
 const input = "h-11 w-full rounded-xl border border-input bg-background/60 px-3.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
 const labelClass = "mb-1.5 block font-mono-ui text-[10px] uppercase tracking-[.12em] text-muted-foreground";
+const notifySuccess = (message: string) => toast.success(message, { position: "bottom-right", duration: 5000 });
+const notifyInfo = (message: string) => toast.info(message, { position: "bottom-right", duration: 6000 });
+const notifyError = (message: string) => toast.error(message, { position: "top-right", duration: 8000 });
 const mobileLabels: Record<string, string> = {
   "Home": "Home",
   "Trips": "Trips",
@@ -1268,7 +1272,6 @@ function FreightPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [cancellationTarget, setCancellationTarget] = useState<Freight | null>(null);
   const [cancellationReason, setCancellationReason] = useState("");
-  const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null);
   const [pendingAction, setPendingAction] = useState("");
   const blankForm = () => ({
     pickup: "", pickupCountry: "UG", pickupLocation: undefined as LocationPoint | undefined,
@@ -1283,7 +1286,7 @@ function FreightPage() {
   const setDropoffLabel = (label: string) => setForm((current) => ({ ...current, dropoff: label, dropoffLocation: undefined }));
   const setPickupCountry = (value: string) => setForm((current) => ({ ...current, pickupCountry: value, pickupLocation: current.pickupLocation?.countryCode === value ? current.pickupLocation : undefined }));
   const setDropoffCountry = (value: string) => setForm((current) => ({ ...current, dropoffCountry: value, dropoffLocation: current.dropoffLocation?.countryCode === value ? current.dropoffLocation : undefined }));
-  const startNewSubmission = () => { setForm(blankForm()); setEditingId(null); setFeedback(null); setOpen(true); };
+  const startNewSubmission = () => { setForm(blankForm()); setEditingId(null); setOpen(true); };
   const closeForm = () => { setOpen(false); setEditingId(null); setForm(blankForm()); };
   const editLoad = (load: Freight) => {
     setForm({
@@ -1293,49 +1296,48 @@ function FreightPage() {
       volumeM3: String(load.volumeM3 ?? ""), dimensions: load.dimensions || "", pickupDate: load.pickupDate,
       price: String(load.price), currency: load.currency || "UGX",
     });
-    setEditingId(load.id); setFeedback(null); setOpen(true);
+    setEditingId(load.id); setOpen(true);
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    setPendingAction("save"); setFeedback(null);
+    setPendingAction("save");
     try {
       const payload = { ...form, weightTons: Number(form.weightTons), volumeM3: Number(form.volumeM3), price: Number(form.price) };
       await api(editingId ? "/freight/" + editingId : "/freight", { method: editingId ? "PATCH" : "POST", body: JSON.stringify(payload) });
       closeForm();
-      setFeedback({ message: editingId ? "Load submission updated." : "Load sent for broker review.", isError: false });
+      notifySuccess(editingId ? "Load submission updated." : "Load sent for broker review.");
       query.reload();
     } catch (reason: unknown) {
-      setFeedback({ message: reason instanceof Error ? reason.message : "The load could not be saved.", isError: true });
+      notifyError(reason instanceof Error ? reason.message : "The load could not be saved.");
     } finally { setPendingAction(""); }
   };
   const deleteLoad = async (load: Freight) => {
     if (!load.canDelete || !window.confirm("Delete this load permanently? This is only allowed before broker review starts.")) return;
-    setPendingAction("delete"); setFeedback(null);
+    setPendingAction("delete");
     try {
       await api("/freight/" + load.id, { method: "DELETE" });
-      setFeedback({ message: "Unprocessed load deleted.", isError: false });
+      notifySuccess("Unprocessed load deleted.");
       query.reload();
     } catch (reason: unknown) {
-      setFeedback({ message: reason instanceof Error ? reason.message : "The load could not be deleted.", isError: true });
+      notifyError(reason instanceof Error ? reason.message : "The load could not be deleted.");
     } finally { setPendingAction(""); }
   };
   const submitCancellation = async (event: FormEvent) => {
     event.preventDefault();
     if (!cancellationTarget?.requestId || cancellationReason.trim().length < 5) return;
-    setPendingAction("cancel"); setFeedback(null);
+    setPendingAction("cancel");
     try {
       await api("/requests/" + cancellationTarget.requestId + "/cancel", { method: "POST", body: JSON.stringify({ reason: cancellationReason.trim() }) });
-      setFeedback({ message: "Cancellation request sent to operations for review.", isError: false });
+      notifySuccess("Cancellation request sent to operations for review.");
       setCancellationTarget(null); setCancellationReason(""); query.reload();
     } catch (reason: unknown) {
-      setFeedback({ message: reason instanceof Error ? reason.message : "Cancellation could not be requested.", isError: true });
+      notifyError(reason instanceof Error ? reason.message : "Cancellation could not be requested.");
     } finally { setPendingAction(""); }
   };
   return (
     <div className="space-y-6">
       <Header eyebrow="Cargo owner submission desk" title="My load submissions" detail="Submit the cargo, route, timing, and budget. Our broker team will qualify it and find a transporter." action={role === "Shipper" ? <button type="button" onClick={startNewSubmission} className={button}><Plus size={14} /> Submit a load</button> : undefined} />
       <ContextImage src="/branding/story/cargo-loading.jpg" alt="Cargo boxes being loaded beside a delivery truck" eyebrow="Broker-managed loads" title="You submit the shipment. The broker coordinates the move." />
-      {feedback && <div className={feedback.isError ? "rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" : "rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]"} role={feedback.isError ? "alert" : "status"}>{feedback.message}</div>}
       {role === "Carrier" ? <Card><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 text-accent-foreground" size={20} /><div><h3 className="font-display text-xl font-semibold">Loads are assigned by the broker desk</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">The operations team will contact you when your submitted route and capacity are a fit. Loads are not exposed as an open marketplace.</p><Link href="/trips" className={button + " mt-4"}>Submit trip capacity <ArrowRight size={14} /></Link></div></div></Card> : query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? <div className="grid gap-5 lg:grid-cols-2">{query.data.map((load) => <FreightCard key={load.id} load={load} role={role} onEdit={editLoad} onDelete={deleteLoad} onRequestCancellation={(item) => { setCancellationTarget(item); setCancellationReason(""); }} />)}</div> : <Card><p className="py-8 text-center text-sm text-muted-foreground">No load submissions yet. Submit a load to start broker review.</p></Card>}
       {open && <Modal title={editingId ? "Edit load submission" : "Submit a load"} eyebrow="Cargo owner portal" onClose={closeForm}><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><LocationPicker label="Pickup area or landmark" value={form.pickupLocation} countryCode={form.pickupCountry} onChange={setPickup} onLabelChange={setPickupLabel} /><CountrySelect label="Pickup country" value={form.pickupCountry} onChange={setPickupCountry} /><LocationPicker label="Drop-off area or landmark" value={form.dropoffLocation} countryCode={form.dropoffCountry} onChange={setDropoff} onLabelChange={setDropoffLabel} /><CountrySelect label="Drop-off country" value={form.dropoffCountry} onChange={setDropoffCountry} /><Field label="Cargo description" value={form.description} onChange={(value) => update("description", value)} placeholder="Bagged maize, cartons..." /><Field label="Cargo type" value={form.cargoType} onChange={(value) => update("cargoType", value)} /><Field label="Weight (tons)" type="number" value={form.weightTons} onChange={(value) => update("weightTons", value)} /><Field label="Volume (m³)" type="number" value={form.volumeM3} onChange={(value) => update("volumeM3", value)} /><Field label="Pickup date" type="date" value={form.pickupDate} onChange={(value) => update("pickupDate", value)} /><Field label="Budget" type="number" value={form.price} onChange={(value) => update("price", value)} /><label><span className={labelClass}>Budget currency</span><select className={input} value={form.currency} onChange={(event) => update("currency", event.target.value)}>{regionalReference.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency} · {country.name}</option>)}</select></label></div><p className="text-[11px] text-muted-foreground">You may edit the submission for 20 minutes, provided broker review has not started. Before review, you can delete it; afterwards, request a cancellation for operations to review.</p><button disabled={Boolean(pendingAction)} className={button + " w-full"}>{pendingAction === "save" ? <RefreshCw size={14} className="animate-spin" /> : editingId ? <Save size={14} /> : <Plus size={14} />}{pendingAction === "save" ? "Saving…" : editingId ? "Save changes" : "Submit for broker review"}</button></form></Modal>}
       {cancellationTarget && <Modal title="Request load cancellation" eyebrow="Operations review" onClose={() => setCancellationTarget(null)}><form onSubmit={submitCancellation} className="space-y-4"><p className="text-sm leading-6 text-muted-foreground">This does not erase the request. Operations will review the reason. For a booked load, cancellation must be reviewed before pickup. If payment was collected, the full refund must complete first; picked-up loads need a manual operations decision.</p><label className="block"><span className={labelClass}>Why do you need to cancel?</span><textarea className={input + " mt-1 min-h-28 w-full resize-y"} maxLength={500} value={cancellationReason} onChange={(event) => setCancellationReason(event.target.value)} placeholder="Add a brief reason for the operations team." /></label><button disabled={pendingAction === "cancel" || cancellationReason.trim().length < 5} className={button + " w-full"}>{pendingAction === "cancel" ? "Sending…" : "Send cancellation request"}</button></form></Modal>}
@@ -1354,18 +1356,17 @@ function LocationAwareFreightPage() {
 
 function MatchesPage() {
   const query = useApi<CustomerRequest[]>("/requests", []);
-  const [feedback, setFeedback] = useState("");
   const confirm = async (request: CustomerRequest) => {
     try {
       await api(`/requests/${request.id}/confirm`, { method: "POST", body: "{}" });
-      setFeedback("Your confirmation was sent to the broker desk.");
+      notifySuccess("Your confirmation was sent to the broker desk.");
       query.reload();
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "The offer could not be confirmed.");
+      notifyError(reason instanceof Error ? reason.message : "The offer could not be confirmed.");
     }
   };
   const flow: BrokerRequest["status"][] = ["New", "Needs information", "Approved", "Matching", "Offer sent", "Confirmed", "Assigned", "In progress", "Closed"];
-  return <div className="mx-auto max-w-4xl space-y-6"><Header eyebrow="Broker-managed matching" title="Your request status" detail="TruckShare’s operations team reviews every load or trip, selects the match, and sends the proposed arrangement for confirmation." action={<Link href="/messages" className={button}><MessageSquare size={14} /> Contact operations</Link>} />{feedback && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{feedback}</div>}<Card className="border-primary/15 bg-[#e5eee9] text-primary"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 text-[#28765a]" size={22} /><div><h3 className="font-display text-xl font-semibold">No self-service matching</h3><p className="mt-2 text-sm leading-6 text-primary/70">Your requests stay private while the broker qualifies the details, verifies the counterpart, and controls the final booking.</p></div></div></Card>{query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? <div className="space-y-4">{query.data.map((request) => { const currentStep = flow.indexOf(request.status); return <Card key={request.id} className="request-status-card"><div className="request-status-visual"><img src={request.kind === "Trip" ? truckAsset("Flatbed") : "/branding/story/cargo-loading.jpg"} alt="" /><div><p className={labelClass}>{request.kind === "Trip" ? "Available transport" : "Shipment in review"}</p><p className="font-display text-lg font-semibold">{request.kind === "Trip" ? "Broker is finding a load" : "Broker is finding a transporter"}</p><p className="text-[11px] text-muted-foreground">{request.corridor}</p></div></div><div className="mt-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">{request.kind} request</span><Status value={request.status} /></div><h3 className="mt-2 font-display text-xl font-semibold">{request.title}</h3><p className="mt-1 text-xs text-muted-foreground">{request.counterpart} · {request.corridor} · pickup/departure {dateFmt(request.date)}</p></div><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">Updated {dateFmt(request.updatedAt)}</p></div>{request.status === "Cancelled" ? <div className="mt-5 rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">This load request was cancelled by operations.</div> : <div className="mt-5 flex flex-wrap gap-1">{flow.slice(0, 7).map((step, index) => <span key={step} className={`rounded-full px-2 py-1 font-mono-ui text-[9px] font-bold ${index <= currentStep ? "bg-[#e5f1e9] text-[#28765a]" : "bg-muted text-muted-foreground"}`}>{step}</span>)}</div>}{request.notes[0] && <div className="mt-4 rounded-lg bg-muted/60 p-3 text-xs leading-5"><span className="font-bold">Latest operations note:</span> {request.notes[0]}</div>}{request.cancellationStatus === "Requested" && <div className="mt-4 rounded-lg border border-[#e7c891] bg-[#fff5e3] p-3 text-xs leading-5 text-[#8c5b20]">Cancellation requested. Reason: {request.cancellationReason || "No reason provided."} Operations will review it before changing the booking.</div>}{request.cancellationStatus === "Declined" && <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs leading-5 text-destructive">Cancellation declined: {request.cancellationResolutionNote || "Contact operations for the decision."}</div>}{request.status === "Offer sent" && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-[#fff5e3] p-3"><p className="text-xs font-semibold text-[#8c5b20]">A proposed arrangement is ready for your confirmation.</p><button type="button" onClick={() => void confirm(request)} className={button}><Check size={14} /> Confirm details</button></div>}{request.bookingId && <Link href="/bookings" className={`${secondaryButton} mt-4`}>View broker-managed booking <ArrowRight size={14} /></Link>}</Card>; })}</div> : <Card><div className="py-10 text-center"><p className="font-display text-xl font-semibold">No requests yet</p><p className="mt-2 text-sm text-muted-foreground">Submit a load or trip capacity and the operations desk will track it here.</p><div className="mt-5 flex justify-center gap-2"><Link href="/freight" className={secondaryButton}>Submit a load</Link><Link href="/trips" className={button}>Submit capacity</Link></div></div></Card>}<div className="grid gap-4 md:grid-cols-3"><Card><p className={labelClass}>Step 1</p><h3 className="mt-2 font-display text-lg font-semibold">Submit</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Send route, timing, cargo, or available capacity.</p></Card><Card><p className={labelClass}>Step 2</p><h3 className="mt-2 font-display text-lg font-semibold">Broker review</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">The operations team qualifies the request and finds the best fit.</p></Card><Card><p className={labelClass}>Step 3</p><h3 className="mt-2 font-display text-lg font-semibold">Confirm</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Review the proposed arrangement before it becomes a booking.</p></Card></div></div>;
+  return <div className="mx-auto max-w-4xl space-y-6"><Header eyebrow="Broker-managed matching" title="Your request status" detail="TruckShare’s operations team reviews every load or trip, selects the match, and sends the proposed arrangement for confirmation." action={<Link href="/messages" className={button}><MessageSquare size={14} /> Contact operations</Link>} /><Card className="border-primary/15 bg-[#e5eee9] text-primary"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 text-[#28765a]" size={22} /><div><h3 className="font-display text-xl font-semibold">No self-service matching</h3><p className="mt-2 text-sm leading-6 text-primary/70">Your requests stay private while the broker qualifies the details, verifies the counterpart, and controls the final booking.</p></div></div></Card>{query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? <div className="space-y-4">{query.data.map((request) => { const currentStep = flow.indexOf(request.status); return <Card key={request.id} className="request-status-card"><div className="request-status-visual"><img src={request.kind === "Trip" ? truckAsset("Flatbed") : "/branding/story/cargo-loading.jpg"} alt="" /><div><p className={labelClass}>{request.kind === "Trip" ? "Available transport" : "Shipment in review"}</p><p className="font-display text-lg font-semibold">{request.kind === "Trip" ? "Broker is finding a load" : "Broker is finding a transporter"}</p><p className="text-[11px] text-muted-foreground">{request.corridor}</p></div></div><div className="mt-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">{request.kind} request</span><Status value={request.status} /></div><h3 className="mt-2 font-display text-xl font-semibold">{request.title}</h3><p className="mt-1 text-xs text-muted-foreground">{request.counterpart} · {request.corridor} · pickup/departure {dateFmt(request.date)}</p></div><p className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">Updated {dateFmt(request.updatedAt)}</p></div>{request.status === "Cancelled" ? <div className="mt-5 rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">This load request was cancelled by operations.</div> : <div className="mt-5 flex flex-wrap gap-1">{flow.slice(0, 7).map((step, index) => <span key={step} className={`rounded-full px-2 py-1 font-mono-ui text-[9px] font-bold ${index <= currentStep ? "bg-[#e5f1e9] text-[#28765a]" : "bg-muted text-muted-foreground"}`}>{step}</span>)}</div>}{request.notes[0] && <div className="mt-4 rounded-lg bg-muted/60 p-3 text-xs leading-5"><span className="font-bold">Latest operations note:</span> {request.notes[0]}</div>}{request.cancellationStatus === "Requested" && <div className="mt-4 rounded-lg border border-[#e7c891] bg-[#fff5e3] p-3 text-xs leading-5 text-[#8c5b20]">Cancellation requested. Reason: {request.cancellationReason || "No reason provided."} Operations will review it before changing the booking.</div>}{request.cancellationStatus === "Declined" && <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs leading-5 text-destructive">Cancellation declined: {request.cancellationResolutionNote || "Contact operations for the decision."}</div>}{request.status === "Offer sent" && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-[#fff5e3] p-3"><p className="text-xs font-semibold text-[#8c5b20]">A proposed arrangement is ready for your confirmation.</p><button type="button" onClick={() => void confirm(request)} className={button}><Check size={14} /> Confirm details</button></div>}{request.bookingId && <Link href="/bookings" className={`${secondaryButton} mt-4`}>View broker-managed booking <ArrowRight size={14} /></Link>}</Card>; })}</div> : <Card><div className="py-10 text-center"><p className="font-display text-xl font-semibold">No requests yet</p><p className="mt-2 text-sm text-muted-foreground">Submit a load or trip capacity and the operations desk will track it here.</p><div className="mt-5 flex justify-center gap-2"><Link href="/freight" className={secondaryButton}>Submit a load</Link><Link href="/trips" className={button}>Submit capacity</Link></div></div></Card>}<div className="grid gap-4 md:grid-cols-3"><Card><p className={labelClass}>Step 1</p><h3 className="mt-2 font-display text-lg font-semibold">Submit</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Send route, timing, cargo, or available capacity.</p></Card><Card><p className={labelClass}>Step 2</p><h3 className="mt-2 font-display text-lg font-semibold">Broker review</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">The operations team qualifies the request and finds the best fit.</p></Card><Card><p className={labelClass}>Step 3</p><h3 className="mt-2 font-display text-lg font-semibold">Confirm</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Review the proposed arrangement before it becomes a booking.</p></Card></div></div>;
 }
 
 function DeliveryProofPanel({ booking, onRefresh }: { booking: Booking; onRefresh: () => void }) {
@@ -1375,19 +1376,17 @@ function DeliveryProofPanel({ booking, onRefresh }: { booking: Booking; onRefres
   const [otpSent, setOtpSent] = useState(booking.podStatus === "OTP sent");
   const [otp, setOtp] = useState("");
   const [photoName, setPhotoName] = useState("");
-  const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
   if (!canManage || booking.status === "Delivered") return null;
   const requestOtp = async () => {
     setBusy(true);
-    setFeedback("");
     try {
       const response = await api<PodRequestResponse>(`/bookings/${booking.id}/request-pod`, { method: "POST", body: "{}" });
       setOtpSent(true);
-      setFeedback(response.devOtp ? `Development receiver OTP: ${response.devOtp}` : response.message);
+      notifyInfo(response.devOtp ? `Development receiver OTP: ${response.devOtp}` : response.message);
       onRefresh();
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "The receiver OTP could not be sent.");
+      notifyError(reason instanceof Error ? reason.message : "The receiver OTP could not be sent.");
     } finally {
       setBusy(false);
     }
@@ -1396,22 +1395,21 @@ function DeliveryProofPanel({ booking, onRefresh }: { booking: Booking; onRefres
     event.preventDefault();
     if (!otp.trim() || busy) return;
     setBusy(true);
-    setFeedback("");
     try {
       const response = await api<PodCompleteResponse>(`/bookings/${booking.id}/complete-delivery`, { method: "POST", body: JSON.stringify({ otp: otp.trim(), photoName: photoName.trim() || undefined }) });
-      setFeedback(response.releaseEligible ? "Delivery verified. The transporter payout is now eligible for release." : "Delivery verified.");
+      notifySuccess(response.releaseEligible ? "Delivery verified. The transporter payout is now eligible for release." : "Delivery verified.");
       setOpen(false);
       onRefresh();
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "Delivery could not be verified.");
+      notifyError(reason instanceof Error ? reason.message : "Delivery could not be verified.");
     } finally {
       setBusy(false);
     }
   };
   return <div className="mt-4 rounded-xl border border-accent/30 bg-[#fff8ec] p-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div><p className={labelClass}>Receiver confirmation</p><p className="text-sm font-semibold">Verify delivery before payout release.</p>{feedback && <p className="mt-1 text-xs text-[#8c5b20]">{feedback}</p>}</div>
-      <button type="button" onClick={() => { setOpen((value) => !value); setFeedback(""); }} className={button}><ShieldCheck size={14} /> {open ? "Close verification" : "Verify delivery"}</button>
+      <div><p className={labelClass}>Receiver confirmation</p><p className="text-sm font-semibold">Verify delivery before payout release.</p></div>
+      <button type="button" onClick={() => setOpen((value) => !value)} className={button}><ShieldCheck size={14} /> {open ? "Close verification" : "Verify delivery"}</button>
     </div>
     {open && <div className="mt-4 border-t border-accent/20 pt-4">
       {!otpSent && <div className="flex flex-wrap items-center gap-3"><p className="text-xs text-muted-foreground">Send a one-time code to the receiver once the goods are at the destination.</p><button type="button" disabled={busy} onClick={() => void requestOtp()} className={secondaryButton}>{busy ? "Sending..." : "Send receiver OTP"}</button></div>}
@@ -1473,9 +1471,10 @@ function BookingsPage() {
   const advance = async (booking: Booking, status: string) => {
     try {
       await api(`/bookings/${booking.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      notifySuccess(`Booking status updated to ${status}.`);
       query.reload();
-    } catch {
-      // The page-level API error remains visible through the next refresh path.
+    } catch (reason: unknown) {
+      notifyError(reason instanceof Error ? reason.message : "The booking status could not be updated.");
     }
   };
   return <div className="space-y-6">
@@ -1543,17 +1542,16 @@ function TrackingPage() {
   const [checkpoint, setCheckpoint] = useState("");
   const [border, setBorder] = useState("");
   const [requiredDocuments, setRequiredDocuments] = useState("");
-  const [feedback, setFeedback] = useState("");
   const baseStops = active ? routeStopsFor(active.corridor.split("→")[0]?.trim() || "", active.originCountry || "", active.corridor.split("→")[1]?.trim() || "", active.destinationCountry || "") : [];
   const routeStops: RouteStop[] = baseStops.map((stop, index) => ({ ...stop, label: index === 0 ? "Origin" : "Destination", status: active?.status === "Delivered" ? "complete" : index === 0 ? "complete" : "active" }));
   const updateMilestone = async (milestone: BorderMilestone, status: string) => {
     try {
       await api(`/bookings/${milestone.bookingId}/border-milestones/${milestone.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
-      setFeedback("Border handoff updated.");
+      notifySuccess("Border handoff updated.");
       milestones.reload();
       query.reload();
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "The border handoff could not be updated.");
+      notifyError(reason instanceof Error ? reason.message : "The border handoff could not be updated.");
     }
   };
   const addMilestone = async (event: FormEvent) => {
@@ -1564,13 +1562,13 @@ function TrackingPage() {
       setCheckpoint("");
       setBorder("");
       setRequiredDocuments("");
-      setFeedback("Border checkpoint added.");
+      notifySuccess("Border checkpoint added.");
       milestones.reload();
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "The border checkpoint could not be added.");
+      notifyError(reason instanceof Error ? reason.message : "The border checkpoint could not be added.");
     }
   };
-  return <div className="space-y-6"><Header eyebrow="Live operations" title="Delivery tracker" detail="Follow each assigned booking, border checkpoint, required document, and verified destination handoff." />{query.loading ? <Loading error={query.error} retry={query.reload} /> : !active ? <Card><div className="py-12 text-center"><MapPin className="mx-auto text-muted-foreground" size={28} /><p className="mt-3 font-display text-xl font-semibold">No active delivery</p><p className="mt-2 text-sm text-muted-foreground">A broker-managed booking will appear here once it is assigned.</p></div></Card> : <><Card><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className={labelClass}>Selected booking</p><h3 className="mt-1 font-display text-xl font-semibold">{active.corridor}</h3><p className="mt-1 text-xs text-muted-foreground">{active.id} · {active.status} · POD {active.podStatus || "Not requested"}</p></div>{query.data.length > 1 && <label className="sm:min-w-[260px]"><span className={labelClass}>Switch booking</span><select className={input} value={active.id} onChange={(event) => setSelectedId(event.target.value)}>{query.data.map((booking) => <option key={booking.id} value={booking.id}>{booking.corridor} · {booking.status}</option>)}</select></label>}</div></Card><div className="grid gap-5 lg:grid-cols-[1.3fr_.7fr]"><Card><div className="relative">{routeStops.length ? <RouteMap stops={routeStops} height="360px" routing /> : <div className="flex h-[360px] items-center justify-center rounded-xl bg-muted text-sm text-muted-foreground">Route coordinates are not available for this corridor yet.</div>}<div className="pointer-events-none absolute left-4 top-4 z-[500] rounded-lg border border-border bg-card/90 p-3 shadow-sm"><p className="font-mono-ui text-[9px] text-muted-foreground">ACTIVE ROUTE</p><p className="mt-1 font-display text-lg font-semibold">{active.corridor}</p><p className="mt-1 text-[11px] text-muted-foreground">{active.status}</p></div></div><div className="grid grid-cols-3 divide-x divide-border border-t border-border p-4 text-center"><div><MapPin className="mx-auto text-accent-foreground" size={17} /><p className="mt-2 text-[11px] font-bold">Pickup</p></div><div><TruckTypeVisual vehicleType="Trailer" compact /><p className="mt-2 text-[11px] font-bold">{/border/i.test(active.status) ? "At border" : active.status}</p></div><div><BadgeCheck className="mx-auto text-primary" size={17} /><p className="mt-2 text-[11px] font-bold">Destination</p></div></div></Card><Card><p className={labelClass}>Handoff timeline</p><h3 className="mt-1 font-display text-xl font-semibold">Recorded delivery states</h3><div className="mt-6 space-y-5">{["En Route to Pickup", "In Transit", "At Border", "Delivered"].map((step, index, steps) => { const currentIndex = steps.indexOf(active.status); const complete = active.status === "Delivered" || (currentIndex >= 0 && index <= currentIndex); return <div key={step} className="flex gap-3"><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${complete ? "bg-[#e4f1ea] text-[#28765a]" : "bg-muted text-muted-foreground"}`}>{complete ? <Check size={14} /> : index + 1}</span><div><p className="text-xs font-bold">{step}</p><p className="mt-1 text-[11px] text-muted-foreground">{complete ? "Recorded" : "Waiting for operations update"}</p></div></div>; })}</div><Link href="/bookings" className={`${button} mt-7 w-full`}>Manage booking <ArrowRight size={14} /></Link></Card></div><Card><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className={labelClass}>Customs handoffs</p><h3 className="mt-1 font-display text-xl font-semibold">{milestones.data.length ? `${milestones.data.length} checkpoint${milestones.data.length === 1 ? "" : "s"} recorded` : "No checkpoints recorded"}</h3></div>{feedback && <p className="text-xs text-[#28765a]">{feedback}</p>}</div>{milestones.loading ? <div className="py-6"><Loading error={milestones.error} retry={milestones.reload} /></div> : <div className="mt-5 space-y-3">{milestones.data.map((milestone) => <div key={milestone.id} className="rounded-xl border border-border p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-bold">{milestone.checkpoint}</p><p className="mt-1 text-[11px] text-muted-foreground">{milestone.country} · {milestone.border} · {milestone.requiredDocuments.length} required document{milestone.requiredDocuments.length === 1 ? "" : "s"}</p>{milestone.requiredDocuments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{milestone.requiredDocuments.map((document) => <span key={document} className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold">{document}</span>)}</div>}</div><div className="flex flex-wrap items-center gap-2"><Status value={milestone.status} />{canManage && <select className="h-9 rounded-lg border border-input bg-background px-2 text-xs" value={milestone.status} onChange={(event) => void updateMilestone(milestone, event.target.value)}>{["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"].map((status) => <option key={status}>{status}</option>)}</select>}</div></div></div>)}</div>}{canManage && <form onSubmit={addMilestone} className="mt-5 grid gap-3 border-t border-border pt-5 sm:grid-cols-3"><label><span className={labelClass}>Checkpoint</span><input className={input} value={checkpoint} onChange={(event) => setCheckpoint(event.target.value)} placeholder="Malaba border" /></label><label><span className={labelClass}>Border / handoff</span><input className={input} value={border} onChange={(event) => setBorder(event.target.value)} placeholder="Malaba / Busia" /></label><label><span className={labelClass}>Required documents</span><input className={input} value={requiredDocuments} onChange={(event) => setRequiredDocuments(event.target.value)} placeholder="Invoice, customs form" /></label><button type="submit" disabled={!checkpoint.trim()} className={`${button} sm:col-span-3`}><Plus size={14} /> Add checkpoint</button></form>}</Card><DeliveryProofPanel booking={active} onRefresh={() => { query.reload(); milestones.reload(); }} /></>}</div>;
+  return <div className="space-y-6"><Header eyebrow="Live operations" title="Delivery tracker" detail="Follow each assigned booking, border checkpoint, required document, and verified destination handoff." />{query.loading ? <Loading error={query.error} retry={query.reload} /> : !active ? <Card><div className="py-12 text-center"><MapPin className="mx-auto text-muted-foreground" size={28} /><p className="mt-3 font-display text-xl font-semibold">No active delivery</p><p className="mt-2 text-sm text-muted-foreground">A broker-managed booking will appear here once it is assigned.</p></div></Card> : <><Card><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className={labelClass}>Selected booking</p><h3 className="mt-1 font-display text-xl font-semibold">{active.corridor}</h3><p className="mt-1 text-xs text-muted-foreground">{active.id} · {active.status} · POD {active.podStatus || "Not requested"}</p></div>{query.data.length > 1 && <label className="sm:min-w-[260px]"><span className={labelClass}>Switch booking</span><select className={input} value={active.id} onChange={(event) => setSelectedId(event.target.value)}>{query.data.map((booking) => <option key={booking.id} value={booking.id}>{booking.corridor} · {booking.status}</option>)}</select></label>}</div></Card><div className="grid gap-5 lg:grid-cols-[1.3fr_.7fr]"><Card><div className="relative">{routeStops.length ? <RouteMap stops={routeStops} height="360px" routing /> : <div className="flex h-[360px] items-center justify-center rounded-xl bg-muted text-sm text-muted-foreground">Route coordinates are not available for this corridor yet.</div>}<div className="pointer-events-none absolute left-4 top-4 z-[500] rounded-lg border border-border bg-card/90 p-3 shadow-sm"><p className="font-mono-ui text-[9px] text-muted-foreground">ACTIVE ROUTE</p><p className="mt-1 font-display text-lg font-semibold">{active.corridor}</p><p className="mt-1 text-[11px] text-muted-foreground">{active.status}</p></div></div><div className="grid grid-cols-3 divide-x divide-border border-t border-border p-4 text-center"><div><MapPin className="mx-auto text-accent-foreground" size={17} /><p className="mt-2 text-[11px] font-bold">Pickup</p></div><div><TruckTypeVisual vehicleType="Trailer" compact /><p className="mt-2 text-[11px] font-bold">{/border/i.test(active.status) ? "At border" : active.status}</p></div><div><BadgeCheck className="mx-auto text-primary" size={17} /><p className="mt-2 text-[11px] font-bold">Destination</p></div></div></Card><Card><p className={labelClass}>Handoff timeline</p><h3 className="mt-1 font-display text-xl font-semibold">Recorded delivery states</h3><div className="mt-6 space-y-5">{["En Route to Pickup", "In Transit", "At Border", "Delivered"].map((step, index, steps) => { const currentIndex = steps.indexOf(active.status); const complete = active.status === "Delivered" || (currentIndex >= 0 && index <= currentIndex); return <div key={step} className="flex gap-3"><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${complete ? "bg-[#e4f1ea] text-[#28765a]" : "bg-muted text-muted-foreground"}`}>{complete ? <Check size={14} /> : index + 1}</span><div><p className="text-xs font-bold">{step}</p><p className="mt-1 text-[11px] text-muted-foreground">{complete ? "Recorded" : "Waiting for operations update"}</p></div></div>; })}</div><Link href="/bookings" className={`${button} mt-7 w-full`}>Manage booking <ArrowRight size={14} /></Link></Card></div><Card><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className={labelClass}>Customs handoffs</p><h3 className="mt-1 font-display text-xl font-semibold">{milestones.data.length ? `${milestones.data.length} checkpoint${milestones.data.length === 1 ? "" : "s"} recorded` : "No checkpoints recorded"}</h3></div></div>{milestones.loading ? <div className="py-6"><Loading error={milestones.error} retry={milestones.reload} /></div> : <div className="mt-5 space-y-3">{milestones.data.map((milestone) => <div key={milestone.id} className="rounded-xl border border-border p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-bold">{milestone.checkpoint}</p><p className="mt-1 text-[11px] text-muted-foreground">{milestone.country} · {milestone.border} · {milestone.requiredDocuments.length} required document{milestone.requiredDocuments.length === 1 ? "" : "s"}</p>{milestone.requiredDocuments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{milestone.requiredDocuments.map((document) => <span key={document} className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold">{document}</span>)}</div>}</div><div className="flex flex-wrap items-center gap-2"><Status value={milestone.status} />{canManage && <select className="h-9 rounded-lg border border-input bg-background px-2 text-xs" value={milestone.status} onChange={(event) => void updateMilestone(milestone, event.target.value)}>{["Planned", "Documents Pending", "Submitted", "Cleared", "Held", "Crossed"].map((status) => <option key={status}>{status}</option>)}</select>}</div></div></div>)}</div>}{canManage && <form onSubmit={addMilestone} className="mt-5 grid gap-3 border-t border-border pt-5 sm:grid-cols-3"><label><span className={labelClass}>Checkpoint</span><input className={input} value={checkpoint} onChange={(event) => setCheckpoint(event.target.value)} placeholder="Malaba border" /></label><label><span className={labelClass}>Border / handoff</span><input className={input} value={border} onChange={(event) => setBorder(event.target.value)} placeholder="Malaba / Busia" /></label><label><span className={labelClass}>Required documents</span><input className={input} value={requiredDocuments} onChange={(event) => setRequiredDocuments(event.target.value)} placeholder="Invoice, customs form" /></label><button type="submit" disabled={!checkpoint.trim()} className={`${button} sm:col-span-3`}><Plus size={14} /> Add checkpoint</button></form>}</Card><DeliveryProofPanel booking={active} onRefresh={() => { query.reload(); milestones.reload(); }} /></>}</div>;
 }
 
 function MessagesPage() {
@@ -1579,48 +1577,44 @@ function MessagesPage() {
   const embeddedAdmin = role === "Admin" && location.startsWith("/admin");
   const query = useApi<{ id: string; sender: string; body: string; sentAt: string; read: boolean }[]>("/messages", []);
   const [body, setBody] = useState("");
-  const [feedback, setFeedback] = useState("");
   const [sending, setSending] = useState(false);
   const send = async (event: FormEvent) => {
     event.preventDefault();
     if (!body.trim() || sending) return;
     setSending(true);
-    setFeedback("");
     try {
       await api("/messages", { method: "POST", body: JSON.stringify({ body }) });
       setBody("");
-      setFeedback("Message sent.");
+      notifySuccess("Message sent.");
       query.reload();
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "Message could not be sent.");
+      notifyError(reason instanceof Error ? reason.message : "Message could not be sent.");
     } finally {
       setSending(false);
     }
   };
-  return <div className="space-y-6">{!embeddedAdmin && <Header eyebrow="Coordination" title="Messages" detail="Send and review messages recorded for your account." />}<Card className="mx-auto max-w-3xl"><div className="mb-5 flex items-center gap-3 border-b border-border pb-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-primary"><MessageSquare size={18} /></div><div><h3 className="text-sm font-bold">Messages</h3><p className="text-[11px] text-muted-foreground">Account activity</p></div></div><div className="min-h-[280px] space-y-3">{query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? query.data.map((message) => <div key={message.id} className={`flex ${message.sender === "You" ? "justify-end" : "justify-start"}`}><div className={`max-w-[80%] rounded-2xl px-4 py-3 text-xs ${message.sender === "You" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted"}`}><p>{message.body}</p><p className={`mt-2 font-mono-ui text-[9px] ${message.sender === "You" ? "text-primary-foreground/55" : "text-muted-foreground"}`}>{message.sender} · {message.sentAt}</p></div></div>) : <div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">No messages have been sent.</div>}</div>{feedback && <p className="mt-3 text-xs text-muted-foreground">{feedback}</p>}<form onSubmit={send} className="mt-4 flex gap-2 border-t border-border pt-4"><input className={input} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." /><button type="submit" disabled={sending || !body.trim()} className={button} aria-label="Send message">{sending ? "Sending..." : <Send size={14} />}</button></form></Card></div>;
+  return <div className="space-y-6">{!embeddedAdmin && <Header eyebrow="Coordination" title="Messages" detail="Send and review messages recorded for your account." />}<Card className="mx-auto max-w-3xl"><div className="mb-5 flex items-center gap-3 border-b border-border pb-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-primary"><MessageSquare size={18} /></div><div><h3 className="text-sm font-bold">Messages</h3><p className="text-[11px] text-muted-foreground">Account activity</p></div></div><div className="min-h-[280px] space-y-3">{query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? query.data.map((message) => <div key={message.id} className={`flex ${message.sender === "You" ? "justify-end" : "justify-start"}`}><div className={`max-w-[80%] rounded-2xl px-4 py-3 text-xs ${message.sender === "You" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted"}`}><p>{message.body}</p><p className={`mt-2 font-mono-ui text-[9px] ${message.sender === "You" ? "text-primary-foreground/55" : "text-muted-foreground"}`}>{message.sender} · {message.sentAt}</p></div></div>) : <div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">No messages have been sent.</div>}</div><form onSubmit={send} className="mt-4 flex gap-2 border-t border-border pt-4"><input className={input} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." /><button type="submit" disabled={sending || !body.trim()} className={button} aria-label="Send message">{sending ? "Sending..." : <Send size={14} />}</button></form></Card></div>;
 }
 
 function DocumentsPage() {
   const query = useApi<{ id: string; name: string; type: string; uploadedBy: string; uploadedAt: string; size: string; status: string }[]>("/documents", []);
   const [formOpen, setFormOpen] = useState(false);
   const [document, setDocument] = useState({ name: "", type: "", size: "" });
-  const [feedback, setFeedback] = useState("");
   const upload = async (event: FormEvent) => {
     event.preventDefault();
     if (!document.name.trim() || !document.type.trim() || !document.size.trim()) return;
     try {
       await api("/documents", { method: "POST", body: JSON.stringify(document) });
       setDocument({ name: "", type: "", size: "" });
-      setFeedback("Document details recorded.");
+      notifySuccess("Document details recorded.");
       setFormOpen(false);
       query.reload();
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "Document details could not be saved.");
+      notifyError(reason instanceof Error ? reason.message : "Document details could not be saved.");
     }
   };
   return <div className="space-y-6"><Header eyebrow="Compliance" title="Document hub" detail="Keep consignment notes, customs forms, permits, and proof of delivery attached to the move." action={<button type="button" onClick={() => setFormOpen((open) => !open)} className={button}><FilePlus2 size={14} /> {formOpen ? "Cancel" : "Add document details"}</button>} />
     {formOpen && <Card><form onSubmit={upload} className="space-y-4"><p className="text-sm text-muted-foreground">This records document metadata only; file storage is not connected yet.</p><div className="grid gap-4 sm:grid-cols-3"><Field label="Document name" value={document.name} onChange={(value) => setDocument((current) => ({ ...current, name: value }))} placeholder="Enter the document name" /><Field label="Document type" value={document.type} onChange={(value) => setDocument((current) => ({ ...current, type: value }))} placeholder="Permit, logbook, invoice…" /><Field label="File size" value={document.size} onChange={(value) => setDocument((current) => ({ ...current, size: value }))} placeholder="Enter file size" /></div><button type="submit" disabled={!document.name.trim() || !document.type.trim() || !document.size.trim()} className={button}><FilePlus2 size={14} /> Save document details</button></form></Card>}
-    {feedback && <p role="status" className="text-sm text-muted-foreground">{feedback}</p>}
     {query.loading ? <Loading error={query.error} retry={query.reload} /> : <Card>{query.data.length ? <div className="space-y-1">{query.data.map((doc) => <div key={doc.id} className="flex flex-col gap-3 border-b border-border py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-primary"><FileText size={18} /></span><div><p className="text-xs font-bold">{doc.name}</p><p className="mt-1 font-mono-ui text-[9px] uppercase tracking-wide text-muted-foreground">{doc.type} · {doc.size} · {doc.uploadedBy}</p></div></div><div className="flex items-center gap-3"><span className="text-[10px] text-muted-foreground">{doc.uploadedAt}</span><Status value={doc.status} /><UploadCloud size={16} className="text-muted-foreground" /></div></div>)}</div> : <p className="py-8 text-center text-sm text-muted-foreground">No document details have been recorded.</p>}</Card>}
   </div>;
 }
@@ -1628,10 +1622,9 @@ function DocumentsPage() {
 function VerificationPage() {
   const query = useApi<Verification[]>("/verification", []);
   const [form, setForm] = useState({ name: "", phone: "", nin: "", licenseNumber: "", logbookNumber: "", logbookPhotoName: "" });
-  const [sent, setSent] = useState(false);
   const update = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = async (event: FormEvent) => { event.preventDefault(); await api("/verification", { method: "POST", body: JSON.stringify(form) }); setSent(true); query.reload(); };
-  return <div className="mx-auto max-w-4xl space-y-6"><Header eyebrow="Driver trust" title="Get your verified badge" detail="Verified drivers are surfaced first when cargo owners search a route. Submit NIN, license, and vehicle logbook details for review." />{sent && <div className="rounded-xl border border-[#b8d8c6] bg-[#e5f1e9] p-4 text-sm font-semibold text-[#28765a]"><BadgeCheck className="mr-2 inline" size={17} />Documents submitted. An admin will review your badge request.</div>}<div className="grid gap-5 lg:grid-cols-[1fr_.75fr]"><Card><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Driver / company name" value={form.name} onChange={(value) => update("name", value)} placeholder="Enter your name or business name" /><Field label="Phone number" value={form.phone} onChange={(value) => update("phone", value)} placeholder="+256…" /><Field label="NIN" value={form.nin} onChange={(value) => update("nin", value)} placeholder="Enter NIN" /><Field label="Driving license number" value={form.licenseNumber} onChange={(value) => update("licenseNumber", value)} placeholder="Enter license number" /><Field label="Vehicle logbook number" value={form.logbookNumber} onChange={(value) => update("logbookNumber", value)} placeholder="Enter logbook number" /><Field label="Logbook photo filename" value={form.logbookPhotoName} onChange={(value) => update("logbookPhotoName", value)} placeholder="Enter the filename if available" required={false} /></div><button className={`${button} w-full`}><ShieldCheck size={14} /> Submit for verification</button></form></Card><Card className="bg-[#e5eee9] text-primary"><ShieldCheck size={24} className="text-[#28765a]" /><h3 className="mt-4 font-display text-xl font-semibold">What the badge unlocks</h3><ul className="mt-4 space-y-3 text-sm text-primary/70"><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Higher visibility in smart matching</li><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Trust signal for new cargo owners</li><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Faster booking acceptance</li></ul></Card></div><Card><div className="mb-4 flex items-center justify-between"><h3 className="font-display text-xl font-semibold">My submissions</h3><RefreshCw size={16} className="text-muted-foreground" /></div>{query.data.length ? <div className="space-y-3">{query.data.map((item) => <div key={item.id} className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{item.name}</p><p className="text-[11px] text-muted-foreground">{item.licenseNumber} · logbook {item.logbookNumber} · submitted {dateFmt(item.submittedAt)}</p></div><Status value={item.status} /></div>)}</div> : <p className="text-sm text-muted-foreground">No verification submissions yet.</p>}</Card></div>;
+  const submit = async (event: FormEvent) => { event.preventDefault(); try { await api("/verification", { method: "POST", body: JSON.stringify(form) }); notifySuccess("Documents submitted. An admin will review your badge request."); query.reload(); } catch (reason: unknown) { notifyError(reason instanceof Error ? reason.message : "Your documents could not be submitted."); } };
+  return <div className="mx-auto max-w-4xl space-y-6"><Header eyebrow="Driver trust" title="Get your verified badge" detail="Verified drivers are surfaced first when cargo owners search a route. Submit NIN, license, and vehicle logbook details for review." /><div className="grid gap-5 lg:grid-cols-[1fr_.75fr]"><Card><form onSubmit={submit} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Driver / company name" value={form.name} onChange={(value) => update("name", value)} placeholder="Enter your name or business name" /><Field label="Phone number" value={form.phone} onChange={(value) => update("phone", value)} placeholder="+256…" /><Field label="NIN" value={form.nin} onChange={(value) => update("nin", value)} placeholder="Enter NIN" /><Field label="Driving license number" value={form.licenseNumber} onChange={(value) => update("licenseNumber", value)} placeholder="Enter license number" /><Field label="Vehicle logbook number" value={form.logbookNumber} onChange={(value) => update("logbookNumber", value)} placeholder="Enter logbook number" /><Field label="Logbook photo filename" value={form.logbookPhotoName} onChange={(value) => update("logbookPhotoName", value)} placeholder="Enter the filename if available" required={false} /></div><button className={`${button} w-full`}><ShieldCheck size={14} /> Submit for verification</button></form></Card><Card className="bg-[#e5eee9] text-primary"><ShieldCheck size={24} className="text-[#28765a]" /><h3 className="mt-4 font-display text-xl font-semibold">What the badge unlocks</h3><ul className="mt-4 space-y-3 text-sm text-primary/70"><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Higher visibility in smart matching</li><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Trust signal for new cargo owners</li><li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-[#28765a]" /> Faster booking acceptance</li></ul></Card></div><Card><div className="mb-4 flex items-center justify-between"><h3 className="font-display text-xl font-semibold">My submissions</h3><RefreshCw size={16} className="text-muted-foreground" /></div>{query.data.length ? <div className="space-y-3">{query.data.map((item) => <div key={item.id} className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{item.name}</p><p className="text-[11px] text-muted-foreground">{item.licenseNumber} · logbook {item.logbookNumber} · submitted {dateFmt(item.submittedAt)}</p></div><Status value={item.status} /></div>)}</div> : <p className="text-sm text-muted-foreground">No verification submissions yet.</p>}</Card></div>;
 }
 
 function AdminPage() {
@@ -1650,15 +1643,9 @@ function AdminPage() {
   const [operationPage, setOperationPage] = useState(1);
   const requestedRequestId = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("request");
   const [note, setNote] = useState("");
-  const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null);
   const [pendingAction, setPendingAction] = useState("");
   const detailPanelRef = useRef<HTMLDivElement>(null);
   const queueListRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!feedback) return;
-    const timeout = window.setTimeout(() => setFeedback(null), 5000);
-    return () => window.clearTimeout(timeout);
-  }, [feedback]);
   const visibleRequests = useMemo(() => {
     const term = requestSearch.trim().toLocaleLowerCase();
     return operations.data.requests.filter((request) => {
@@ -1739,14 +1726,13 @@ function AdminPage() {
   const updateRequest = async (payload: { status?: BrokerRequest["status"]; priority?: BrokerRequest["priority"]; note?: string }, action = "save") => {
     if (!selected || pendingAction) return;
     setPendingAction(action);
-    setFeedback(null);
     try {
       await api(`/admin/requests/${selected.id}`, { method: "PATCH", body: JSON.stringify(payload) });
       if (payload.note) setNote("");
-      setFeedback({ message: "Request updated.", isError: false });
+      notifySuccess("Request updated.");
       operations.reload();
     } catch (reason: unknown) {
-      setFeedback({ message: reason instanceof Error ? reason.message : "The request could not be updated.", isError: true });
+      notifyError(reason instanceof Error ? reason.message : "The request could not be updated.");
     } finally {
       setPendingAction("");
     }
@@ -1754,13 +1740,12 @@ function AdminPage() {
   const sendOffer = async (suggestion: BrokerSuggestion) => {
     if (!selected || pendingAction) return;
     setPendingAction(`offer:${suggestion.id}`);
-    setFeedback(null);
     try {
       await api(`/admin/requests/${selected.id}/offer`, { method: "POST", body: JSON.stringify({ matchId: suggestion.id }) });
-      setFeedback({ message: `Offer sent to ${suggestion.counterpart}.`, isError: false });
+      notifySuccess(`Offer sent to ${suggestion.counterpart}.`);
       operations.reload();
     } catch (reason: unknown) {
-      setFeedback({ message: reason instanceof Error ? reason.message : "The offer could not be sent.", isError: true });
+      notifyError(reason instanceof Error ? reason.message : "The offer could not be sent.");
     } finally {
       setPendingAction("");
     }
@@ -1768,13 +1753,12 @@ function AdminPage() {
   const assignBooking = async () => {
     if (!selected || !selected.proposedMatchId || pendingAction) return;
     setPendingAction("assign");
-    setFeedback(null);
     try {
       await api(`/admin/requests/${selected.id}/assign`, { method: "POST", body: JSON.stringify({ matchId: selected.proposedMatchId }) });
-      setFeedback({ message: "Broker-managed booking created and both request records were assigned.", isError: false });
+      notifySuccess("Broker-managed booking created and both request records were assigned.");
       operations.reload();
     } catch (reason: unknown) {
-      setFeedback({ message: reason instanceof Error ? reason.message : "The booking could not be created.", isError: true });
+      notifyError(reason instanceof Error ? reason.message : "The booking could not be created.");
     } finally {
       setPendingAction("");
     }
@@ -1783,27 +1767,27 @@ function AdminPage() {
     if (!selected || pendingAction) return;
     const noteText = decision === "decline" ? window.prompt("Explain why this cancellation is declined. The explanation will be visible to the cargo owner.")?.trim() || "" : "";
     if (decision === "decline" && noteText.length < 3) return;
-    setPendingAction("cancellation-" + decision); setFeedback(null);
+    setPendingAction("cancellation-" + decision);
     try {
       await api("/admin/requests/" + selected.id + "/cancellation", { method: "POST", body: JSON.stringify({ decision, note: noteText }) });
-      setFeedback({ message: decision === "approve" ? "Cancellation approved; the load and any eligible booking were retained as cancelled records." : "Cancellation declined with an explanation for the cargo owner.", isError: false });
+      notifySuccess(decision === "approve" ? "Cancellation approved; the load and any eligible booking were retained as cancelled records." : "Cancellation declined with an explanation for the cargo owner.");
       operations.reload();
     } catch (reason: unknown) {
-      setFeedback({ message: reason instanceof Error ? reason.message : "The cancellation could not be resolved.", isError: true });
+      notifyError(reason instanceof Error ? reason.message : "The cancellation could not be resolved.");
     } finally { setPendingAction(""); }
   };
   const deleteSelectedLoad = async () => {
     if (!selected || selected.kind !== "Load" || selected.bookingId || pendingAction) return;
     if (!window.confirm("Permanently delete this load and its submission history? Booked loads cannot be deleted.")) return;
-    setPendingAction("delete-load"); setFeedback(null);
+    setPendingAction("delete-load");
     try {
       await api("/admin/freight/" + selected.entityId, { method: "DELETE" });
       setSelectedId("");
       setShowMobileRequestDetail(false);
-      setFeedback({ message: "Load submission deleted by admin.", isError: false });
+      notifySuccess("Load submission deleted by admin.");
       operations.reload();
     } catch (reason: unknown) {
-      setFeedback({ message: reason instanceof Error ? reason.message : "The load could not be deleted.", isError: true });
+      notifyError(reason instanceof Error ? reason.message : "The load could not be deleted.");
     } finally { setPendingAction(""); }
   };
   const currentUser = auth.data.user;
@@ -1811,7 +1795,6 @@ function AdminPage() {
   if (currentUser?.role !== "Admin") return <div className="mx-auto max-w-xl py-12"><Card><ShieldCheck className="text-muted-foreground" size={24} /><h2 className="mt-4 font-display text-2xl font-semibold">Admin area</h2><p className="mt-2 text-sm text-muted-foreground">This area is only available to verified admin accounts.</p><Link href="/" className={`${secondaryButton} mt-5`}>Return home <ArrowRight size={14} /></Link></Card></div>;
   return <RoleContext.Provider value="Admin"><AdminPanelLayout user={currentUser} page={currentPage} action={<button type="button" onClick={operations.reload} disabled={operations.loading} aria-busy={operations.loading} className={`${secondaryButton} admin-refresh`}><RefreshCw size={14} className={operations.loading ? "animate-spin" : ""} /> {operations.loading ? "Refreshing…" : "Refresh data"}</button>}>
     {currentPage.key === "bookings" ? <BookingsPage /> : currentPage.key === "messages" ? <MessagesPage /> : <div className="admin-dashboard admin-page-content space-y-6">
-      {feedback && createPortal(<div className={`admin-toast ${feedback.isError ? "is-error" : "is-success"}`} role={feedback.isError ? "alert" : "status"} aria-live={feedback.isError ? "assertive" : "polite"}><span className="admin-toast-icon">{feedback.isError ? <CircleAlert size={17} /> : <CircleCheck size={17} />}</span><p>{feedback.message}</p><button type="button" aria-label="Dismiss notification" onClick={() => setFeedback(null)}><X size={15} /></button></div>, document.body)}
       {operations.error && <div className="admin-inline-error" role="alert">{operations.error}</div>}
       {currentPage.key === "overview" && <>
         <div className="admin-live-mark"><span className="admin-live-dot" /> Broker workspace <i /> {operations.data.metrics.totalOpen} open items</div>
@@ -1958,7 +1941,6 @@ function FinanceOperationsPage() {
   const [financeError, setFinanceError] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [releaseReason, setReleaseReason] = useState("");
-  const [feedback, setFeedback] = useState("");
   const [feeRateInput, setFeeRateInput] = useState("12");
   const [feeRateLoading, setFeeRateLoading] = useState(role === "Admin");
   const [feeRateSaving, setFeeRateSaving] = useState(false);
@@ -2027,7 +2009,7 @@ function FinanceOperationsPage() {
   const release = async () => {
     if (!selected || role !== "Admin") return;
     if (releaseReason.trim().length < 3) {
-      setFeedback("Add a release reason before approving this payout.");
+      notifyError("Add a release reason before approving this payout.");
       return;
     }
     try {
@@ -2042,9 +2024,10 @@ function FinanceOperationsPage() {
         payoutsCompleted: current.payoutsCompleted + selected.carrierPayable,
         carrierFundsPendingRelease: Math.max(0, current.carrierFundsPendingRelease - selected.carrierPayable),
       }));
-      setFeedback(updated.payout?.provider === "flutterwave" ? "Flutterwave transfer completed and the finance ledger was updated." : "Development payout simulation recorded; no transfer was sent.");
+      if (updated.payout?.provider === "flutterwave") notifySuccess("Flutterwave transfer completed and the finance ledger was updated.");
+      else notifyInfo("Development payout simulation recorded; no transfer was sent.");
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "Payout release failed.");
+      notifyError(reason instanceof Error ? reason.message : "Payout release failed.");
     }
   };
   const accessError = (bookings.error && !bookings.data.length ? bookings.error : "") || (role === "Admin" ? overviewError : "") || financeError;
@@ -2072,7 +2055,6 @@ function FinanceOperationsPage() {
       <Stat label="Payouts due" value={overviewLoading ? "…" : money(overview.payoutsDue, overview.currency)} note={`${overview.refundsPending} refunds pending`} icon={Send} />
     </div>}
     {role === "Admin" && <Card><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-border p-4"><p className={labelClass}>Provider fees</p><p className="mt-2 font-display text-xl font-semibold">{money(overview.providerFees, overview.currency)}</p><p className="mt-1 text-xs text-muted-foreground">Tracked separately from revenue</p></div><div className="rounded-lg border border-border p-4"><p className={labelClass}>Payouts completed</p><p className="mt-2 font-display text-xl font-semibold">{money(overview.payoutsCompleted, overview.currency)}</p><p className="mt-1 text-xs text-muted-foreground">Recorded releases; development entries may be simulated</p></div><div className={`rounded-lg border p-4 ${overview.reconciliationRequired ? "border-[#e4b4a9] bg-[#fbefeb]" : "border-border"}`}><p className={labelClass}>Reconciliation</p><p className="mt-2 font-display text-xl font-semibold">{overview.reconciliationRequired}</p><p className="mt-1 text-xs text-muted-foreground">{overview.reconciliationRequired ? "Settlement mismatches need review" : "No settlement mismatches"}</p></div></div></Card>}
-    {feedback && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{feedback}</div>}
     {accessError && !financeLoading && <Card><div className="flex items-start gap-3"><CircleAlert className="mt-0.5 text-[#ad4339]" size={18} /><div><p className="font-semibold">Finance data is not available yet</p><p className="mt-1 text-sm text-muted-foreground">{accessError}</p><button type="button" onClick={() => bookings.reload()} className={`${secondaryButton} mt-4`}>Retry</button></div></div></Card>}
     {financeLoading ? <Loading error="" retry={() => bookings.reload()} /> : financeRows.length === 0 && !accessError ? <Card><div className="py-8 text-center"><Banknote className="mx-auto text-muted-foreground" size={24} /><p className="mt-3 font-display text-xl font-semibold">No finance records yet</p><p className="mt-1 text-sm text-muted-foreground">{role === "Admin" ? "Funded bookings and payout exceptions will appear here." : "Your booking finance details will appear after a booking is created."}</p><Link href="/bookings" className={`${button} mt-5`}>Open bookings <ArrowRight size={14} /></Link></div></Card> : <div className="grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
       <Card><div className="mb-4 flex items-center justify-between gap-3"><div><p className={labelClass}>{role === "Admin" ? "Finance queue" : role === "Carrier" ? "Bookings connected to payout" : "Your payment records"}</p><h3 className="mt-1 font-display text-xl font-semibold">{financeRows.length} booking{financeRows.length === 1 ? "" : "s"}</h3></div><RefreshCw size={18} className="text-muted-foreground" /></div><div className="space-y-3">{financeRows.map((row) => { const booking = bookings.data.find((item) => item.id === row.bookingId); if (!booking) return null; return <button type="button" key={row.bookingId} onClick={() => setSelectedId(row.bookingId)} className={`w-full rounded-xl border p-4 text-left transition ${selected?.bookingId === row.bookingId ? "border-accent bg-accent/10" : "border-border hover:border-primary/30 hover:bg-muted/30"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-bold">{booking.corridor}</p><p className="mt-1 text-[11px] text-muted-foreground">Booking {booking.id} · {dateFmt(booking.bookedAt)}</p></div><Status value={prettyState(role === "Shipper" ? row.paymentState : role === "Carrier" ? row.payoutState : row.escrowState)} /></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><p className={labelClass}>{role === "Carrier" ? "Expected payout" : "Booking value"}</p><p className="font-semibold">{money(role === "Carrier" ? row.carrierPayable : row.grossAmount, row.currency)}</p></div><div><p className={labelClass}>{role === "Admin" ? "Platform fee" : role === "Carrier" ? "Release condition" : "TruckShare fee"}</p><p className="font-semibold">{role === "Admin" ? money(row.platformFee, row.currency) : role === "Carrier" ? (booking.podStatus === "Verified" || row.escrowState === "RELEASE_ELIGIBLE" ? "Delivery verified" : "Delivery confirmation") : money(row.platformFee, row.currency)}</p></div></div></button>; })}</div></Card>
@@ -2259,7 +2241,6 @@ function AccountPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [feedback, setFeedback] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
@@ -2273,13 +2254,12 @@ function AccountPage() {
   const saveProfile = async (event: FormEvent) => {
     event.preventDefault();
     setSavingProfile(true);
-    setFeedback("");
     try {
       const result = await api<{ user: AuthUser; message: string }>("/auth/profile", { method: "PATCH", body: JSON.stringify({ name, country }) });
       auth.setData({ user: result.user });
-      setFeedback(result.message);
+      notifySuccess(result.message);
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "Your profile could not be updated.");
+      notifyError(reason instanceof Error ? reason.message : "Your profile could not be updated.");
     } finally {
       setSavingProfile(false);
     }
@@ -2288,20 +2268,19 @@ function AccountPage() {
   const changePassword = async (event: FormEvent) => {
     event.preventDefault();
     if (newPassword !== confirmPassword) {
-      setFeedback("The new passwords do not match.");
+      notifyError("The new passwords do not match.");
       return;
     }
     setSavingPassword(true);
-    setFeedback("");
     try {
       const result = await api<{ user: AuthUser; message: string }>("/auth/password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
       auth.setData({ user: result.user });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setFeedback(result.message);
+      notifySuccess(result.message);
     } catch (reason: unknown) {
-      setFeedback(reason instanceof Error ? reason.message : "Your password could not be updated.");
+      notifyError(reason instanceof Error ? reason.message : "Your password could not be updated.");
     } finally {
       setSavingPassword(false);
     }
@@ -2311,7 +2290,6 @@ function AccountPage() {
   if (!user) return <div className="mx-auto max-w-4xl"><Loading error="Your account could not be loaded." retry={auth.reload} /></div>;
   return <div className="mx-auto max-w-4xl space-y-6">
     <Header eyebrow="Account" title="My account" detail="Keep your contact details, sign-in security, and account documents in one place." />
-    {feedback && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{feedback}</div>}
     <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
       <Card>
         <div className="mb-5 flex items-center gap-3 border-b border-border pb-5"><div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#d9a35c] text-sm font-bold text-primary">{initials(user.name)}</div><div><h3 className="font-display text-xl font-semibold">{user.name}</h3><p className="text-xs text-muted-foreground">{displayRoleName(user.role)} account · {user.verified ? "Verified account" : "Verification pending"}</p></div></div>
@@ -2371,4 +2349,18 @@ function Router() {
     </Switch>
   </ErrorBoundary>;
 }
-export default function App() { return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /><InstallPrompt /></WouterRouter>; }
+export default function App() {
+  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+    <Router />
+    <Toaster
+      position="bottom-right"
+      richColors
+      closeButton
+      visibleToasts={4}
+      duration={5000}
+      offset={{ top: 80, right: 16, bottom: 16 }}
+      mobileOffset={{ top: 88, right: 12, bottom: 88, left: 12 }}
+    />
+    <InstallPrompt />
+  </WouterRouter>;
+}
