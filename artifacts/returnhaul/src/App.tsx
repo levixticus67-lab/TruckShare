@@ -1420,6 +1420,29 @@ function DeliveryProofPanel({ booking, onRefresh }: { booking: Booking; onRefres
   </div>;
 }
 
+const ADMIN_LIST_PAGE_SIZE = 10;
+
+function AdminPagination({ currentPage, pageSize = ADMIN_LIST_PAGE_SIZE, totalItems, itemLabel, onPageChange }: {
+  currentPage: number;
+  pageSize?: number;
+  totalItems: number;
+  itemLabel: string;
+  onPageChange: (page: number) => void;
+}) {
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  const start = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(totalItems, currentPage * pageSize);
+  const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+  return <div className="flex flex-col gap-3 border-t border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <p className="text-xs text-muted-foreground" role="status" aria-live="polite">Showing {start}–{end} of {totalItems} {itemLabel}</p>
+    {pageCount > 1 && <nav aria-label={`${itemLabel} pages`} className="flex items-center gap-2">
+      <button type="button" disabled={currentPage <= 1} onClick={() => onPageChange(Math.max(1, currentPage - 1))} className={`${secondaryButton} min-h-11 px-3 ${focusRing}`}><ArrowLeft size={14} aria-hidden="true" /><span>Previous</span></button>
+      <span className="min-w-[5.5rem] text-center text-xs font-semibold" aria-current="page">Page {currentPage} of {pageCount}</span>
+      <button type="button" disabled={currentPage >= pageCount} onClick={() => onPageChange(Math.min(pageCount, currentPage + 1))} className={`${secondaryButton} min-h-11 px-3 ${focusRing}`}><span>Next</span><ArrowRight size={14} aria-hidden="true" /></button>
+    </nav>}
+  </div>;
+}
+
 function BookingsPage() {
   const role = useRole();
   const admin = role === "Admin";
@@ -1427,6 +1450,26 @@ function BookingsPage() {
   const embeddedAdmin = admin && location.startsWith("/admin");
   const canManage = role === "Admin" || role === "Carrier";
   const query = useApi<Booking[]>("/bookings", []);
+  const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingView, setBookingView] = useState<"active" | "history" | "all">("active");
+  const [bookingPage, setBookingPage] = useState(1);
+  const bookingCounts = useMemo(() => ({
+    active: query.data.filter((booking) => !["Delivered", "Cancelled"].includes(booking.status)).length,
+    history: query.data.filter((booking) => ["Delivered", "Cancelled"].includes(booking.status)).length,
+  }), [query.data]);
+  const visibleBookings = useMemo(() => {
+    const term = bookingSearch.trim().toLocaleLowerCase();
+    return query.data.filter((booking) => {
+      const isHistory = ["Delivered", "Cancelled"].includes(booking.status);
+      const matchesView = bookingView === "all" || (bookingView === "history" ? isHistory : !isHistory);
+      const searchable = [booking.id, booking.corridor, booking.status, booking.escrowStatus, booking.paymentStatus, booking.podStatus].filter(Boolean).join(" ").toLocaleLowerCase();
+      return matchesView && (!term || searchable.includes(term));
+    });
+  }, [bookingSearch, bookingView, query.data]);
+  useEffect(() => setBookingPage(1), [bookingSearch, bookingView]);
+  const bookingPageCount = Math.max(1, Math.ceil(visibleBookings.length / ADMIN_LIST_PAGE_SIZE));
+  const currentBookingPage = Math.min(bookingPage, bookingPageCount);
+  const pagedBookings = visibleBookings.slice((currentBookingPage - 1) * ADMIN_LIST_PAGE_SIZE, currentBookingPage * ADMIN_LIST_PAGE_SIZE);
   const advance = async (booking: Booking, status: string) => {
     try {
       await api(`/bookings/${booking.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
@@ -1435,7 +1478,59 @@ function BookingsPage() {
       // The page-level API error remains visible through the next refresh path.
     }
   };
-  return <div className="space-y-6">{!embeddedAdmin && <Header eyebrow={admin ? "Operations control" : "Broker-managed bookings"} title={admin ? "Bookings & payout control" : "My bookings"} detail={admin ? "Move each assigned load through pickup, transit, border handoff, and verified delivery." : "Review bookings assigned by the broker team. Status changes and payout actions are handled by operations."} action={admin ? <Link href="/payments" className={button}><Banknote size={14} /> Mobile Money checkout</Link> : undefined} />}<div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="Bookings" value={query.data.length} note="All corridors" icon={ClipboardCheck} /><Stat label="Held in escrow" value={money(query.data.filter((item) => item.escrowStatus === "Held").reduce((sum, item) => sum + item.amount, 0))} note="Protected" icon={LockKeyhole} accent /><Stat label="In transit" value={query.data.filter((item) => /transit|border/i.test(item.status)).length} note="Live handoffs" icon={RouteIcon} /><Stat label="Released" value={money(query.data.filter((item) => item.escrowStatus === "Released").reduce((sum, item) => sum + item.amount, 0))} note="Verified delivery" icon={BadgeCheck} /></div>{query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? <div className="space-y-3">{query.data.map((booking) => <Card key={booking.id} className="booking-card"><div className="booking-card-hero"><img src={truckAsset("Trailer")} alt="" /><div><p className={labelClass}>Assigned transport</p><p className="font-display text-lg font-semibold">{booking.corridor}</p><p className="text-[11px] text-muted-foreground">Broker-managed booking · {booking.status}</p></div></div><div className="mt-5 flex flex-col justify-between gap-4 md:flex-row md:items-center"><div><div className="flex flex-wrap items-center gap-2"><LockKeyhole size={16} className="text-accent-foreground" /><h3 className="text-sm font-bold">{booking.corridor}</h3><Status value={booking.status} /><Status value={booking.escrowStatus} /></div><p className="mt-2 font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{booking.id} · booked {dateFmt(booking.bookedAt)} · {booking.paymentStatus || "Unpaid"} · POD {booking.podStatus || "Not requested"}</p></div><div className="flex flex-wrap gap-2">{canManage && booking.status !== "Delivered" && <button onClick={() => void advance(booking, /pickup/i.test(booking.status) ? "In Transit" : /transit/i.test(booking.status) ? "At Border" : "Delivered")} className={secondaryButton}><ArrowRight size={14} /> Advance status</button>}{booking.status === "Delivered" && <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#28765a]"><Check size={15} /> Delivery verified</span>}</div></div><div className="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-4"><div><p className={labelClass}>Load value</p><p className="font-display text-lg font-semibold">{money(booking.amount, booking.currency)}</p></div><div><p className={labelClass}>TruckShare 12%</p><p className="font-display text-lg font-semibold">{money(booking.commissionAmount || booking.amount * .12, booking.currency)}</p></div><div><p className={labelClass}>Transporter 88%</p><p className="font-display text-lg font-semibold text-[#28765a]">{money(booking.carrierPayout || booking.amount * .88, booking.currency)}</p></div></div><DeliveryProofPanel booking={booking} onRefresh={query.reload} /></Card>)}</div> : <Card><div className="py-12 text-center"><p className="font-display text-xl font-semibold">No bookings assigned yet</p><p className="mt-2 text-sm text-muted-foreground">Your broker-managed bookings will appear here once an arrangement is confirmed.</p></div></Card>}</div>;
+  return <div className="space-y-6">
+    {!embeddedAdmin && <Header eyebrow={admin ? "Operations control" : "Broker-managed bookings"} title={admin ? "Bookings & payout control" : "My bookings"} detail={admin ? "Move each assigned load through pickup, transit, border handoff, and verified delivery." : "Review bookings assigned by the broker team. Status changes and payout actions are handled by operations."} action={admin ? <Link href="/payments" className={button}><Banknote size={14} /> Mobile Money checkout</Link> : undefined} />}
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <Stat label="Bookings" value={query.data.length} note="All corridors" icon={ClipboardCheck} />
+      <Stat label="Held in escrow" value={money(query.data.filter((item) => item.escrowStatus === "Held").reduce((sum, item) => sum + item.amount, 0))} note="Protected" icon={LockKeyhole} accent />
+      <Stat label="In transit" value={query.data.filter((item) => /transit|border/i.test(item.status)).length} note="Live handoffs" icon={RouteIcon} />
+      <Stat label="Released" value={money(query.data.filter((item) => item.escrowStatus === "Released").reduce((sum, item) => sum + item.amount, 0))} note="Verified delivery" icon={BadgeCheck} />
+    </div>
+    {query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? <>
+      <Card className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <label>
+            <span className={labelClass}>Search bookings</span>
+            <input type="search" className={input} value={bookingSearch} onChange={(event) => setBookingSearch(event.target.value)} placeholder="Route, booking ID, or status" aria-label="Search bookings by route, booking ID, or status" />
+          </label>
+          <div role="group" aria-label="Filter bookings" className="flex flex-wrap gap-2">
+            {([
+              ["active", `Active (${bookingCounts.active})`],
+              ["history", `History (${bookingCounts.history})`],
+              ["all", `All (${query.data.length})`],
+            ] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={bookingView === value} onClick={() => setBookingView(value)} className={`${secondaryButton} min-h-11 px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${bookingView === value ? "border-primary bg-primary text-primary-foreground" : ""}`}>{label}</button>)}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">Active bookings are shown first. Delivered and cancelled bookings are in History.</p>
+      </Card>
+      {visibleBookings.length ? <div className="space-y-3">
+        {pagedBookings.map((booking) => <Card key={booking.id} className="booking-card">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className={labelClass}>Assigned transport</p>
+              <h3 className="truncate font-display text-lg font-semibold">{booking.corridor}</h3>
+              <p className="mt-1 break-words font-mono-ui text-[10px] uppercase tracking-wider text-muted-foreground">{booking.id} · booked {dateFmt(booking.bookedAt)}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2"><Status value={booking.status} /><Status value={booking.escrowStatus} /><span className="text-xs text-muted-foreground">{booking.paymentStatus || "Unpaid"} · POD {booking.podStatus || "Not requested"}</span></div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {canManage && booking.status !== "Delivered" && booking.status !== "Cancelled" && <button type="button" onClick={() => void advance(booking, /pickup/i.test(booking.status) ? "In Transit" : /transit/i.test(booking.status) ? "At Border" : "Delivered")} aria-label={`Advance status for ${booking.corridor}, booking ${booking.id}`} className={`${secondaryButton} min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}><ArrowRight size={14} /> Advance status</button>}
+              {booking.status === "Delivered" && <span className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-[#28765a]"><Check size={15} /> Delivery verified</span>}
+            </div>
+          </div>
+          <details className="mt-3 border-t border-border pt-3">
+            <summary className="min-h-11 cursor-pointer rounded-lg px-2 py-3 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">Booking details, payout split, and delivery proof</summary>
+            <div className="mt-2 grid grid-cols-1 gap-3 border-b border-border pb-4 sm:grid-cols-3">
+              <div><p className={labelClass}>Load value</p><p className="font-display text-lg font-semibold">{money(booking.amount, booking.currency)}</p></div>
+              <div><p className={labelClass}>TruckShare 12%</p><p className="font-display text-lg font-semibold">{money(booking.commissionAmount || booking.amount * .12, booking.currency)}</p></div>
+              <div><p className={labelClass}>Transporter 88%</p><p className="font-display text-lg font-semibold text-[#28765a]">{money(booking.carrierPayout || booking.amount * .88, booking.currency)}</p></div>
+            </div>
+            <DeliveryProofPanel booking={booking} onRefresh={query.reload} />
+          </details>
+        </Card>)}
+        <AdminPagination currentPage={currentBookingPage} totalItems={visibleBookings.length} itemLabel="bookings" onPageChange={setBookingPage} />
+      </div> : <Card><div className="py-10 text-center"><p className="font-display text-xl font-semibold">No matching bookings</p><p className="mt-2 text-sm text-muted-foreground">Try a different search or switch the booking filter.</p></div></Card>}
+    </> : <Card><div className="py-12 text-center"><p className="font-display text-xl font-semibold">No bookings assigned yet</p><p className="mt-2 text-sm text-muted-foreground">Your broker-managed bookings will appear here once an arrangement is confirmed.</p></div></Card>}
+  </div>;
 }
 
 function TrackingPage() {
@@ -1547,27 +1642,72 @@ function AdminPage() {
   const currentPage = adminPanelPages.find((page) => page.href === location) || adminPanelPages[0];
   const [selectedId, setSelectedId] = useState("");
   const [filter, setFilter] = useState("All");
+  const [requestSearch, setRequestSearch] = useState("");
+  const [requestPage, setRequestPage] = useState(1);
+  const [showMobileRequestDetail, setShowMobileRequestDetail] = useState(false);
+  const [operationSearch, setOperationSearch] = useState("");
+  const [operationStatus, setOperationStatus] = useState("All active");
+  const [operationPage, setOperationPage] = useState(1);
+  const requestedRequestId = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("request");
   const [note, setNote] = useState("");
   const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null);
   const [pendingAction, setPendingAction] = useState("");
   const detailPanelRef = useRef<HTMLDivElement>(null);
+  const queueListRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!feedback) return;
     const timeout = window.setTimeout(() => setFeedback(null), 5000);
     return () => window.clearTimeout(timeout);
   }, [feedback]);
+  const visibleRequests = useMemo(() => {
+    const term = requestSearch.trim().toLocaleLowerCase();
+    return operations.data.requests.filter((request) => {
+      const matchesFilter = filter === "All" || request.status === filter || (filter === "Attention" && ["New", "Needs information", "On hold"].includes(request.status)) || (filter === "Matching desk" && ["Approved", "Matching", "Offer sent"].includes(request.status));
+      const searchable = [request.id, request.kind, request.title, request.counterpart, request.corridor, request.status, request.priority].filter(Boolean).join(" ").toLocaleLowerCase();
+      return matchesFilter && (!term || searchable.includes(term));
+    });
+  }, [filter, operations.data.requests, requestSearch]);
   useEffect(() => {
-    if (!selectedId && operations.data.requests[0]) setSelectedId(operations.data.requests[0].id);
-    if (selectedId && !operations.data.requests.some((request) => request.id === selectedId)) setSelectedId(operations.data.requests[0]?.id || "");
-  }, [operations.data.requests, selectedId]);
+    if (!selectedId || !visibleRequests.some((request) => request.id === selectedId)) setSelectedId(visibleRequests[0]?.id || "");
+  }, [selectedId, visibleRequests]);
+  useEffect(() => {
+    if (!requestedRequestId || !operations.data.requests.some((request) => request.id === requestedRequestId)) return;
+    setFilter("All");
+    setRequestSearch("");
+    setSelectedId(requestedRequestId);
+    if (window.matchMedia("(max-width: 1279px)").matches) {
+      setShowMobileRequestDetail(true);
+      window.requestAnimationFrame(() => detailPanelRef.current?.focus());
+    }
+  }, [operations.data.requests, requestedRequestId]);
   const selected = operations.data.requests.find((request) => request.id === selectedId);
-  const visibleRequests = useMemo(() => operations.data.requests.filter((request) => filter === "All" || request.status === filter || (filter === "Attention" && ["New", "Needs information", "On hold"].includes(request.status)) || (filter === "Matching desk" && ["Approved", "Matching", "Offer sent"].includes(request.status))), [filter, operations.data.requests]);
+  useEffect(() => setRequestPage(1), [filter, requestSearch]);
+  const requestPageCount = Math.max(1, Math.ceil(visibleRequests.length / ADMIN_LIST_PAGE_SIZE));
+  const currentRequestPage = Math.min(requestPage, requestPageCount);
+  const pagedRequests = visibleRequests.slice((currentRequestPage - 1) * ADMIN_LIST_PAGE_SIZE, currentRequestPage * ADMIN_LIST_PAGE_SIZE);
   const activeRequests = useMemo(() => operations.data.requests.filter((request) => ["Confirmed", "Assigned", "In progress", "On hold"].includes(request.status)), [operations.data.requests]);
+  const visibleActiveRequests = useMemo(() => {
+    const term = operationSearch.trim().toLocaleLowerCase();
+    return activeRequests.filter((request) => {
+      const matchesStatus = operationStatus === "All active" || request.status === operationStatus;
+      const searchable = [request.id, request.kind, request.title, request.counterpart, request.corridor, request.status, request.priority, request.assignedTo].filter(Boolean).join(" ").toLocaleLowerCase();
+      return matchesStatus && (!term || searchable.includes(term));
+    });
+  }, [activeRequests, operationSearch, operationStatus]);
+  useEffect(() => setOperationPage(1), [operationSearch, operationStatus]);
+  const operationPageCount = Math.max(1, Math.ceil(visibleActiveRequests.length / ADMIN_LIST_PAGE_SIZE));
+  const currentOperationPage = Math.min(operationPage, operationPageCount);
+  const pagedActiveRequests = visibleActiveRequests.slice((currentOperationPage - 1) * ADMIN_LIST_PAGE_SIZE, currentOperationPage * ADMIN_LIST_PAGE_SIZE);
   const selectRequest = (requestId: string) => {
     setSelectedId(requestId);
     if (window.matchMedia("(max-width: 1279px)").matches) {
-      window.requestAnimationFrame(() => detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      setShowMobileRequestDetail(true);
+      window.requestAnimationFrame(() => detailPanelRef.current?.focus());
     }
+  };
+  const returnToRequestQueue = () => {
+    setShowMobileRequestDetail(false);
+    window.requestAnimationFrame(() => queueListRef.current?.focus());
   };
   const workflowSlices = useMemo(() => {
     const groups = [
@@ -1659,6 +1799,7 @@ function AdminPage() {
     try {
       await api("/admin/freight/" + selected.entityId, { method: "DELETE" });
       setSelectedId("");
+      setShowMobileRequestDetail(false);
       setFeedback({ message: "Load submission deleted by admin.", isError: false });
       operations.reload();
     } catch (reason: unknown) {
@@ -1681,12 +1822,20 @@ function AdminPage() {
        </section>
       </>}
       {currentPage.key === "finance" && <section className="admin-finance-stats grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Booking and handoff metrics"><Stat label="Gross booking value" value={money(operations.data.metrics.grossVolume)} note="All broker-managed bookings" icon={Banknote} /><Stat label="Broker commission" value={money(operations.data.metrics.commissionValue)} note="Recorded commission value" icon={BarChart3} /><Stat label="Unpaid bookings" value={operations.data.metrics.unpaidBookings} note="Payment follow-up" icon={LockKeyhole} accent={operations.data.metrics.unpaidBookings > 0} /><Stat label="Border issues" value={operations.data.metrics.borderIssues} note="At-border handoffs" icon={CircleAlert} accent={operations.data.metrics.borderIssues > 0} /></section>}
-      {currentPage.key === "requests" && <div className="admin-workspace grid gap-5 xl:grid-cols-[.92fr_1.35fr]">
-       <Card className="admin-queue-card p-0">
-         <div className="admin-queue-header border-b border-border p-4"><div className="flex items-center justify-between"><div><p className={labelClass}>Broker queue</p><h2 className="font-display text-xl font-semibold">Requests to work</h2></div><Filter size={17} className="text-muted-foreground" /></div><div className="admin-queue-filters mt-4 flex flex-wrap gap-2">{["All", "Attention", "Matching desk", "In progress", "Closed"].map((item) => <button type="button" key={item} onClick={() => setFilter(item)} className={`admin-queue-filter rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${filter === item ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"}`}>{item}</button>)}</div></div>
-          <div className="admin-queue-list max-h-[720px] overflow-y-auto p-3">{operations.loading && !operations.data.requests.length ? <Loading error={operations.error} retry={operations.reload} /> : visibleRequests.length ? <div className="space-y-2">{visibleRequests.map((request) => <button type="button" key={request.id} onClick={() => selectRequest(request.id)} aria-current={selectedId === request.id ? "true" : undefined} className={`admin-request-card w-full rounded-xl border p-3 text-left transition ${selectedId === request.id ? "border-primary bg-[#e5eee9] shadow-sm" : "border-border hover:border-primary/40 hover:bg-muted/40"}`}><div className="admin-request-card-head flex items-start justify-between gap-3"><div className="admin-request-card-copy min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-mono-ui text-[9px] font-bold uppercase tracking-[.14em] text-muted-foreground">{request.kind} · {request.priority}</span>{request.priority === "Urgent" && <span className="admin-urgent-badge rounded-full px-2 py-0.5 text-[9px] font-bold">Urgent</span>}{request.cancellationStatus === "Requested" && <span className="rounded-full bg-[#fff5e3] px-2 py-0.5 text-[9px] font-bold text-[#8c5b20]">Cancel requested</span>}</div><p className="admin-request-title mt-2 truncate text-sm font-bold">{request.title}</p><p className="admin-request-route mt-1 truncate text-[11px] text-muted-foreground">{request.counterpart} · {request.corridor}</p></div><span className="admin-request-status"><Status value={request.status} /></span></div><div className="admin-request-footer mt-3 flex items-center justify-between border-t border-border/70 pt-2 text-[10px] text-muted-foreground"><span>{dateFmt(request.date)}</span><span>{request.suggestions.length} suggested match{request.suggestions.length === 1 ? "" : "es"}</span></div></button>)}</div> : <div className="p-6 text-center text-sm text-muted-foreground">No requests in this queue.</div>}</div>
+       {currentPage.key === "requests" && <div className="admin-workspace grid gap-5 xl:grid-cols-[.92fr_1.35fr]">
+        <Card className={`admin-queue-card p-0 ${showMobileRequestDetail ? "hidden xl:block" : ""}`}>
+          <div className="admin-queue-header border-b border-border p-4">
+            <div className="flex items-center justify-between"><div><p className={labelClass}>Broker queue</p><h2 className="font-display text-xl font-semibold">Requests to work</h2></div><Filter size={17} className="text-muted-foreground" aria-hidden="true" /></div>
+            <label className="mt-4 block"><span className={labelClass}>Search requests</span><input type="search" className={input} value={requestSearch} onChange={(event) => setRequestSearch(event.target.value)} placeholder="Title, route, counterpart, or ID" aria-label="Search requests by title, route, counterpart, or ID" /></label>
+            <div role="group" aria-label="Filter requests" className="admin-queue-filters mt-4 flex flex-wrap gap-2">{["All", "Attention", "Matching desk", "In progress", "Closed"].map((item) => <button type="button" key={item} aria-pressed={filter === item} onClick={() => setFilter(item)} className={`admin-queue-filter min-h-10 rounded-full border px-3 py-2 text-[10px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${filter === item ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"}`}>{item}</button>)}</div>
+          </div>
+          <div ref={queueListRef} id="admin-request-list" tabIndex={-1} aria-label="Request results" className="admin-queue-list p-3">
+            {operations.loading && !operations.data.requests.length ? <Loading error={operations.error} retry={operations.reload} /> : pagedRequests.length ? <div className="space-y-2">{pagedRequests.map((request) => <button type="button" key={request.id} onClick={() => selectRequest(request.id)} aria-current={selectedId === request.id ? "true" : undefined} className={`admin-request-card w-full rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${selectedId === request.id ? "border-primary bg-[#e5eee9] shadow-sm" : "border-border hover:border-primary/40 hover:bg-muted/40"}`}><div className="admin-request-card-head flex items-start justify-between gap-3"><div className="admin-request-card-copy min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-mono-ui text-[9px] font-bold uppercase tracking-[.14em] text-muted-foreground">{request.kind} · {request.priority}</span>{request.priority === "Urgent" && <span className="admin-urgent-badge rounded-full px-2 py-0.5 text-[9px] font-bold">Urgent</span>}{request.cancellationStatus === "Requested" && <span className="rounded-full bg-[#fff5e3] px-2 py-0.5 text-[9px] font-bold text-[#8c5b20]">Cancel requested</span>}</div><p className="admin-request-title mt-2 truncate text-sm font-bold">{request.title}</p><p className="admin-request-route mt-1 truncate text-[11px] text-muted-foreground">{request.counterpart} · {request.corridor}</p></div><span className="admin-request-status"><Status value={request.status} /></span></div><div className="admin-request-footer mt-3 flex items-center justify-between border-t border-border/70 pt-2 text-[10px] text-muted-foreground"><span>{dateFmt(request.date)}</span><span>{request.suggestions.length} suggested match{request.suggestions.length === 1 ? "" : "es"}</span></div></button>)}</div> : <div className="p-6 text-center text-sm text-muted-foreground">No requests match these filters.</div>}
+          </div>
+          <AdminPagination currentPage={currentRequestPage} totalItems={visibleRequests.length} itemLabel="requests" onPageChange={setRequestPage} />
       </Card>
-       <div ref={detailPanelRef} className="admin-request-workspace space-y-5" aria-busy={Boolean(pendingAction)}>
+        <div ref={detailPanelRef} tabIndex={-1} className={`admin-request-workspace space-y-5 ${showMobileRequestDetail ? "" : "hidden xl:block"}`} aria-busy={Boolean(pendingAction)}>
+          <button type="button" onClick={returnToRequestQueue} className={`${secondaryButton} min-h-11 xl:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}><ArrowLeft size={14} /> Back to request list</button>
          {selected ? <Card className="admin-detail-card">
           <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-muted px-2.5 py-1 font-mono-ui text-[9px] font-bold uppercase tracking-[.14em]">{selected.kind} intake</span><Status value={selected.status} /></div><h2 className="mt-3 font-display text-2xl font-semibold tracking-[-.04em]">{selected.title}</h2><p className="mt-1 text-sm text-muted-foreground">{selected.counterpart} · {selected.corridor} · {dateFmt(selected.date)}</p></div><p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-muted-foreground">Updated {dateFmt(selected.updatedAt)}</p></div>
            {selected.cancellationStatus === "Requested" && <div className="mt-5 rounded-xl border border-[#e7c891] bg-[#fff5e3] p-4"><p className="text-sm font-bold text-[#8c5b20]">Cargo owner requested cancellation</p><p className="mt-2 text-xs leading-5">Reason: {selected.cancellationReason || "No reason provided."}</p><p className="mt-2 text-xs leading-5 text-muted-foreground">A booked load can be cancelled only before pickup. If payment was collected, its full refund must complete first; picked-up or in-transit loads need a separate operations decision.</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={Boolean(pendingAction)} onClick={() => void resolveCancellation("approve")} className={button}>{pendingAction === "cancellation-approve" ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}Approve cancellation</button><button type="button" disabled={Boolean(pendingAction)} onClick={() => void resolveCancellation("decline")} className={secondaryButton}>{pendingAction === "cancellation-decline" ? <RefreshCw size={14} className="animate-spin" /> : <X size={14} />}Decline with reason</button></div></div>}
@@ -1698,7 +1847,19 @@ function AdminPage() {
           {selected && <Card className="admin-matches-card"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className={labelClass}>Suggested matches</p><h3 className="font-display text-xl font-semibold">Admin chooses the pairing</h3><p className="mt-1 text-xs text-muted-foreground">Suggestions are ranked by corridor, date, capacity, and fit. Nothing is booked automatically.</p></div><Search size={18} className="shrink-0 text-accent-foreground" /></div><div className="mt-4 space-y-3">{selected.suggestions.length ? selected.suggestions.map((suggestion) => <div key={suggestion.id} className="admin-suggestion flex flex-col gap-3 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><div className="admin-suggestion-thumb"><img src={suggestion.kind === "Trip" ? truckAsset(suggestion.title.split(" ")[0]) : "/branding/story/cargo-loading.jpg"} alt="" /></div><div className="min-w-0"><div className="flex items-center gap-2"><span className="admin-positive-badge rounded-full px-2 py-1 font-mono-ui text-[9px] font-bold">{suggestion.compatibility}% fit</span><span className="font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{suggestion.kind}</span></div><p className="mt-2 text-sm font-bold">{suggestion.title}</p><p className="mt-1 text-[11px] text-muted-foreground">{suggestion.counterpart} · {suggestion.corridor} · {dateFmt(suggestion.date)}</p></div><div className="admin-suggestion-action flex items-center justify-between gap-3 sm:justify-end"><strong className="font-display text-lg">{money(suggestion.price)}</strong><button type="button" disabled={Boolean(pendingAction)} onClick={() => void sendOffer(suggestion)} className={button}>{pendingAction === `offer:${suggestion.id}` ? <><RefreshCw size={14} className="animate-spin" /> Sending…</> : <>Send offer <ArrowRight size={14} /></>}</button></div></div>) : <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">No suitable candidate yet. Keep this request in the matching queue.</div>}</div></Card>}
       </div>
       </div>}
-      {currentPage.key === "operations" && <Card className="admin-module-card"><div className="mb-4 flex items-start justify-between gap-4"><div><p className={labelClass}>WORKFLOW</p><h2 className="font-display text-xl font-semibold">Active operations</h2><p className="mt-1 text-sm text-muted-foreground">Confirmed and assigned requests that still need coordination.</p></div><span className="admin-chart-total">{activeRequests.length} active</span></div>{activeRequests.length ? <div className="space-y-2">{activeRequests.map((request) => <div key={request.id} className="admin-module-row flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold">{request.title}</p><Status value={request.status} /></div><p className="mt-1 text-xs text-muted-foreground">{request.counterpart} · {request.corridor}</p><p className="mt-1 font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{request.kind} · updated {dateFmt(request.updatedAt)}</p></div><Link href="/admin/requests" className={`${secondaryButton} admin-row-action`}>Open request <ArrowRight size={14} /></Link></div>)}</div> : <div className="admin-module-empty"><RouteIcon size={22} /><p>No active operations</p><span>Requests move here after they are confirmed or assigned.</span></div>}</Card>}
+       {currentPage.key === "operations" && <Card className="admin-module-card">
+         <div className="mb-4 flex items-start justify-between gap-4"><div><p className={labelClass}>WORKFLOW</p><h2 className="font-display text-xl font-semibold">Active operations</h2><p className="mt-1 text-sm text-muted-foreground">Confirmed and assigned requests that still need coordination.</p></div><span className="admin-chart-total">{activeRequests.length} active</span></div>
+         {activeRequests.length ? <>
+           <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+             <label><span className={labelClass}>Search active operations</span><input type="search" className={input} value={operationSearch} onChange={(event) => setOperationSearch(event.target.value)} placeholder="Title, route, counterpart, or ID" aria-label="Search active operations by title, route, counterpart, or ID" /></label>
+             <label><span className={labelClass}>Status</span><select className={input} value={operationStatus} onChange={(event) => setOperationStatus(event.target.value)} aria-label="Filter active operations by status">{["All active", "Confirmed", "Assigned", "In progress", "On hold"].map((status) => <option key={status}>{status}</option>)}</select></label>
+           </div>
+           {visibleActiveRequests.length ? <>
+              <div className="space-y-2">{pagedActiveRequests.map((request) => <div key={request.id} className="admin-module-row flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold">{request.title}</p><Status value={request.status} /></div><p className="mt-1 text-xs text-muted-foreground">{request.counterpart} · {request.corridor}</p><p className="mt-1 font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{request.kind} · updated {dateFmt(request.updatedAt)}</p></div><Link href={`/admin/requests?request=${encodeURIComponent(request.id)}`} className={`${secondaryButton} admin-row-action min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}>Open request <ArrowRight size={14} /></Link></div>)}</div>
+             <div className="mt-3"><AdminPagination currentPage={currentOperationPage} totalItems={visibleActiveRequests.length} itemLabel="active operations" onPageChange={setOperationPage} /></div>
+           </> : <div className="admin-module-empty"><Search size={22} /><p>No matching active operations</p><span>Try a different search or status.</span></div>}
+         </> : <div className="admin-module-empty"><RouteIcon size={22} /><p>No active operations</p><span>Requests move here after they are confirmed or assigned.</span></div>}
+       </Card>}
       {currentPage.key === "compliance" && <Card className="admin-module-card"><div className="mb-4 flex items-start justify-between gap-4"><div><p className={labelClass}>VERIFICATION REVIEW</p><h2 className="font-display text-xl font-semibold">Compliance queue</h2><p className="mt-1 text-sm text-muted-foreground">Submitted driver and vehicle records awaiting review.</p></div><span className="admin-chart-total">{operations.data.verifications.length} submissions</span></div>{operations.data.verifications.length ? <div className="space-y-2">{operations.data.verifications.map((item) => <div key={item.id} className="admin-module-row flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate text-sm font-semibold">{item.name}</p><p className="mt-1 text-xs text-muted-foreground">{item.licenseNumber} · logbook {item.logbookNumber}</p><p className="mt-1 font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">Submitted {dateFmt(item.submittedAt)}</p></div><Status value={item.status} /></div>)}</div> : <div className="admin-module-empty"><ShieldCheck size={22} /><p>Nothing awaiting review</p><span>New verification submissions will appear here.</span></div>}</Card>}
       {currentPage.key === "activity" && <Card className="admin-module-card"><div className="mb-4 flex items-start justify-between gap-4"><div><p className={labelClass}>AUDIT TRAIL</p><h2 className="font-display text-xl font-semibold">Recent decisions</h2><p className="mt-1 text-sm text-muted-foreground">A record of recent changes made by the broker team.</p></div><span className="admin-chart-total">{operations.data.activities.length} events</span></div>{operations.data.activities.length ? <div className="space-y-1">{operations.data.activities.map((activity) => <div key={activity.id} className="admin-activity-row flex gap-3 border-t border-border py-4 first:border-t-0"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" /><div className="min-w-0"><p className="text-sm font-semibold">{activity.label}</p><p className="mt-1 text-xs text-muted-foreground">{activity.detail}</p><p className="mt-2 font-mono-ui text-[9px] uppercase tracking-wider text-muted-foreground">{activity.actor} · {dateFmt(activity.createdAt)}</p></div></div>)}</div> : <div className="admin-module-empty"><Activity size={22} /><p>No activity recorded</p><span>Admin decisions will appear here as the queue changes.</span></div>}</Card>}
       {!operations.loading && currentPage.key !== "overview" && currentPage.key !== "requests" && currentPage.key !== "operations" && currentPage.key !== "finance" && currentPage.key !== "compliance" && currentPage.key !== "activity" && <Card><p className="text-sm text-muted-foreground">Choose a page from the admin navigation.</p></Card>}
