@@ -1921,6 +1921,129 @@ function RegionalPaymentsPage() {
   return <div className="mx-auto max-w-5xl space-y-6"><Header eyebrow="Regional settlement" title="Cross-border checkout" detail="Choose the payer market, preview the indicative FX quote and fees, then fund the booking through a supported network." />{message && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{message}</div>}<div className="grid gap-5 lg:grid-cols-[1fr_.85fr]"><Card><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff0d9] text-[#9a641c]"><Globe2 size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a regional booking</h3><p className="text-xs text-muted-foreground">The booking value stays fixed in the transporter’s currency; only the payer amount changes with FX.</p></div></div><div className="mt-6 space-y-4"><label><span className={labelClass}>Booking</span><select className={input} value={selected} onChange={(event) => { setSelected(event.target.value); setQuote(undefined); }}><option value="">Select a booking</option>{bookings.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><label><span className={labelClass}>Payer country</span><select className={input} value={payerCountry} onChange={(event) => { const country = reference.data.countries.find((item) => item.code === event.target.value); setPayerCountry(event.target.value); if (country) setPayerCurrency(country.currency); setQuote(undefined); }} >{reference.data.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label><label><span className={labelClass}>Payer currency</span><select className={input} value={payerCurrency} onChange={(event) => { setPayerCurrency(event.target.value); setQuote(undefined); }}>{reference.data.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency}</option>)}</select></label></div><label><span className={labelClass}>Payment network</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option><option>Bank Transfer</option></select></label><Field label="EAC phone number" value={phone} onChange={setPhone} /><div className="flex flex-col gap-2 sm:flex-row"><button onClick={getQuote} className={`${secondaryButton} flex-1`}><RefreshCw size={14} /> Preview FX quote</button><button onClick={pay} disabled={!booking} className={`${button} flex-1`}><LockKeyhole size={14} /> Continue to Flutterwave</button></div></div></Card><Card className="border-primary/15 bg-[#e5eee9] text-primary"><p className={labelClass}>Settlement preview</p>{quote ? <div className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><span className="text-primary/65">Payer pays</span><strong>{money(quote.payerAmount ?? quote.amount, quote.currency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">FX rate</span><strong>1 {quote.currency} = {quote.exchangeRate} {quote.settlementCurrency}</strong></div><div className="flex justify-between"><span className="text-primary/65">Booking value (fixed)</span><strong>{money(quote.settlementAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">Fees + commission</span><strong>{money(quote.fee + quote.commissionAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between border-t border-primary/15 pt-4"><span className="font-bold">Transporter payout</span><strong className="font-display text-2xl">{money(quote.carrierPayout, quote.settlementCurrency)}</strong></div><p className="text-[11px] leading-5 text-primary/60">The UGX booking amount is not replaced by the foreign currency amount. This is an indicative quote · expires in {quote.expiresInSeconds}s.</p></div> : <div className="mt-5 space-y-3 text-sm text-primary/70"><p>Select a booking and payer market to calculate the payer amount before collecting payment.</p><p>Supported networks: MTN MoMo, Airtel Money, and bank transfer.</p></div>}</Card></div></div>;
 }
 
+function PaymentReturnPage() {
+  const searchParams = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
+  const transactionReference = searchParams.get("tx_ref") || searchParams.get("transaction_reference") || "";
+  const checkoutStatus = (searchParams.get("status") || "").toLowerCase();
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [loading, setLoading] = useState(Boolean(transactionReference));
+  const [lookupError, setLookupError] = useState("");
+  const [checkAgain, setCheckAgain] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    let timer: number | undefined;
+    let attempt = 0;
+    if (!transactionReference) {
+      setBooking(null);
+      setLookupError("");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLookupError("");
+    const checkStatus = async () => {
+      try {
+        const visibleBookings = await api<Booking[]>("/bookings");
+        if (!active) return;
+        const match = visibleBookings.find((item) => transactionReference.startsWith(`TS-${item.id}-`)) || null;
+        setBooking(match);
+        if (match?.paymentStatus === "Paid") {
+          setLoading(false);
+          return;
+        }
+        if (attempt < 11) {
+          attempt += 1;
+          timer = window.setTimeout(() => void checkStatus(), 2500);
+        } else {
+          setLoading(false);
+          if (!match) setLookupError("We couldn't match this checkout to a booking on your account.");
+        }
+      } catch (reason: unknown) {
+        if (!active) return;
+        setLookupError(reason instanceof Error ? reason.message : "We couldn't check the booking status.");
+        setLoading(false);
+      }
+    };
+
+    void checkStatus();
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [transactionReference, checkAgain]);
+
+  const isPaid = booking?.paymentStatus === "Paid";
+  const isCancelled = ["cancelled", "canceled", "failed"].includes(checkoutStatus);
+  const title = !transactionReference
+    ? "Payment reference missing"
+    : isPaid
+      ? "Payment confirmed"
+    : lookupError
+      ? "We couldn’t confirm this payment"
+      : loading
+        ? "Checking your payment"
+        : isCancelled
+          ? "Checkout wasn’t completed"
+          : "Payment confirmation is pending";
+  const detail = !transactionReference
+    ? "Open this page from a Flutterwave checkout return link, or check the payment status from your bookings."
+    : isPaid
+      ? "Flutterwave’s server-verified confirmation is recorded. Your booking is funded and protected."
+    : lookupError
+      ? lookupError.toLowerCase().includes("log in") || lookupError.includes("401")
+        ? "Sign in to the same TruckShare account that started this checkout, then check the booking again."
+        : "Your booking hasn’t been marked as paid. You can check again or open your bookings."
+      : loading
+        ? "We’re waiting for TruckShare’s server to verify the payment. This can take a short moment."
+        : isCancelled
+          ? "No verified payment is recorded for this booking yet. Check its status before trying to pay again."
+          : "Flutterwave has returned you to TruckShare, but the server hasn’t recorded a verified payment yet.";
+
+  return <div className="mx-auto max-w-3xl space-y-6">
+    <Header eyebrow="Secure checkout" title="Payment status" detail="A clear update for your booking after checkout." />
+    <Card className="overflow-hidden p-0">
+      <div className={`p-6 sm:p-9 ${isPaid ? "bg-[#e5f1e9]" : lookupError ? "bg-[#fbefeb]" : "bg-[#fff5e3]"}`} role="status" aria-live="polite" aria-atomic="true">
+        <div className="flex items-start gap-4">
+          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${isPaid ? "bg-white text-[#28765a]" : lookupError ? "bg-white text-[#ad4339]" : "bg-white text-[#9a641c]"}`}>
+            {isPaid ? <Check size={24} /> : lookupError ? <CircleAlert size={24} /> : loading ? <RefreshCw size={22} className="animate-spin" /> : <Clock3 size={23} />}
+          </span>
+          <div className="min-w-0">
+            <p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.14em] text-muted-foreground">Flutterwave checkout</p>
+            <h2 className="mt-2 font-display text-2xl font-semibold sm:text-3xl">{title}</h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{detail}</p>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-5 p-5 sm:p-8">
+        {booking && <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-2">
+          <div><p className={labelClass}>Booking</p><p className="text-sm font-semibold">{booking.corridor}</p><p className="mt-1 text-xs text-muted-foreground">{booking.id}</p></div>
+          <div><p className={labelClass}>Booking payment status</p><Status value={booking.paymentStatus || "Pending"} /><p className="mt-1 text-xs text-muted-foreground">{money(booking.amount, booking.currency)}</p></div>
+        </div>}
+        {transactionReference && <div className="rounded-xl border border-border p-4">
+          <p className={labelClass}>Transaction reference</p>
+          <p className="break-all font-mono-ui text-xs font-semibold">{transactionReference}</p>
+        </div>}
+        {!isPaid && <div className="flex gap-3 rounded-xl border border-primary/15 bg-[#e5eee9] p-4 text-xs leading-5 text-primary/75">
+          <ShieldCheck className="mt-0.5 shrink-0 text-[#28765a]" size={18} />
+          <p>For your protection, this page does not treat the browser’s return message as proof of payment. TruckShare marks a booking paid only after the server verifies Flutterwave’s confirmation.</p>
+        </div>}
+        {lookupError && !lookupError.toLowerCase().includes("log in") && !lookupError.includes("401") && <p className="text-sm text-destructive" role="alert">{lookupError}</p>}
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link href={isPaid || !transactionReference ? "/bookings" : "/payments"} className={`${button} min-h-11`}>
+            {isPaid ? "View my bookings" : transactionReference ? "Return to checkout" : "Go to my bookings"} <ArrowRight size={14} />
+          </Link>
+          {!isPaid && transactionReference && <button type="button" disabled={loading} onClick={() => setCheckAgain((value) => value + 1)} className={`${secondaryButton} min-h-11`}>
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> {loading ? "Checking…" : "Check status again"}
+          </button>}
+        </div>
+        {!isPaid && <p className="text-[11px] leading-5 text-muted-foreground">If you just approved a mobile-money prompt, wait for the confirmation before attempting another payment.</p>}
+      </div>
+    </Card>
+  </div>;
+}
+
 function EacNetworkPage() {
   const reference = useApi<EacReference>("/reference/eac", regionalReference);
   const bookings = useApi<Booking[]>("/bookings", []);
@@ -2340,6 +2463,7 @@ function Router() {
             <Route path="/documents" component={DocumentsPage} />
             <Route path="/verification" component={VerificationPage} />
             <Route path="/finance" component={FinanceOperationsPage} />
+            <Route path="/payments/return" component={PaymentReturnPage} />
             <Route path="/payments" component={RegionalPaymentsPage} />
             <Route path="/regional" component={EacNetworkPage} />
             <Route component={NotFound} />
