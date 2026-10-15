@@ -20,7 +20,7 @@ Cross-border and regional freight matching that turns carrier backhaul capacity 
 - `DEV_ADMIN_ACCESS=true` — enables the development-only admin session when the API is not running with `NODE_ENV=production`; never enable this on a public production API
 - `VITE_DEV_ADMIN_ACCESS=true` — shows the development admin button in a non-Vite-dev frontend build; never enable for a public production Vercel deployment
 - Pesapal redirects customers to `/payments/return` on `FRONTEND_URL`; the API verifies payments through the registered Pesapal IPN before marking bookings paid. Pesapal refund requests remain pending until the transaction is reversed/confirmed.
-- Live transporter payouts are not integrated; production payouts remain held.
+- Production carrier payouts are admin-recorded after an external bank/mobile-money transfer is completed. Production recording requires the external transfer reference and admin reason; delivery verification only makes a payout eligible and never sends funds. Pesapal API 3.0 is used for collection/refunds, not transporter disbursements.
 
 ## Stack
 

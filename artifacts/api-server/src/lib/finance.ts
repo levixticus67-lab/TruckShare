@@ -44,8 +44,9 @@ export type FinancePayout = {
   bookingId: string;
   amount: number;
   currency: string;
-  provider: "simulation";
+  provider: "simulation" | "manual";
   providerTransferId?: string;
+  releasedBy?: string;
   status: "PENDING_RELEASE" | "PROCESSING" | "COMPLETED" | "FAILED" | "REVERSED";
   releaseReason?: string;
   createdAt: string;
@@ -247,9 +248,26 @@ export function markReleaseEligible(bookingId: string) {
   return current;
 }
 
-export function releasePayout(bookingId: string, reason: string) {
+export function hasPayoutTransferReference(reference: string) {
+  const normalized = reference.trim().toUpperCase();
+  return normalized.length > 0 && state.bookings.some(
+    (item) => item.payout?.providerTransferId?.trim().toUpperCase() === normalized,
+  );
+}
+
+export function releasePayout(
+  bookingId: string,
+  reason: string,
+  options: { provider: FinancePayout["provider"]; providerTransferId?: string; releasedBy: string },
+) {
   const current = bookingState(bookingId);
   if (current.escrowState !== "RELEASE_ELIGIBLE" && current.escrowState !== "PAYOUT_PENDING") {
+    return undefined;
+  }
+  const providerTransferId = options.provider === "manual"
+    ? options.providerTransferId?.trim()
+    : `SIM-${randomUUID().slice(0, 10).toUpperCase()}`;
+  if (!providerTransferId || (options.provider === "manual" && hasPayoutTransferReference(providerTransferId))) {
     return undefined;
   }
   const payout: FinancePayout = {
@@ -257,10 +275,11 @@ export function releasePayout(bookingId: string, reason: string) {
     bookingId,
     amount: current.carrierPayable,
     currency: current.currency,
-    provider: "simulation",
-    providerTransferId: `SIM-${randomUUID().slice(0, 10).toUpperCase()}`,
+    provider: options.provider,
+    providerTransferId,
+    releasedBy: options.releasedBy,
     status: "COMPLETED",
-    releaseReason: reason,
+    releaseReason: reason.trim(),
     createdAt: now(),
     completedAt: now(),
   };
@@ -273,22 +292,27 @@ export function releasePayout(bookingId: string, reason: string) {
     direction: "debit",
     amount: current.carrierPayable,
     currency: current.currency,
-    reference: payout.providerTransferId ?? payout.id,
+    reference: payout.providerTransferId,
     idempotencyKey: `payout:${payout.id}:carrier`,
   });
   entry(current, {
-    account: "pesapal_collection",
+    account: options.provider === "manual" ? "manual_payout_clearing" : "pesapal_collection",
     entryType: "PAYOUT",
     direction: "credit",
     amount: current.carrierPayable,
     currency: current.currency,
-    reference: payout.providerTransferId ?? payout.id,
+    reference: payout.providerTransferId,
     idempotencyKey: `payout:${payout.id}:collection`,
   });
-  timeline(current, "PAYOUT_COMPLETED", "Carrier payout completed in simulation mode");
+  timeline(
+    current,
+    "PAYOUT_COMPLETED",
+    options.provider === "manual"
+      ? `External carrier transfer recorded by ${options.releasedBy}`
+      : "Carrier payout completed in development simulation",
+  );
   return view(current);
 }
-
 export function getBookingFinance(bookingId: string) {
   const current = state.bookings.find((item) => item.bookingId === bookingId);
   return current ? view(current) : undefined;

@@ -39,6 +39,7 @@ import {
 } from "@workspace/api-zod";
 import {
   getBookingFinance,
+  hasPayoutTransferReference,
   getFinanceOverview,
   getFinanceSettings,
   getPlatformFeeRate,
@@ -1122,11 +1123,7 @@ router.get("/finance/bookings/:id", (req, res) => {
 router.post("/finance/bookings/:id/release", async (req, res) => {
   const user = authenticatedUser(req);
   if (!user || user.role !== "Admin") {
-    res.status(403).json({ error: "Only finance administrators can release transporter payouts." });
-    return;
-  }
-  if (process.env.NODE_ENV === "production") {
-    res.status(501).json({ error: "Live transporter transfers are not integrated yet; payout remains held." });
+    res.status(403).json({ error: "Only finance administrators can record transporter payouts." });
     return;
   }
   const booking = bookings.find((item) => item.id === text(req.params.id));
@@ -1135,9 +1132,28 @@ router.post("/finance/bookings/:id/release", async (req, res) => {
     return;
   }
   const data = ReleaseBookingPayoutBody.parse(req.body);
-  const current = releasePayout(booking.id, data.reason);
+  const reason = data.reason.trim();
+  if (reason.length < 3) {
+    res.status(400).json({ error: "A payout reason of at least 3 characters is required." });
+    return;
+  }
+  const production = process.env.NODE_ENV === "production";
+  const transferReference = data.transferReference?.trim();
+  if (production && (!transferReference || transferReference.length < 3)) {
+    res.status(400).json({ error: "Enter the completed bank or mobile-money transfer reference before recording a production payout." });
+    return;
+  }
+  if (production && transferReference && hasPayoutTransferReference(transferReference)) {
+    res.status(409).json({ error: "That transfer reference has already been recorded for another payout." });
+    return;
+  }
+  const current = releasePayout(booking.id, reason, {
+    provider: production ? "manual" : "simulation",
+    providerTransferId: transferReference,
+    releasedBy: user.name || user.email || user.id,
+  });
   if (!current) {
-    res.status(409).json({ error: "This booking is not eligible for payout release. Delivery confirmation must be completed first." });
+    res.status(409).json({ error: "This booking is not eligible for payout recording. Verified delivery and payment are required, and a completed payout cannot be repeated." });
     return;
   }
   booking.escrowStatus = "Released";

@@ -12,4 +12,10 @@ export interface ReleasePayoutInput {
      * @maxLength 240
      */
   reason: string;
+  /**
+   * Required in production after the external transfer has been completed.
+   * @minLength 3
+   * @maxLength 120
+   */
+  transferReference?: string;
 }

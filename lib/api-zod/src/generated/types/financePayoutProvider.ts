@@ -11,4 +11,5 @@ export type FinancePayoutProvider = typeof FinancePayoutProvider[keyof typeof Fi
 
 export const FinancePayoutProvider = {
   simulation: 'simulation',
+  manual: 'manual',
 } as const;

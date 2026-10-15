@@ -16,6 +16,7 @@ export interface FinancePayout {
   currency: CurrencyCode;
   provider: FinancePayoutProvider;
   providerTransferId?: string;
+  releasedBy?: string;
   status: FinancePayoutStatus;
   releaseReason?: string;
   createdAt: string;

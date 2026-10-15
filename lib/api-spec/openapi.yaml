@@ -625,7 +625,8 @@ paths:
     post:
       operationId: releaseBookingPayout
       tags: [finance]
-      summary: Release a carrier payout after delivery verification
+      summary: Record an admin-approved carrier transfer after delivery verification
+      description: Delivery verification only makes a booking eligible. An administrator records a completed external transfer with its reference; this endpoint does not send funds.
       parameters:
         - $ref: "#/components/parameters/Id"
       requestBody:
@@ -1068,8 +1069,9 @@ components:
         bookingId: { type: string }
         amount: { type: number }
         currency: { $ref: "#/components/schemas/CurrencyCode" }
-        provider: { type: string, enum: [simulation] }
+        provider: { type: string, enum: [simulation, manual] }
         providerTransferId: { type: string }
+        releasedBy: { type: string }
         status: { type: string, enum: [PENDING_RELEASE, PROCESSING, COMPLETED, FAILED, REVERSED] }
         releaseReason: { type: string }
         createdAt: { type: string }
@@ -1108,6 +1110,7 @@ components:
       required: [reason]
       properties:
         reason: { type: string, minLength: 3, maxLength: 240 }
+        transferReference: { type: string, minLength: 3, maxLength: 120, description: Required in production after an external bank or mobile-money transfer is completed. }
     BorderMilestoneStatus:
       type: string
       enum: [Planned, "Documents Pending", Submitted, Cleared, Held, Crossed]

@@ -933,8 +933,9 @@ export const GetBookingFinanceResponse = zod.object({
   "bookingId": zod.string(),
   "amount": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "provider": zod.enum(['simulation']),
+  "provider": zod.enum(['simulation', 'manual']),
   "providerTransferId": zod.string().optional(),
+  "releasedBy": zod.string().optional(),
   "status": zod.enum(['PENDING_RELEASE', 'PROCESSING', 'COMPLETED', 'FAILED', 'REVERSED']),
   "releaseReason": zod.string().optional(),
   "createdAt": zod.string(),
@@ -961,7 +962,8 @@ export const releaseBookingPayoutBodyReasonMax = 240;
 
 
 export const ReleaseBookingPayoutBody = zod.object({
-  "reason": zod.string().min(releaseBookingPayoutBodyReasonMin).max(releaseBookingPayoutBodyReasonMax)
+  "reason": zod.string().min(releaseBookingPayoutBodyReasonMin).max(releaseBookingPayoutBodyReasonMax),
+  "transferReference": zod.string().min(3).max(120).optional()
 })
 
 export const ReleaseBookingPayoutResponse = zod.object({
@@ -990,8 +992,9 @@ export const ReleaseBookingPayoutResponse = zod.object({
   "bookingId": zod.string(),
   "amount": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "provider": zod.enum(['simulation']),
+  "provider": zod.enum(['simulation', 'manual']),
   "providerTransferId": zod.string().optional(),
+  "releasedBy": zod.string().optional(),
   "status": zod.enum(['PENDING_RELEASE', 'PROCESSING', 'COMPLETED', 'FAILED', 'REVERSED']),
   "releaseReason": zod.string().optional(),
   "createdAt": zod.string(),
