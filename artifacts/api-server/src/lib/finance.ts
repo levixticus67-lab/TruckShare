@@ -44,7 +44,7 @@ export type FinancePayout = {
   bookingId: string;
   amount: number;
   currency: string;
-  provider: "flutterwave" | "simulation";
+  provider: "simulation";
   providerTransferId?: string;
   status: "PENDING_RELEASE" | "PROCESSING" | "COMPLETED" | "FAILED" | "REVERSED";
   releaseReason?: string;
@@ -59,7 +59,7 @@ type FinanceTimelineItem = {
 };
 
 export type FinanceWebhookEvent = {
-  provider: "flutterwave";
+  provider: "flutterwave" | "pesapal";
   providerEventId: string;
   eventType: string;
   status: "Received" | "Processed" | "Ignored";
@@ -73,7 +73,7 @@ export type FinanceRefund = {
   bookingId: string;
   amount: number;
   currency: string;
-  provider: "flutterwave" | "simulation";
+  provider: "flutterwave" | "pesapal" | "simulation";
   providerRefundId?: string;
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
   reason: string;
@@ -178,7 +178,7 @@ export function recordPayment(input: {
   current.escrowState = "FUNDS_HELD";
   current.payoutState = "PENDING_RELEASE";
   entry(current, {
-    account: "flutterwave_collection",
+    account: "pesapal_collection",
     entryType: "CUSTOMER_PAYMENT",
     direction: "debit",
     amount: input.grossAmount,
@@ -214,7 +214,7 @@ export function recordPayment(input: {
     idempotencyKey: `payment:${input.paymentId}:provider-fee`,
   });
   entry(current, {
-    account: "flutterwave_collection",
+    account: "pesapal_collection",
     entryType: "PROVIDER_FEE",
     direction: "credit",
     amount: input.providerFee,
@@ -277,7 +277,7 @@ export function releasePayout(bookingId: string, reason: string) {
     idempotencyKey: `payout:${payout.id}:carrier`,
   });
   entry(current, {
-    account: "flutterwave_collection",
+    account: "pesapal_collection",
     entryType: "PAYOUT",
     direction: "credit",
     amount: current.carrierPayable,
@@ -327,35 +327,60 @@ export function getFinanceOverview() {
   return overview;
 }
 
+function applyRefundFinanceState(bookingId: string) {
+  const current = bookingState(bookingId);
+  const bookingRefunds = state.refunds.filter((refund) => refund.bookingId === bookingId);
+  const hasPendingRefund = bookingRefunds.some((refund) => refund.status === "PENDING" || refund.status === "PROCESSING");
+  const completedAmount = bookingRefunds
+    .filter((refund) => refund.status === "COMPLETED")
+    .reduce((total, refund) => total + refund.amount, 0);
+  const fullyRefunded = current.grossAmount > 0 && completedAmount >= current.grossAmount - 0.01;
+
+  if (hasPendingRefund) {
+    current.paymentState = "REFUND_PENDING";
+    current.escrowState = "REFUND_PENDING";
+    timeline(current, "REFUND_PENDING", "Refund requested");
+  } else if (fullyRefunded) {
+    current.paymentState = "REFUNDED";
+    current.escrowState = "REFUNDED";
+    timeline(current, "REFUNDED", "Payment refund completed");
+  } else {
+    current.paymentState = "PAYMENT_VERIFIED";
+    current.escrowState = "FUNDS_HELD";
+    timeline(current, "PAYMENT_VERIFIED", "Partial refund completed; remaining funds stay held");
+  }
+}
+
+function recordRefundLedger(refund: FinanceRefund) {
+  const current = bookingState(refund.bookingId);
+  const collectionAccount = refund.provider === "flutterwave" ? "flutterwave_collection" : "pesapal_collection";
+  entry(current, {
+    account: "refund_expense",
+    entryType: "REFUND",
+    direction: "debit",
+    amount: refund.amount,
+    currency: refund.currency,
+    reference: refund.id,
+    idempotencyKey: `refund:${refund.id}:expense`,
+  });
+  entry(current, {
+    account: collectionAccount,
+    entryType: "REFUND",
+    direction: "credit",
+    amount: refund.amount,
+    currency: refund.currency,
+    reference: refund.id,
+    idempotencyKey: `refund:${refund.id}:collection`,
+  });
+}
+
 export function recordRefund(input: Omit<FinanceRefund, "createdAt">) {
   const existing = state.refunds.find((refund) => refund.id === input.id);
   if (existing) return existing;
   const refund = { ...input, createdAt: now() };
   state.refunds.push(refund);
-  const current = bookingState(input.bookingId);
-  current.paymentState = input.status === "COMPLETED" ? "REFUNDED" : "REFUND_PENDING";
-  current.escrowState = input.status === "COMPLETED" ? "REFUNDED" : "REFUND_PENDING";
-  timeline(current, current.escrowState, input.status === "COMPLETED" ? "Payment refunded" : "Refund requested");
-  if (input.status === "COMPLETED") {
-    entry(current, {
-      account: "refund_expense",
-      entryType: "REFUND",
-      direction: "debit",
-      amount: input.amount,
-      currency: input.currency,
-      reference: input.id,
-      idempotencyKey: `refund:${input.id}:expense`,
-    });
-    entry(current, {
-      account: "flutterwave_collection",
-      entryType: "REFUND",
-      direction: "credit",
-      amount: input.amount,
-      currency: input.currency,
-      reference: input.id,
-      idempotencyKey: `refund:${input.id}:collection`,
-    });
-  }
+  if (input.status === "COMPLETED") recordRefundLedger(refund);
+  applyRefundFinanceState(input.bookingId);
   return refund;
 }
 
@@ -363,24 +388,34 @@ export function getRefund(refundId: string) {
   return state.refunds.find((refund) => refund.id === refundId);
 }
 
+export function getRefundForPayment(paymentId: string) {
+  return state.refunds.find((refund) => refund.paymentId === paymentId);
+}
+
 export function updateRefund(refundId: string, status: FinanceRefund["status"], providerRefundId?: string) {
   const refund = getRefund(refundId);
   if (!refund) return undefined;
+  const wasCompleted = refund.status === "COMPLETED";
   refund.status = status;
   refund.providerRefundId = providerRefundId ?? refund.providerRefundId;
+  if (status === "COMPLETED" && !wasCompleted) {
+    recordRefundLedger(refund);
+  }
+  applyRefundFinanceState(refund.bookingId);
   return refund;
 }
 
 export function recordWebhookEvent(input: {
+  provider: FinanceWebhookEvent["provider"];
   providerEventId: string;
   eventType: string;
 }) {
   const existing = state.webhookEvents.find(
-    (item) => item.provider === "flutterwave" && item.providerEventId === input.providerEventId,
+    (item) => item.provider === input.provider && item.providerEventId === input.providerEventId,
   );
   if (existing) return { event: existing, duplicate: true };
   const event: FinanceWebhookEvent = {
-    provider: "flutterwave",
+    provider: input.provider,
     providerEventId: input.providerEventId,
     eventType: input.eventType,
     status: "Received",
@@ -390,9 +425,13 @@ export function recordWebhookEvent(input: {
   return { event, duplicate: false };
 }
 
-export function completeWebhookEvent(providerEventId: string, status: "Processed" | "Ignored") {
+export function completeWebhookEvent(
+  providerEventId: string,
+  status: "Processed" | "Ignored",
+  provider: FinanceWebhookEvent["provider"] = "pesapal",
+) {
   const event = state.webhookEvents.find(
-    (item) => item.provider === "flutterwave" && item.providerEventId === providerEventId,
+    (item) => item.provider === provider && item.providerEventId === providerEventId,
   );
   if (event) {
     event.status = status;

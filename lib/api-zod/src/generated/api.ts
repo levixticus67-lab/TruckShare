@@ -804,7 +804,7 @@ export const SimulatePaymentResponse = zod.object({
 
 
 /**
- * @summary Create a Flutterwave checkout or development simulation
+ * @summary Create a Pesapal checkout or development simulation
  */
 export const CreatePaymentCheckoutBody = zod.object({
   "bookingId": zod.string(),
@@ -816,8 +816,8 @@ export const CreatePaymentCheckoutBody = zod.object({
 
 export const CreatePaymentCheckoutResponse = zod.object({
   "bookingId": zod.string(),
-  "provider": zod.enum(['flutterwave']),
-  "mode": zod.enum(['flutterwave', 'simulation']),
+  "provider": zod.enum(['pesapal']),
+  "mode": zod.enum(['pesapal', 'simulation']),
   "transactionReference": zod.string(),
   "checkoutUrl": zod.string().nullish(),
   "status": zod.enum(['PENDING', 'SIMULATION_PENDING'])
@@ -849,7 +849,7 @@ export const CreatePaymentRefundResponse = zod.object({
   "bookingId": zod.string(),
   "amount": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "provider": zod.enum(['flutterwave', 'simulation']),
+  "provider": zod.enum(['flutterwave', 'pesapal', 'simulation']),
   "providerRefundId": zod.string().optional(),
   "status": zod.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED']),
   "reason": zod.string(),
@@ -858,17 +858,19 @@ export const CreatePaymentRefundResponse = zod.object({
 
 
 /**
- * @summary Receive and idempotently process a Flutterwave webhook
+ * @summary Verify and acknowledge a Pesapal payment notification
  */
-export const ReceiveFlutterwaveWebhookHeader = zod.object({
-  "verif-hash": zod.string().optional()
+export const ReceivePesapalIpnQuery = zod.object({
+  "OrderNotificationType": zod.string().optional(),
+  "OrderTrackingId": zod.string(),
+  "OrderMerchantReference": zod.string()
 })
 
-export const ReceiveFlutterwaveWebhookBody = zod.record(zod.string(), zod.unknown())
-
-export const ReceiveFlutterwaveWebhookResponse = zod.object({
-  "received": zod.boolean(),
-  "duplicate": zod.boolean()
+export const ReceivePesapalIpnResponse = zod.object({
+  "orderNotificationType": zod.string(),
+  "orderTrackingId": zod.string(),
+  "orderMerchantReference": zod.string(),
+  "status": zod.number()
 })
 
 
@@ -931,7 +933,7 @@ export const GetBookingFinanceResponse = zod.object({
   "bookingId": zod.string(),
   "amount": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "provider": zod.enum(['flutterwave', 'simulation']),
+  "provider": zod.enum(['simulation']),
   "providerTransferId": zod.string().optional(),
   "status": zod.enum(['PENDING_RELEASE', 'PROCESSING', 'COMPLETED', 'FAILED', 'REVERSED']),
   "releaseReason": zod.string().optional(),
@@ -988,7 +990,7 @@ export const ReleaseBookingPayoutResponse = zod.object({
   "bookingId": zod.string(),
   "amount": zod.number(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']),
-  "provider": zod.enum(['flutterwave', 'simulation']),
+  "provider": zod.enum(['simulation']),
   "providerTransferId": zod.string().optional(),
   "status": zod.enum(['PENDING_RELEASE', 'PROCESSING', 'COMPLETED', 'FAILED', 'REVERSED']),
   "releaseReason": zod.string().optional(),

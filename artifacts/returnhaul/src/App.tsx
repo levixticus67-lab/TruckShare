@@ -77,7 +77,7 @@ type DashboardData = { activeTrips: number; availableLoads: number; inTransit: n
 type EacReference = { countries: { code: string; name: string; currency: string }[]; corridors: { origin: string; originCountry: string; destination: string; destinationCountry: string; border: string }[] };
 type BorderMilestone = { id: string; bookingId: string; sequence: number; country: string; checkpoint: string; border?: string; status: string; requiredDocuments: string[]; updatedAt?: string; completedAt?: string };
 type PaymentQuote = { quoteId: string; payerCountry: string; payeeCountry: string; amount: number; payerAmount?: number; currency: string; settlementAmount: number; settlementCurrency: string; exchangeRate: number; fee: number; commissionAmount: number; carrierPayout: number; commissionRate: number; carrierRate: number; indicative: boolean; expiresInSeconds: number };
-type PaymentCheckout = { provider: "flutterwave"; mode: "flutterwave" | "simulation"; transactionReference: string; checkoutUrl?: string | null; status: string };
+type PaymentCheckout = { provider: "pesapal"; mode: "pesapal" | "simulation"; transactionReference: string; checkoutUrl?: string | null; status: string };
 type PodRequestResponse = { bookingId: string; message: string; devOtp?: string };
 type PodCompleteResponse = { booking: Booking; payoutUnlocked: boolean; releaseEligible: boolean };
 type FinanceOverview = { currency: string; totalCollected: number; platformRevenue: number; providerFees: number; carrierFundsPendingRelease: number; payoutsDue: number; payoutsCompleted: number; refundsPending: number; reconciliationRequired: number; bookingsFunded: number };
@@ -1866,20 +1866,20 @@ function PaymentsPage() {
     try {
       const result = await api<PaymentCheckout>("/payments/checkout", { method: "POST", body: JSON.stringify({ bookingId: booking.id, network, phone, currency }) });
       if (result.checkoutUrl) { window.location.assign(result.checkoutUrl); return; }
-      setMessage(result.mode === "simulation" ? "Flutterwave is in development simulation mode; configure live credentials before accepting payments." : "Flutterwave did not return a checkout URL.");
+      setMessage(result.mode === "simulation" ? "Pesapal is in development simulation mode; live checkout is available on the production API." : "Pesapal did not return a checkout URL.");
     } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Payment failed."); }
   };
   return <div className="mx-auto max-w-4xl space-y-6">
-    <Header eyebrow="Flutterwave checkout" title="Checkout & payouts" detail={quote.data ? `Flutterwave checkout with an admin-set platform fee (${quote.data.commissionRate}% currently).` : "Choose a booking to view its current payment split."} />
+    <Header eyebrow="Pesapal checkout" title="Checkout & payouts" detail={quote.data ? `Pesapal checkout with an admin-set platform fee (${quote.data.commissionRate}% currently).` : "Choose a booking to view its current payment split."} />
     {message && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{message}</div>}
     <div className="grid gap-5 md:grid-cols-[1fr_.8fr]">
       <Card>
         <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff0d9] text-[#9a641c]"><Banknote size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a booking</h3><p className="text-xs text-muted-foreground">Payment is held until receiver proof of delivery.</p></div></div>
         <div className="mt-6 space-y-4">
           <label><span className={labelClass}>Booking</span><select className={input} value={selected || booking?.id || ""} onChange={(event) => setSelected(event.target.value)}><option value="">Select a booking</option>{query.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label>
-          <label><span className={labelClass}>Payment network</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option></select></label>
+          <label><span className={labelClass}>Expected payment method</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option></select><span className="mt-1 block text-xs text-muted-foreground">This records your preference; Pesapal controls the methods available at checkout.</span></label>
           <Field label="Ugandan phone number" value={phone} onChange={setPhone} placeholder="+256…" />
-          <button onClick={pay} disabled={!booking || !phone.trim()} className={button + " mt-2 w-full"}><LockKeyhole size={14} /> Continue to Flutterwave</button>
+          <button onClick={pay} disabled={!booking || !phone.trim()} className={button + " mt-2 w-full"}><LockKeyhole size={14} /> Continue to Pesapal</button>
         </div>
       </Card>
       <Card className="border-primary/15 bg-[#e5eee9] text-primary">
@@ -1916,14 +1916,14 @@ function RegionalPaymentsPage() {
   };
   const pay = async () => {
     if (!booking) return;
-    try { const result = await api<PaymentCheckout>("/payments/checkout", { method: "POST", body: JSON.stringify({ bookingId: booking.id, network, phone, payerCountry, currency: payerCurrency }) }); if (result.checkoutUrl) { window.location.assign(result.checkoutUrl); return; } setMessage(result.mode === "simulation" ? "Flutterwave is in development simulation mode; configure live credentials before accepting payments." : "Flutterwave did not return a checkout URL."); } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Payment failed."); }
+    try { const result = await api<PaymentCheckout>("/payments/checkout", { method: "POST", body: JSON.stringify({ bookingId: booking.id, network, phone, payerCountry, currency: payerCurrency }) }); if (result.checkoutUrl) { window.location.assign(result.checkoutUrl); return; } setMessage(result.mode === "simulation" ? "Pesapal is in development simulation mode; live checkout is available on the production API." : "Pesapal did not return a checkout URL."); } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Payment failed."); }
   };
-  return <div className="mx-auto max-w-5xl space-y-6"><Header eyebrow="Regional settlement" title="Cross-border checkout" detail="Choose the payer market, preview the indicative FX quote and fees, then fund the booking through a supported network." />{message && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{message}</div>}<div className="grid gap-5 lg:grid-cols-[1fr_.85fr]"><Card><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff0d9] text-[#9a641c]"><Globe2 size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a regional booking</h3><p className="text-xs text-muted-foreground">The booking value stays fixed in the transporter’s currency; only the payer amount changes with FX.</p></div></div><div className="mt-6 space-y-4"><label><span className={labelClass}>Booking</span><select className={input} value={selected} onChange={(event) => { setSelected(event.target.value); setQuote(undefined); }}><option value="">Select a booking</option>{bookings.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><label><span className={labelClass}>Payer country</span><select className={input} value={payerCountry} onChange={(event) => { const country = reference.data.countries.find((item) => item.code === event.target.value); setPayerCountry(event.target.value); if (country) setPayerCurrency(country.currency); setQuote(undefined); }} >{reference.data.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label><label><span className={labelClass}>Payer currency</span><select className={input} value={payerCurrency} onChange={(event) => { setPayerCurrency(event.target.value); setQuote(undefined); }}>{reference.data.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency}</option>)}</select></label></div><label><span className={labelClass}>Payment network</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option><option>Bank Transfer</option></select></label><Field label="EAC phone number" value={phone} onChange={setPhone} /><div className="flex flex-col gap-2 sm:flex-row"><button onClick={getQuote} className={`${secondaryButton} flex-1`}><RefreshCw size={14} /> Preview FX quote</button><button onClick={pay} disabled={!booking} className={`${button} flex-1`}><LockKeyhole size={14} /> Continue to Flutterwave</button></div></div></Card><Card className="border-primary/15 bg-[#e5eee9] text-primary"><p className={labelClass}>Settlement preview</p>{quote ? <div className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><span className="text-primary/65">Payer pays</span><strong>{money(quote.payerAmount ?? quote.amount, quote.currency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">FX rate</span><strong>1 {quote.currency} = {quote.exchangeRate} {quote.settlementCurrency}</strong></div><div className="flex justify-between"><span className="text-primary/65">Booking value (fixed)</span><strong>{money(quote.settlementAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">Fees + commission</span><strong>{money(quote.fee + quote.commissionAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between border-t border-primary/15 pt-4"><span className="font-bold">Transporter payout</span><strong className="font-display text-2xl">{money(quote.carrierPayout, quote.settlementCurrency)}</strong></div><p className="text-[11px] leading-5 text-primary/60">The UGX booking amount is not replaced by the foreign currency amount. This is an indicative quote · expires in {quote.expiresInSeconds}s.</p></div> : <div className="mt-5 space-y-3 text-sm text-primary/70"><p>Select a booking and payer market to calculate the payer amount before collecting payment.</p><p>Supported networks: MTN MoMo, Airtel Money, and bank transfer.</p></div>}</Card></div></div>;
+  return <div className="mx-auto max-w-5xl space-y-6"><Header eyebrow="Regional settlement" title="Cross-border checkout" detail="Choose the payer market, preview the indicative FX quote and fees, then fund the booking through a supported network." />{message && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{message}</div>}<div className="grid gap-5 lg:grid-cols-[1fr_.85fr]"><Card><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff0d9] text-[#9a641c]"><Globe2 size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a regional booking</h3><p className="text-xs text-muted-foreground">The booking value stays fixed in the transporter’s currency; only the payer amount changes with FX.</p></div></div><div className="mt-6 space-y-4"><label><span className={labelClass}>Booking</span><select className={input} value={selected} onChange={(event) => { setSelected(event.target.value); setQuote(undefined); }}><option value="">Select a booking</option>{bookings.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><label><span className={labelClass}>Payer country</span><select className={input} value={payerCountry} onChange={(event) => { const country = reference.data.countries.find((item) => item.code === event.target.value); setPayerCountry(event.target.value); if (country) setPayerCurrency(country.currency); setQuote(undefined); }} >{reference.data.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label><label><span className={labelClass}>Payer currency</span><select className={input} value={payerCurrency} onChange={(event) => { setPayerCurrency(event.target.value); setQuote(undefined); }}>{reference.data.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency}</option>)}</select></label></div><label><span className={labelClass}>Expected payment method</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option><option>Bank Transfer</option></select><span className="mt-1 block text-xs text-muted-foreground">This records your preference; Pesapal controls the methods available at checkout.</span></label><Field label="EAC phone number" value={phone} onChange={setPhone} /><div className="flex flex-col gap-2 sm:flex-row"><button onClick={getQuote} className={`${secondaryButton} flex-1`}><RefreshCw size={14} /> Preview FX quote</button><button onClick={pay} disabled={!booking} className={`${button} flex-1`}><LockKeyhole size={14} /> Continue to Pesapal</button></div></div></Card><Card className="border-primary/15 bg-[#e5eee9] text-primary"><p className={labelClass}>Settlement preview</p>{quote ? <div className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><span className="text-primary/65">Payer pays</span><strong>{money(quote.payerAmount ?? quote.amount, quote.currency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">FX rate</span><strong>1 {quote.currency} = {quote.exchangeRate} {quote.settlementCurrency}</strong></div><div className="flex justify-between"><span className="text-primary/65">Booking value (fixed)</span><strong>{money(quote.settlementAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">Fees + commission</span><strong>{money(quote.fee + quote.commissionAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between border-t border-primary/15 pt-4"><span className="font-bold">Transporter payout</span><strong className="font-display text-2xl">{money(quote.carrierPayout, quote.settlementCurrency)}</strong></div><p className="text-[11px] leading-5 text-primary/60">The UGX booking amount is not replaced by the foreign currency amount. This is an indicative quote · expires in {quote.expiresInSeconds}s.</p></div> : <div className="mt-5 space-y-3 text-sm text-primary/70"><p>Select a booking and payer market to calculate the payer amount before collecting payment.</p><p>Available methods are shown by Pesapal at checkout.</p></div>}</Card></div></div>;
 }
 
 function PaymentReturnPage() {
   const searchParams = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
-  const transactionReference = searchParams.get("tx_ref") || searchParams.get("transaction_reference") || "";
+  const transactionReference = searchParams.get("OrderMerchantReference") || searchParams.get("orderMerchantReference") || searchParams.get("tx_ref") || searchParams.get("transaction_reference") || "";
   const checkoutStatus = (searchParams.get("status") || "").toLowerCase();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(Boolean(transactionReference));
@@ -1988,9 +1988,9 @@ function PaymentReturnPage() {
           ? "Checkout wasn’t completed"
           : "Payment confirmation is pending";
   const detail = !transactionReference
-    ? "Open this page from a Flutterwave checkout return link, or check the payment status from your bookings."
+    ? "Open this page from a Pesapal checkout return link, or check the payment status from your bookings."
     : isPaid
-      ? "Flutterwave’s server-verified confirmation is recorded. Your booking is funded and protected."
+      ? "Pesapal’s server-verified confirmation is recorded. Your booking is funded and protected."
     : lookupError
       ? lookupError.toLowerCase().includes("log in") || lookupError.includes("401")
         ? "Sign in to the same TruckShare account that started this checkout, then check the booking again."
@@ -1999,7 +1999,7 @@ function PaymentReturnPage() {
         ? "We’re waiting for TruckShare’s server to verify the payment. This can take a short moment."
         : isCancelled
           ? "No verified payment is recorded for this booking yet. Check its status before trying to pay again."
-          : "Flutterwave has returned you to TruckShare, but the server hasn’t recorded a verified payment yet.";
+          : "Pesapal has returned you to TruckShare, but the server hasn’t recorded a verified payment yet.";
 
   return <div className="mx-auto max-w-3xl space-y-6">
     <Header eyebrow="Secure checkout" title="Payment status" detail="A clear update for your booking after checkout." />
@@ -2010,7 +2010,7 @@ function PaymentReturnPage() {
             {isPaid ? <Check size={24} /> : lookupError ? <CircleAlert size={24} /> : loading ? <RefreshCw size={22} className="animate-spin" /> : <Clock3 size={23} />}
           </span>
           <div className="min-w-0">
-            <p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.14em] text-muted-foreground">Flutterwave checkout</p>
+            <p className="font-mono-ui text-[10px] font-bold uppercase tracking-[.14em] text-muted-foreground">Pesapal checkout</p>
             <h2 className="mt-2 font-display text-2xl font-semibold sm:text-3xl">{title}</h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{detail}</p>
           </div>
@@ -2027,7 +2027,7 @@ function PaymentReturnPage() {
         </div>}
         {!isPaid && <div className="flex gap-3 rounded-xl border border-primary/15 bg-[#e5eee9] p-4 text-xs leading-5 text-primary/75">
           <ShieldCheck className="mt-0.5 shrink-0 text-[#28765a]" size={18} />
-          <p>For your protection, this page does not treat the browser’s return message as proof of payment. TruckShare marks a booking paid only after the server verifies Flutterwave’s confirmation.</p>
+          <p>For your protection, this page does not treat the browser’s return message as proof of payment. TruckShare marks a booking paid only after the server verifies Pesapal’s transaction status.</p>
         </div>}
         {lookupError && !lookupError.toLowerCase().includes("log in") && !lookupError.includes("401") && <p className="text-sm text-destructive" role="alert">{lookupError}</p>}
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -2147,8 +2147,7 @@ function FinanceOperationsPage() {
         payoutsCompleted: current.payoutsCompleted + selected.carrierPayable,
         carrierFundsPendingRelease: Math.max(0, current.carrierFundsPendingRelease - selected.carrierPayable),
       }));
-      if (updated.payout?.provider === "flutterwave") notifySuccess("Flutterwave transfer completed and the finance ledger was updated.");
-      else notifyInfo("Development payout simulation recorded; no transfer was sent.");
+      notifyInfo("Development payout simulation recorded; no live transfer was sent.");
     } catch (reason: unknown) {
       notifyError(reason instanceof Error ? reason.message : "Payout release failed.");
     }

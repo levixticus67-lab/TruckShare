@@ -13,12 +13,14 @@ Cross-border and regional freight matching that turns carrier backhaul capacity 
 - `DATABASE_URL` — Neon PostgreSQL connection string; configure on the Render API service
 - `FRONTEND_URL` — production Vercel origin allowed by the Render API's CORS policy
 - `JWT_SECRET` — strong signing secret configured on Render
-- `FLW_SECRET_KEY` — Flutterwave live API secret; Render only, never expose to Vercel
-- `FLW_SECRET_HASH` — Flutterwave webhook verification hash; Render only
-- `FLW_REDIRECT_URL` — Vercel payment-return URL, e.g. `https://<frontend-domain>/payments/return`
+- `PESAPAL_CONSUMER_KEY` — live Pesapal API consumer key; Render only, never expose to Vercel
+- `PESAPAL_CONSUMER_SECRET` — live Pesapal API consumer secret; Render only
+- `PESAPAL_IPN_ID` — ID returned when the production `GET /api/webhooks/pesapal` URL is registered with Pesapal
 - `VITE_API_URL` — Render API URL for Vercel builds; include the `/api` prefix
 - `DEV_ADMIN_ACCESS=true` — enables the development-only admin session when the API is not running with `NODE_ENV=production`; never enable this on a public production API
 - `VITE_DEV_ADMIN_ACCESS=true` — shows the development admin button in a non-Vite-dev frontend build; never enable for a public production Vercel deployment
+- Pesapal redirects customers to `/payments/return` on `FRONTEND_URL`; the API verifies payments through the registered Pesapal IPN before marking bookings paid. Pesapal refund requests remain pending until the transaction is reversed/confirmed.
+- Live transporter payouts are not integrated; production payouts remain held.
 
 ## Stack
 
@@ -52,7 +54,7 @@ Cross-border and regional freight matching that turns carrier backhaul capacity 
 - EAC phone-country onboarding and simulated Google onboarding
 - Driver verification with NIN, license, and vehicle logbook review
 - Cross-border settlement quote model with EAC currencies, fees, and payment ledger
-- Booking with MTN MoMo / Airtel Money simulation and 12% / 88% split
+- Pesapal-hosted customer checkout, local payment simulation, and 12% / 88% split
 - Status tracking, receiver OTP proof of delivery, and payout unlock
 - Escrow state machine: Pending → Held → Released, gated by payment and delivery proof
 - Customs and border milestones with required-document tracking

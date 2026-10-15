@@ -173,7 +173,7 @@ export const financePayoutsTable = pgTable("returnhaul_finance_payouts", {
   accountReference: text("account_reference").notNull(),
   amount: numeric("amount").notNull(),
   currency: text("currency").notNull().default("UGX"),
-  provider: text("provider").notNull().default("flutterwave"),
+  provider: text("provider").notNull().default("simulation"),
   providerTransferId: text("provider_transfer_id"),
   status: text("status").notNull().default("Pending Release"),
   releaseReason: text("release_reason"),
@@ -197,7 +197,7 @@ export const financeRefundsTable = pgTable("returnhaul_finance_refunds", {
 
 export const financeWebhookEventsTable = pgTable("returnhaul_finance_webhook_events", {
   id: text("id").primaryKey(),
-  provider: text("provider").notNull().default("flutterwave"),
+  provider: text("provider").notNull().default("pesapal"),
   eventType: text("event_type").notNull(),
   providerEventId: text("provider_event_id").notNull(),
   signature: text("signature"),
@@ -211,7 +211,7 @@ export const financeWebhookEventsTable = pgTable("returnhaul_finance_webhook_eve
 
 export const financeReconciliationsTable = pgTable("returnhaul_finance_reconciliations", {
   id: text("id").primaryKey(),
-  provider: text("provider").notNull().default("flutterwave"),
+  provider: text("provider").notNull().default("pesapal"),
   settlementReference: text("settlement_reference").notNull(),
   currency: text("currency").notNull().default("UGX"),
   settledAmount: numeric("settled_amount").notNull(),

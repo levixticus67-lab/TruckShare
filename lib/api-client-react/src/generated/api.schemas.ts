@@ -319,14 +319,14 @@ export type PaymentCheckoutProvider = typeof PaymentCheckoutProvider[keyof typeo
 
 
 export const PaymentCheckoutProvider = {
-  flutterwave: 'flutterwave',
+  pesapal: 'pesapal',
 } as const;
 
 export type PaymentCheckoutMode = typeof PaymentCheckoutMode[keyof typeof PaymentCheckoutMode];
 
 
 export const PaymentCheckoutMode = {
-  flutterwave: 'flutterwave',
+  pesapal: 'pesapal',
   simulation: 'simulation',
 } as const;
 
@@ -362,6 +362,7 @@ export type RefundProvider = typeof RefundProvider[keyof typeof RefundProvider];
 
 export const RefundProvider = {
   flutterwave: 'flutterwave',
+  pesapal: 'pesapal',
   simulation: 'simulation',
 } as const;
 
@@ -496,7 +497,6 @@ export type FinancePayoutProvider = typeof FinancePayoutProvider[keyof typeof Fi
 
 
 export const FinancePayoutProvider = {
-  flutterwave: 'flutterwave',
   simulation: 'simulation',
 } as const;
 
@@ -768,10 +768,16 @@ export type SimulatePayment200 = {
   payment: Payment;
 };
 
-export type ReceiveFlutterwaveWebhookBody = { [key: string]: unknown };
+export type ReceivePesapalIpnQuery = {
+  OrderNotificationType?: string;
+  OrderTrackingId: string;
+  OrderMerchantReference: string;
+};
 
-export type ReceiveFlutterwaveWebhook200 = {
-  received: boolean;
-  duplicate: boolean;
+export type ReceivePesapalIpn200 = {
+  orderNotificationType: string;
+  orderTrackingId: string;
+  orderMerchantReference: string;
+  status: number;
 };
 

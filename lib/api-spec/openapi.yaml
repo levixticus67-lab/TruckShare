@@ -499,7 +499,7 @@ paths:
     post:
       operationId: createPaymentCheckout
       tags: [payments]
-      summary: Create a Flutterwave checkout or development simulation
+      summary: Create a Pesapal checkout or development simulation
       requestBody:
         required: true
         content:
@@ -533,36 +533,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Refund"
-  /webhooks/flutterwave:
-    post:
-      operationId: receiveFlutterwaveWebhook
+  /webhooks/pesapal:
+    get:
+      operationId: receivePesapalIpn
       tags: [payments]
-      summary: Receive and idempotently process a Flutterwave webhook
+      summary: Verify and acknowledge a Pesapal payment notification
       parameters:
-        - name: verif-hash
-          in: header
+        - name: OrderNotificationType
+          in: query
           required: false
           schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
+        - name: OrderTrackingId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: OrderMerchantReference
+          in: query
+          required: true
+          schema: { type: string }
       responses:
         "200":
-          description: Webhook accepted
+          description: Pesapal IPN acknowledgement; status is 200 when verified and 500 when processing should be retried
           content:
             application/json:
               schema:
                 type: object
-                required: [received, duplicate]
+                required: [orderNotificationType, orderTrackingId, orderMerchantReference, status]
                 properties:
-                  received: { type: boolean }
-                  duplicate: { type: boolean }
-        "401":
-          description: Invalid webhook signature
+                  orderNotificationType: { type: string }
+                  orderTrackingId: { type: string }
+                  orderMerchantReference: { type: string }
+                  status: { type: integer, enum: [200, 500] }
   /finance/settings:
     get:
       operationId: getFinanceSettings
@@ -957,8 +958,8 @@ components:
       required: [bookingId, provider, mode, transactionReference, status]
       properties:
         bookingId: { type: string }
-        provider: { type: string, enum: [flutterwave] }
-        mode: { type: string, enum: [flutterwave, simulation] }
+        provider: { type: string, enum: [pesapal] }
+        mode: { type: string, enum: [pesapal, simulation] }
         transactionReference: { type: string }
         checkoutUrl: { type: string, nullable: true }
         status: { type: string, enum: [PENDING, SIMULATION_PENDING] }
@@ -966,7 +967,7 @@ components:
       type: object
       required: [reason]
       properties:
-        amount: { type: number, exclusiveMinimum: 0 }
+        amount: { type: number, exclusiveMinimum: 0, description: "Amount in the booking settlement currency. Pesapal mobile-money refunds must be full." }
         reason: { type: string, minLength: 3, maxLength: 240 }
     Refund:
       type: object
@@ -977,7 +978,7 @@ components:
         bookingId: { type: string }
         amount: { type: number }
         currency: { $ref: "#/components/schemas/CurrencyCode" }
-        provider: { type: string, enum: [flutterwave, simulation] }
+        provider: { type: string, enum: [flutterwave, pesapal, simulation] }
         providerRefundId: { type: string }
         status: { type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED] }
         reason: { type: string }
@@ -1067,7 +1068,7 @@ components:
         bookingId: { type: string }
         amount: { type: number }
         currency: { $ref: "#/components/schemas/CurrencyCode" }
-        provider: { type: string, enum: [flutterwave, simulation] }
+        provider: { type: string, enum: [simulation] }
         providerTransferId: { type: string }
         status: { type: string, enum: [PENDING_RELEASE, PROCESSING, COMPLETED, FAILED, REVERSED] }
         releaseReason: { type: string }

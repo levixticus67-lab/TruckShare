@@ -10,5 +10,5 @@ export type PaymentCheckoutProvider = typeof PaymentCheckoutProvider[keyof typeo
 
 
 export const PaymentCheckoutProvider = {
-  flutterwave: 'flutterwave',
+  pesapal: 'pesapal',
 } as const;

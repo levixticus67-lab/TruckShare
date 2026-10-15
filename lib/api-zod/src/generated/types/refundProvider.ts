@@ -11,5 +11,6 @@ export type RefundProvider = typeof RefundProvider[keyof typeof RefundProvider];
 
 export const RefundProvider = {
   flutterwave: 'flutterwave',
+  pesapal: 'pesapal',
   simulation: 'simulation',
 } as const;

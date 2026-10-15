@@ -12,11 +12,11 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: FLW_SECRET_KEY
+      - key: PESAPAL_CONSUMER_KEY
         sync: false
-      - key: FLW_SECRET_HASH
+      - key: PESAPAL_CONSUMER_SECRET
         sync: false
-      - key: FLW_REDIRECT_URL
+      - key: PESAPAL_IPN_ID
         sync: false
       - key: RESEND_API_KEY
         sync: false

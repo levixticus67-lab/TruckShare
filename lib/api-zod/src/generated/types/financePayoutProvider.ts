@@ -10,6 +10,5 @@ export type FinancePayoutProvider = typeof FinancePayoutProvider[keyof typeof Fi
 
 
 export const FinancePayoutProvider = {
-  flutterwave: 'flutterwave',
   simulation: 'simulation',
 } as const;

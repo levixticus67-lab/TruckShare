@@ -33,7 +33,7 @@ import {
   CreatePaymentCheckoutResponse,
   CreatePaymentRefundBody,
   CreatePaymentRefundResponse,
-  ReceiveFlutterwaveWebhookResponse,
+  ReceivePesapalIpnResponse,
   UpdateBookingStatusBody,
   UpdateBookingStatusParams,
 } from "@workspace/api-zod";
@@ -48,19 +48,15 @@ import {
   recordPayment,
   releasePayout,
   ensureBookingFinance,
+  getRefundForPayment,
   completeWebhookEvent,
   recordRefund,
   recordWebhookEvent,
+  updateRefund,
   removeBookingFinance,
   serializeFinanceState,
 } from "../lib/finance";
-import {
-  createCheckout,
-  createRefund,
-  flutterwaveMode,
-  verifyFlutterwaveWebhook,
-  verifyTransaction,
-} from "../lib/flutterwave";
+import { createCheckout, createRefund, hasPesapalConfiguration, pesapalMode, verifyTransaction } from "../lib/pesapal";
 
 type Trip = {
   id: string;
@@ -155,6 +151,9 @@ type Payment = {
   fee: number;
   reference: string;
   providerTransactionId?: string;
+  providerCheckoutUrl?: string;
+  providerConfirmationCode?: string;
+  providerPaymentMethod?: string;
   providerStatus?: string;
   status: PaymentStatus;
   createdAt: string;
@@ -2164,8 +2163,10 @@ router.post("/payments/checkout", async (req, res) => {
     return;
   }
   const data = CreatePaymentCheckoutBody.parse(req.body);
-  if (process.env.NODE_ENV === "production" && (!process.env.FLW_SECRET_KEY || !process.env.FLW_SECRET_HASH)) {
-    res.status(503).json({ error: "Live Flutterwave checkout is unavailable until FLW_SECRET_KEY and FLW_SECRET_HASH are configured." });
+  if (process.env.NODE_ENV === "production" && (!hasPesapalConfiguration() || !process.env.FRONTEND_URL?.trim())) {
+    res.status(503).json({
+      error: "Live Pesapal checkout is unavailable until PESAPAL_CONSUMER_KEY, PESAPAL_CONSUMER_SECRET, PESAPAL_IPN_ID, and FRONTEND_URL are configured.",
+    });
     return;
   }
   const booking = bookings.find((item) => item.id === data.bookingId);
@@ -2192,30 +2193,39 @@ router.post("/payments/checkout", async (req, res) => {
   const payerCurrency = data.currency ?? settlementCurrency;
   const fee = Math.round(settlementAmount * 0.015);
   const commissionAmount = platformCommissionAmount(settlementAmount);
-  const existingPayment = payments.find((item) => item.bookingId === booking.id && item.status === "Initiated");
+  const existingPayment = payments.find((item) =>
+    item.bookingId === booking.id &&
+    item.status === "Initiated" &&
+    (item.providerCheckoutUrl || item.providerStatus === "SIMULATION_PENDING"),
+  );
   if (existingPayment) {
     res.status(201).json(CreatePaymentCheckoutResponse.parse({
       bookingId: booking.id,
-      provider: "flutterwave",
-      mode: flutterwaveMode(),
+      provider: "pesapal",
+      mode: pesapalMode(),
       transactionReference: existingPayment.reference,
-      checkoutUrl: null,
-      status: flutterwaveMode() === "flutterwave" ? "PENDING" : "SIMULATION_PENDING",
+      checkoutUrl: existingPayment.providerCheckoutUrl ?? null,
+      status: existingPayment.providerStatus === "SIMULATION_PENDING" ? "SIMULATION_PENDING" : "PENDING",
     }));
     return;
   }
   const transactionReference = `TS-${booking.id}-${randomUUID().slice(0, 12).toUpperCase()}`;
   try {
+    const frontendUrl = process.env.FRONTEND_URL?.trim() || "http://localhost:5173";
+    const callbackUrl = new URL("/payments/return", frontendUrl).toString();
+    const nameParts = (user.name || "").trim().split(/\s+/).filter(Boolean);
     const checkout = await createCheckout({
-      txRef: transactionReference,
+      merchantReference: transactionReference,
       amount: convertedAmount(settlementAmount, settlementCurrency, payerCurrency),
       currency: payerCurrency,
-      email: user.email || `${data.phone.replace(/\D/g, "")}@checkout.truckshare.local`,
+      description: `TruckShare booking ${booking.id}`,
+      callbackUrl,
+      notificationId: process.env.PESAPAL_IPN_ID || "",
+      email: user.email || undefined,
       phoneNumber: data.phone,
-      name: user.name,
-      redirectUrl: process.env.FLW_REDIRECT_URL,
-      paymentOptions: data.network === "Bank Transfer" ? "banktransfer" : "mobilemoney",
-      meta: { bookingId: booking.id },
+      countryCode: payerCountry,
+      firstName: nameParts[0],
+      lastName: nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined,
     });
     const payment: Payment = {
       id: id("payment"),
@@ -2232,8 +2242,9 @@ router.post("/payments/checkout", async (req, res) => {
       commissionAmount,
       carrierPayout: settlementAmount - fee - commissionAmount,
       fee,
-      reference: checkout.txRef,
-      providerTransactionId: checkout.providerTransactionId,
+      reference: checkout.merchantReference,
+      providerTransactionId: checkout.orderTrackingId,
+      providerCheckoutUrl: checkout.redirectUrl,
       providerStatus: checkout.providerStatus,
       status: "Initiated",
       createdAt: nowDate(),
@@ -2244,10 +2255,10 @@ router.post("/payments/checkout", async (req, res) => {
     await persistDatabaseState();
     res.status(201).json(CreatePaymentCheckoutResponse.parse({
       bookingId: booking.id,
-      provider: "flutterwave",
-      mode: flutterwaveMode(),
-      transactionReference: checkout.txRef,
-      checkoutUrl: checkout.link ?? null,
+      provider: "pesapal",
+      mode: pesapalMode(),
+      transactionReference: checkout.merchantReference,
+      checkoutUrl: checkout.redirectUrl ?? null,
       status: checkout.providerStatus,
     }));
   } catch (error) {
@@ -2274,13 +2285,38 @@ router.post("/payments/:id/refund", async (req, res) => {
     return;
   }
   try {
-    if (flutterwaveMode() === "flutterwave" && !payment.providerTransactionId) {
-      res.status(409).json({ error: "The payment has not been verified by Flutterwave yet." });
-      return;
+    const livePesapal = pesapalMode() === "pesapal";
+    if (livePesapal) {
+      if (
+        payment.status !== "Held" ||
+        !payment.providerTransactionId ||
+        !payment.providerConfirmationCode
+      ) {
+        res.status(409).json({ error: "This payment must be verified by Pesapal before it can be refunded." });
+        return;
+      }
+      if (getRefundForPayment(payment.id)) {
+        res.status(409).json({ error: "Pesapal allows one refund request per payment; a refund has already been requested." });
+        return;
+      }
+      const paymentMethod = (payment.providerPaymentMethod || "").toLowerCase();
+      const isCardPayment = /(visa|master|amex|american express|discover|card)/i.test(paymentMethod);
+      if (!isCardPayment && amount !== payment.settlementAmount) {
+        res.status(400).json({ error: "Pesapal requires a full refund for mobile-money and unconfirmed payment methods." });
+        return;
+      }
     }
-    const providerRefund = flutterwaveMode() === "flutterwave"
-      ? await createRefund(payment.providerTransactionId as string, amount)
-      : { id: undefined, status: "COMPLETED", amount, currency: payment.settlementCurrency };
+    const providerAmount = amount === payment.settlementAmount
+      ? payment.amount
+      : Math.round(amount / (payment.exchangeRate || 1));
+    const providerRefund = livePesapal
+      ? await createRefund(
+        payment.providerConfirmationCode as string,
+        Number(providerAmount.toFixed(2)),
+        user.name || user.email || "TruckShare finance",
+        data.reason,
+      )
+      : { id: undefined, status: "COMPLETED" as const, amount, currency: payment.settlementCurrency };
     const refundId = id("refund");
     const refundStatus = providerRefund.status === "COMPLETED" ? "COMPLETED" as const : "PROCESSING" as const;
     const refund = {
@@ -2289,14 +2325,14 @@ router.post("/payments/:id/refund", async (req, res) => {
       bookingId: payment.bookingId,
       amount,
       currency: payment.settlementCurrency,
-      provider: flutterwaveMode(),
+      provider: livePesapal ? "pesapal" as const : "simulation" as const,
       providerRefundId: providerRefund.id,
       status: refundStatus,
       reason: data.reason,
       createdAt: nowDate(),
     };
     recordRefund(refund);
-    if (refundStatus === "COMPLETED") {
+    if (refundStatus === "COMPLETED" && amount >= payment.settlementAmount - 0.01) {
       payment.status = "Refunded";
       const booking = bookings.find((item) => item.id === payment.bookingId);
       if (booking) {
@@ -2311,67 +2347,115 @@ router.post("/payments/:id/refund", async (req, res) => {
   }
 });
 
-router.post("/webhooks/flutterwave", async (req, res) => {
-  if (!verifyFlutterwaveWebhook(text(req.headers["verif-hash"]))) {
-    res.status(401).json({ error: "Invalid Flutterwave webhook signature." });
+router.get("/webhooks/pesapal", async (req, res) => {
+  const orderTrackingId = text(req.query.OrderTrackingId || req.query.orderTrackingId);
+  const orderMerchantReference = text(req.query.OrderMerchantReference || req.query.orderMerchantReference);
+  const orderNotificationType = text(req.query.OrderNotificationType || req.query.orderNotificationType) || "IPNCHANGE";
+  const ipnResponse = (status: number) => ReceivePesapalIpnResponse.parse({
+    orderNotificationType,
+    orderTrackingId,
+    orderMerchantReference,
+    status,
+  });
+
+  if (
+    !orderTrackingId ||
+    orderTrackingId.length > 80 ||
+    !orderMerchantReference ||
+    orderMerchantReference.length > 50
+  ) {
+    res.status(200).json(ipnResponse(500));
     return;
   }
-  const body = req.body as Record<string, unknown>;
-  const eventType = text(body.event || body["event.type"] || body.type) || "unknown";
-  const data = typeof body.data === "object" && body.data !== null ? body.data as Record<string, unknown> : {};
-  const providerEventId = text(data.id || data.tx_ref || data.reference);
-  if (!providerEventId) {
-    res.status(400).json({ error: "Flutterwave webhook is missing an event identifier." });
-    return;
-  }
-  const result = recordWebhookEvent({ providerEventId, eventType });
-  if (result.duplicate) {
-    res.json(ReceiveFlutterwaveWebhookResponse.parse({ received: true, duplicate: true }));
-    return;
-  }
+
   try {
-    if (eventType === "charge.completed" || eventType === "charge.success") {
-      const transactionId = text(data.id);
-      const verified = flutterwaveMode() === "flutterwave" && transactionId
-        ? await verifyTransaction(transactionId)
-        : undefined;
-      const providerStatus = text(verified?.status || data.status).toUpperCase();
-      const transactionReference = text(verified?.txRef || verified?.tx_ref || data.tx_ref || data.reference);
-      const payment = payments.find((item) => item.reference === transactionReference);
-      if (payment && providerStatus === "SUCCESSFUL") {
-        payment.providerTransactionId = transactionId || payment.providerTransactionId;
-        payment.providerStatus = providerStatus;
-        payment.status = "Held";
-        const booking = bookings.find((item) => item.id === payment.bookingId);
-        if (booking) {
-          booking.paymentStatus = "Paid";
-          booking.escrowStatus = "Held";
-        }
-        recordPayment({
-          bookingId: payment.bookingId,
+    // Pesapal's notification parameters are not payment proof. Always fetch status
+    // from Pesapal, then bind the verified order to the stored payment and amount.
+    const verified = await verifyTransaction(orderTrackingId);
+    const verifiedReference = text(verified.merchant_reference);
+    const payment = payments.find((item) => item.reference === verifiedReference);
+    const verifiedAmount = Number(verified.amount);
+    if (
+      !payment ||
+      text(verified.order_tracking_id) !== orderTrackingId ||
+      verifiedReference !== orderMerchantReference ||
+      payment.providerTransactionId !== orderTrackingId ||
+      !Number.isFinite(verifiedAmount) ||
+      Math.abs(verifiedAmount - payment.amount) > 0.01 ||
+      text(verified.currency).toUpperCase() !== payment.currency.toUpperCase()
+    ) {
+      throw new Error("Pesapal transaction details do not match the stored checkout.");
+    }
+    recordWebhookEvent({
+      provider: "pesapal",
+      providerEventId: orderTrackingId,
+      eventType: orderNotificationType,
+    });
+
+    const statusCode = Number(verified.status_code);
+    const statusText = text(verified.payment_status_description).toUpperCase();
+    payment.providerStatus = statusText || String(verified.status_code ?? "PENDING");
+    payment.providerConfirmationCode = verified.confirmation_code || payment.providerConfirmationCode;
+    payment.providerPaymentMethod = verified.payment_method || payment.providerPaymentMethod;
+
+    if ((statusCode === 1 || statusText === "COMPLETED") && payment.status !== "Refunded") {
+      payment.status = "Held";
+      const booking = bookings.find((item) => item.id === payment.bookingId);
+      if (booking) {
+        booking.paymentStatus = "Paid";
+        booking.escrowStatus = "Held";
+      }
+      recordPayment({
+        bookingId: payment.bookingId,
+        paymentId: payment.id,
+        grossAmount: payment.settlementAmount,
+        currency: payment.settlementCurrency,
+        platformFee: payment.commissionAmount,
+        providerFee: payment.fee,
+        carrierPayable: payment.carrierPayout,
+        reference: payment.reference,
+      });
+    } else if ((statusCode === 2 || statusText === "FAILED") && payment.status === "Initiated") {
+      payment.status = "Failed";
+    } else if (statusCode === 3 || statusText === "REVERSED") {
+      payment.status = "Refunded";
+      const booking = bookings.find((item) => item.id === payment.bookingId);
+      if (booking) {
+        booking.paymentStatus = "Unpaid";
+        booking.escrowStatus = "Pending";
+      }
+      const refund = getRefundForPayment(payment.id);
+      if (refund) {
+        refund.amount = payment.settlementAmount;
+        refund.currency = payment.settlementCurrency;
+        updateRefund(refund.id, "COMPLETED");
+      } else {
+        recordRefund({
+          id: id("refund"),
           paymentId: payment.id,
-          grossAmount: payment.settlementAmount,
+          bookingId: payment.bookingId,
+          amount: payment.settlementAmount,
           currency: payment.settlementCurrency,
-          platformFee: payment.commissionAmount,
-          providerFee: payment.fee,
-          carrierPayable: payment.carrierPayout,
-          reference: payment.reference,
+          provider: "pesapal",
+          status: "COMPLETED",
+          reason: "Pesapal marked the payment as reversed.",
         });
       }
     }
-    completeWebhookEvent(providerEventId, "Processed");
+
+    completeWebhookEvent(orderTrackingId, "Processed", "pesapal");
     await persistDatabaseState();
-    res.json(ReceiveFlutterwaveWebhookResponse.parse({ received: true, duplicate: false }));
-  } catch (error) {
-    completeWebhookEvent(providerEventId, "Ignored");
+    res.status(200).json(ipnResponse(200));
+  } catch {
+    completeWebhookEvent(orderTrackingId, "Ignored", "pesapal");
     await persistDatabaseState();
-    res.status(502).json({ error: error instanceof Error ? error.message : "Flutterwave webhook processing failed." });
+    res.status(200).json(ipnResponse(500));
   }
 });
 
 router.post("/payments/simulate", async (req, res) => {
   if (process.env.NODE_ENV === "production") {
-    res.status(403).json({ error: "Simulated payments are disabled in production. Use Flutterwave checkout." });
+    res.status(403).json({ error: "Simulated payments are disabled in production. Use Pesapal checkout." });
     return;
   }
   const booking = bookings.find((item) => item.id === text(req.body?.bookingId));

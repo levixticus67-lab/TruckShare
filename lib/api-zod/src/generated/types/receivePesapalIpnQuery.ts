@@ -6,7 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReceiveFlutterwaveWebhook200 = {
-  received: boolean;
-  duplicate: boolean;
+export type ReceivePesapalIpnQuery = {
+  OrderNotificationType?: string;
+  OrderTrackingId: string;
+  OrderMerchantReference: string;
 };
