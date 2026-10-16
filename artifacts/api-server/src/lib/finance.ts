@@ -292,7 +292,7 @@ export function releasePayout(
     direction: "debit",
     amount: current.carrierPayable,
     currency: current.currency,
-    reference: payout.providerTransferId,
+    reference: providerTransferId,
     idempotencyKey: `payout:${payout.id}:carrier`,
   });
   entry(current, {
@@ -301,7 +301,7 @@ export function releasePayout(
     direction: "credit",
     amount: current.carrierPayable,
     currency: current.currency,
-    reference: payout.providerTransferId,
+    reference: providerTransferId,
     idempotencyKey: `payout:${payout.id}:collection`,
   });
   timeline(
