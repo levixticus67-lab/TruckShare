@@ -1140,7 +1140,7 @@ router.post("/finance/bookings/:id/release", async (req, res) => {
   const production = process.env.NODE_ENV === "production";
   const transferReference = data.transferReference?.trim();
   if (production && (!transferReference || transferReference.length < 3)) {
-    res.status(400).json({ error: "Enter the completed bank or mobile-money transfer reference before recording a production payout." });
+    res.status(400).json({ error: "Enter the successful Openfloat driver-transfer reference before recording the production payout." });
     return;
   }
   if (production && transferReference && hasPayoutTransferReference(transferReference)) {
