@@ -2194,19 +2194,30 @@ router.post("/payments/checkout", async (req, res) => {
     res.status(409).json({ error: "This booking has already been funded." });
     return;
   }
-  const detectedPayerCountry = phoneCountry(data.phone);
-  if (!detectedPayerCountry) {
+  const suppliedPhone = data.phone?.trim() || undefined;
+  const userEmail = user.email?.trim() || undefined;
+  const checkoutPhone = suppliedPhone || (!userEmail ? user.phone?.trim() || undefined : undefined);
+  const detectedPayerCountry = checkoutPhone ? phoneCountry(checkoutPhone) : undefined;
+  if (suppliedPhone && !detectedPayerCountry) {
     res.status(400).json({ error: "Use an international phone number with a supported EAC country code." });
     return;
   }
-  const payerCountry = data.payerCountry ?? detectedPayerCountry;
-  if (detectedPayerCountry !== payerCountry) {
-    res.status(400).json({ error: "The payer country must match the phone number country code." });
+  const payerCountry = data.payerCountry ?? detectedPayerCountry ?? "UG";
+  if (detectedPayerCountry && detectedPayerCountry !== payerCountry) {
+    res.status(400).json({ error: "The payer country must match the phone number on your account. To pay from another country, add an email address to your account so Pesapal can collect the payment number." });
+    return;
+  }
+  if (!userEmail && !checkoutPhone) {
+    res.status(400).json({ error: "Pesapal requires an email or phone contact. Add an email address to your account to continue without entering a phone number here." });
+    return;
+  }
+  if (!userEmail && !detectedPayerCountry) {
+    res.status(400).json({ error: "Your account phone number must use a supported EAC country code, or add an email address so Pesapal can collect the payment number." });
     return;
   }
   const settlementCurrency = booking.currency;
   const settlementAmount = booking.amount;
-  const payerCurrency = data.currency ?? settlementCurrency;
+  const payerCurrency = currencyForCountry(payerCountry);
   const fee = Math.round(settlementAmount * 0.015);
   const commissionAmount = platformCommissionAmount(settlementAmount);
   const existingPayment = payments.find((item) =>
@@ -2237,8 +2248,8 @@ router.post("/payments/checkout", async (req, res) => {
       description: `TruckShare booking ${booking.id}`,
       callbackUrl,
       notificationId: process.env.PESAPAL_IPN_ID || "",
-      email: user.email || undefined,
-      phoneNumber: data.phone,
+      email: userEmail,
+      phoneNumber: checkoutPhone,
       countryCode: payerCountry,
       firstName: nameParts[0],
       lastName: nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined,
@@ -2247,7 +2258,7 @@ router.post("/payments/checkout", async (req, res) => {
       id: id("payment"),
       bookingId: booking.id,
       network: data.network,
-      phone: data.phone,
+      phone: suppliedPhone || "",
       payerCountry,
       payeeCountry: booking.destinationCountry,
       amount: convertedAmount(settlementAmount, settlementCurrency, payerCurrency),
@@ -2413,6 +2424,13 @@ router.get("/webhooks/pesapal", async (req, res) => {
     payment.providerStatus = statusText || String(verified.status_code ?? "PENDING");
     payment.providerConfirmationCode = verified.confirmation_code || payment.providerConfirmationCode;
     payment.providerPaymentMethod = verified.payment_method || payment.providerPaymentMethod;
+    if (
+      payment.providerPaymentMethod &&
+      /(mobile|momo|mtn|airtel|m-?pesa|tigo)/i.test(payment.providerPaymentMethod) &&
+      verified.payment_account
+    ) {
+      payment.phone = text(verified.payment_account);
+    }
 
     if ((statusCode === 1 || statusText === "COMPLETED") && payment.status !== "Refunded") {
       payment.status = "Held";

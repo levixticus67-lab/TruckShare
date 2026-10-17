@@ -1853,75 +1853,108 @@ function AdminPage() {
   </AdminPanelLayout></RoleContext.Provider>;
 }
 
+function usePaymentQuote(booking: Booking | undefined, payerCountry: string, payerCurrency: string) {
+  const params = new URLSearchParams({
+    amount: String(booking?.amount || 1),
+    fromCurrency: payerCurrency,
+    toCurrency: booking?.currency || "UGX",
+    payerCountry,
+    payeeCountry: booking?.destinationCountry || "UG",
+  });
+  const path = `/payments/quote?${params.toString()}`;
+  const enabled = Boolean(booking);
+  const [data, setData] = useState<PaymentQuote | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+  const reload = () => setRetryCount((count) => count + 1);
+
+  useEffect(() => {
+    let active = true;
+    if (!enabled) {
+      setData(null);
+      setError("");
+      setLoading(false);
+      return;
+    }
+    setData(null);
+    setError("");
+    setLoading(true);
+    api<PaymentQuote>(path)
+      .then((quote) => { if (active) setData(quote); })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Unable to create settlement quote."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [path, enabled, retryCount]);
+
+  return { data, loading, error, reload };
+}
+
 function PaymentsPage() {
-  const query = useApi<Booking[]>("/bookings", []);
-  const [network, setNetwork] = useState("MTN MoMo");
-  const [phone, setPhone] = useState("");
+  const bookings = useApi<Booking[]>("/bookings", []);
+  const reference = useApi<EacReference>("/reference/eac", regionalReference);
   const [selected, setSelected] = useState("");
-  const booking = query.data.find((item) => item.id === selected) || query.data[0];
-  const gross = booking?.amount || 0;
-  const currency = booking?.currency || "UGX";
-  const quoteParams = new URLSearchParams({ amount: String(gross || 1), fromCurrency: currency, toCurrency: currency });
-  const quote = useApi<PaymentQuote | null>("/payments/quote?" + quoteParams.toString(), null, Boolean(booking));
+  const [network, setNetwork] = useState("MTN MoMo");
+  const [payerCountry, setPayerCountry] = useState("UG");
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const booking = bookings.data.find((item) => item.id === selected) || bookings.data[0];
+  const payerCurrency = reference.data.countries.find((item) => item.code === payerCountry)?.currency
+    || regionalReference.countries.find((item) => item.code === payerCountry)?.currency
+    || "UGX";
+  const quote = usePaymentQuote(booking, payerCountry, payerCurrency);
+
   const pay = async () => {
-    if (!booking) return;
+    if (!booking || busy) return;
+    setBusy(true);
+    setMessage("");
     try {
-      const result = await api<PaymentCheckout>("/payments/checkout", { method: "POST", body: JSON.stringify({ bookingId: booking.id, network, phone, currency }) });
+      const result = await api<PaymentCheckout>("/payments/checkout", {
+        method: "POST",
+        body: JSON.stringify({ bookingId: booking.id, network, payerCountry }),
+      });
       if (result.checkoutUrl) { window.location.assign(result.checkoutUrl); return; }
       setMessage(result.mode === "simulation" ? "Pesapal is in development simulation mode; live checkout is available on the production API." : "Pesapal did not return a checkout URL.");
-    } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Payment failed."); }
+    } catch (reason: unknown) {
+      setMessage(reason instanceof Error ? reason.message : "Payment failed.");
+    } finally {
+      setBusy(false);
+    }
   };
-  return <div className="mx-auto max-w-4xl space-y-6">
-    <Header eyebrow="Pesapal checkout" title="Checkout & payouts" detail={quote.data ? `Pesapal checkout with an admin-set platform fee (${quote.data.commissionRate}% currently).` : "Choose a booking to view its current payment split."} />
-    {message && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{message}</div>}
-    <div className="grid gap-5 md:grid-cols-[1fr_.8fr]">
+
+  return <div className="mx-auto max-w-5xl space-y-6">
+    <Header eyebrow="Pesapal checkout" title="Payment checkout" detail="Choose a country, booking, and payment method. Currency is filled automatically; Pesapal handles payment details on its secure checkout." />
+    {message && <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{message}</div>}
+    <div className="grid gap-5 lg:grid-cols-[1fr_.85fr]">
       <Card>
-        <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff0d9] text-[#9a641c]"><Banknote size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a booking</h3><p className="text-xs text-muted-foreground">Payment is held until receiver proof of delivery.</p></div></div>
+        <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Banknote size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a booking</h3><p className="text-xs text-muted-foreground">Payment is held until receiver proof of delivery.</p></div></div>
         <div className="mt-6 space-y-4">
-          <label><span className={labelClass}>Booking</span><select className={input} value={selected || booking?.id || ""} onChange={(event) => setSelected(event.target.value)}><option value="">Select a booking</option>{query.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label>
-          <label><span className={labelClass}>Expected payment method</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option></select><span className="mt-1 block text-xs text-muted-foreground">This records your preference; Pesapal controls the methods available at checkout.</span></label>
-          <Field label="Ugandan phone number" value={phone} onChange={setPhone} placeholder="+256…" />
-          <button onClick={pay} disabled={!booking || !phone.trim()} className={button + " mt-2 w-full"}><LockKeyhole size={14} /> Continue to Pesapal</button>
+          <label><span className={labelClass}>Country</span><select className={input} value={payerCountry} onChange={(event) => { setPayerCountry(event.target.value); setMessage(""); }}>{reference.data.countries.map((country) => <option key={country.code} value={country.code}>{country.name} · {dialingCodes[country.code] || country.code} · {country.currency}</option>)}</select><span className="mt-1 block text-xs text-muted-foreground">Uganda is preselected with +256 and UGX. No phone number is requested here.</span></label>
+          <label><span className={labelClass}>Booking</span><select className={input} value={booking?.id || ""} onChange={(event) => { setSelected(event.target.value); setMessage(""); }}><option value="" disabled>{bookings.loading ? "Loading bookings…" : "No bookings available"}</option>{bookings.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label>
+          <label><span className={labelClass}>Method</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option><option>Bank Transfer</option></select><span className="mt-1 block text-xs text-muted-foreground">Pesapal confirms the available methods on its checkout.</span></label>
+          <button type="button" onClick={() => void pay()} disabled={!booking || busy} className={`${button} mt-2 w-full`}><LockKeyhole size={14} /> {busy ? "Opening Pesapal…" : "Continue to Pesapal"}</button>
         </div>
       </Card>
-      <Card className="border-primary/15 bg-[#e5eee9] text-primary">
-        <p className={labelClass}>Transparent split</p><h3 className="font-display text-xl font-semibold">Where the money goes</h3>
-        {quote.loading ? <div className="mt-6"><Loading error={quote.error} retry={quote.reload} /></div> : quote.data ? <>
+      <Card className="border-primary/15 bg-primary/5">
+        <p className={labelClass}>Automatic FX preview</p>
+        <h3 className="font-display text-xl font-semibold">Where the money goes</h3>
+        {quote.loading ? <div className="mt-6"><Loading error="" retry={quote.reload} /></div> : quote.error ? <div className="mt-6"><Loading error={quote.error} retry={quote.reload} /></div> : quote.data ? <>
           <div className="mt-6 space-y-4 text-sm">
-            <div className="flex justify-between"><span className="text-primary/65">Load price</span><strong>{money(gross, currency)}</strong></div>
-            <div className="flex justify-between"><span className="text-primary/65">Platform fee · {quote.data.commissionRate}%</span><strong>{money(quote.data.commissionAmount, currency)}</strong></div>
-            <div className="flex justify-between"><span className="text-primary/65">Provider fee</span><strong>{money(quote.data.fee, currency)}</strong></div>
-            <div className="flex justify-between border-t border-primary/15 pt-4"><span className="font-bold">Transporter payout</span><strong className="font-display text-2xl">{money(quote.data.carrierPayout, currency)}</strong></div>
+            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Payer pays</span><strong>{money(quote.data.payerAmount ?? quote.data.amount, quote.data.currency)}</strong></div>
+            <div className="flex justify-between gap-4"><span className="text-muted-foreground">FX rate</span><strong className="text-right">1 {quote.data.currency} = {quote.data.exchangeRate} {quote.data.settlementCurrency}</strong></div>
+            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Booking value</span><strong>{money(quote.data.settlementAmount, quote.data.settlementCurrency)}</strong></div>
+            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Provider + platform fees</span><strong>{money(quote.data.fee + quote.data.commissionAmount, quote.data.settlementCurrency)}</strong></div>
+            <div className="flex justify-between gap-4 border-t border-border pt-4"><span className="font-bold">Transporter payout</span><strong className="font-display text-2xl">{money(quote.data.carrierPayout, quote.data.settlementCurrency)}</strong></div>
           </div>
-          <p className="mt-6 text-xs leading-relaxed text-primary/60">The percentage is applied when checkout is created. Transporter payout unlocks after delivery proof and admin approval.</p>
-        </> : <p className="mt-5 text-sm text-primary/70">{booking ? "The current payment split is unavailable." : "No booking is available for payment."}</p>}
+          <p className="mt-6 text-xs leading-relaxed text-muted-foreground">Indicative quote · expires in {quote.data.expiresInSeconds}s. The booking currency remains fixed; the payer amount follows the selected country.</p>
+        </> : <p className="mt-5 text-sm text-muted-foreground">{booking ? "The current payment quote is unavailable." : "No booking is available for payment."}</p>}
       </Card>
     </div>
   </div>;
 }
 
 function RegionalPaymentsPage() {
-  const bookings = useApi<Booking[]>("/bookings", []);
-  const reference = useApi<EacReference>("/reference/eac", regionalReference);
-  const [selected, setSelected] = useState("");
-  const [network, setNetwork] = useState("MTN MoMo");
-  const [payerCountry, setPayerCountry] = useState("UG");
-  const [payerCurrency, setPayerCurrency] = useState("UGX");
-  const [phone, setPhone] = useState("");
-  const [quote, setQuote] = useState<PaymentQuote>();
-  const [message, setMessage] = useState("");
-  const booking = bookings.data.find((item) => item.id === selected);
-  const getQuote = async () => {
-    if (!booking) return;
-    const params = new URLSearchParams({ amount: String(booking.amount), fromCurrency: payerCurrency, toCurrency: booking.currency || "UGX", payerCountry, payeeCountry: booking.destinationCountry || "UG" });
-    try { setQuote(await api<PaymentQuote>(`/payments/quote?${params.toString()}`)); setMessage(""); } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Unable to create settlement quote."); }
-  };
-  const pay = async () => {
-    if (!booking) return;
-    try { const result = await api<PaymentCheckout>("/payments/checkout", { method: "POST", body: JSON.stringify({ bookingId: booking.id, network, phone, payerCountry, currency: payerCurrency }) }); if (result.checkoutUrl) { window.location.assign(result.checkoutUrl); return; } setMessage(result.mode === "simulation" ? "Pesapal is in development simulation mode; live checkout is available on the production API." : "Pesapal did not return a checkout URL."); } catch (reason: unknown) { setMessage(reason instanceof Error ? reason.message : "Payment failed."); }
-  };
-  return <div className="mx-auto max-w-5xl space-y-6"><Header eyebrow="Regional settlement" title="Cross-border checkout" detail="Choose the payer market, preview the indicative FX quote and fees, then fund the booking through a supported network." />{message && <div className="rounded-lg border border-[#b8d8c6] bg-[#e5f1e9] p-3 text-sm text-[#28765a]">{message}</div>}<div className="grid gap-5 lg:grid-cols-[1fr_.85fr]"><Card><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#fff0d9] text-[#9a641c]"><Globe2 size={19} /></span><div><h3 className="font-display text-xl font-semibold">Fund a regional booking</h3><p className="text-xs text-muted-foreground">The booking value stays fixed in the transporter’s currency; only the payer amount changes with FX.</p></div></div><div className="mt-6 space-y-4"><label><span className={labelClass}>Booking</span><select className={input} value={selected} onChange={(event) => { setSelected(event.target.value); setQuote(undefined); }}><option value="">Select a booking</option>{bookings.data.map((item) => <option key={item.id} value={item.id}>{item.corridor} · {money(item.amount, item.currency)}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><label><span className={labelClass}>Payer country</span><select className={input} value={payerCountry} onChange={(event) => { const country = reference.data.countries.find((item) => item.code === event.target.value); setPayerCountry(event.target.value); if (country) setPayerCurrency(country.currency); setQuote(undefined); }} >{reference.data.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label><label><span className={labelClass}>Payer currency</span><select className={input} value={payerCurrency} onChange={(event) => { setPayerCurrency(event.target.value); setQuote(undefined); }}>{reference.data.countries.map((country) => <option key={country.currency} value={country.currency}>{country.currency}</option>)}</select></label></div><label><span className={labelClass}>Expected payment method</span><select className={input} value={network} onChange={(event) => setNetwork(event.target.value)}><option>MTN MoMo</option><option>Airtel Money</option><option>Bank Transfer</option></select><span className="mt-1 block text-xs text-muted-foreground">This records your preference; Pesapal controls the methods available at checkout.</span></label><Field label="EAC phone number" value={phone} onChange={setPhone} /><div className="flex flex-col gap-2 sm:flex-row"><button onClick={getQuote} className={`${secondaryButton} flex-1`}><RefreshCw size={14} /> Preview FX quote</button><button onClick={pay} disabled={!booking} className={`${button} flex-1`}><LockKeyhole size={14} /> Continue to Pesapal</button></div></div></Card><Card className="border-primary/15 bg-[#e5eee9] text-primary"><p className={labelClass}>Settlement preview</p>{quote ? <div className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><span className="text-primary/65">Payer pays</span><strong>{money(quote.payerAmount ?? quote.amount, quote.currency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">FX rate</span><strong>1 {quote.currency} = {quote.exchangeRate} {quote.settlementCurrency}</strong></div><div className="flex justify-between"><span className="text-primary/65">Booking value (fixed)</span><strong>{money(quote.settlementAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between"><span className="text-primary/65">Fees + commission</span><strong>{money(quote.fee + quote.commissionAmount, quote.settlementCurrency)}</strong></div><div className="flex justify-between border-t border-primary/15 pt-4"><span className="font-bold">Transporter payout</span><strong className="font-display text-2xl">{money(quote.carrierPayout, quote.settlementCurrency)}</strong></div><p className="text-[11px] leading-5 text-primary/60">The UGX booking amount is not replaced by the foreign currency amount. This is an indicative quote · expires in {quote.expiresInSeconds}s.</p></div> : <div className="mt-5 space-y-3 text-sm text-primary/70"><p>Select a booking and payer market to calculate the payer amount before collecting payment.</p><p>Available methods are shown by Pesapal at checkout.</p></div>}</Card></div></div>;
+  return <PaymentsPage />;
 }
 
 function PaymentReturnPage() {

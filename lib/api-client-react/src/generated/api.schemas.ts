@@ -310,7 +310,7 @@ export const PaymentCheckoutInputNetwork = {
 export interface PaymentCheckoutInput {
   bookingId: string;
   network: PaymentCheckoutInputNetwork;
-  phone: string;
+  phone?: string;
   payerCountry?: CountryCode;
   currency?: CurrencyCode;
 }

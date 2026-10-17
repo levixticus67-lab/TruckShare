@@ -809,7 +809,7 @@ export const SimulatePaymentResponse = zod.object({
 export const CreatePaymentCheckoutBody = zod.object({
   "bookingId": zod.string(),
   "network": zod.enum(['MTN MoMo', 'Airtel Money', 'Bank Transfer']),
-  "phone": zod.string(),
+  "phone": zod.string().optional(),
   "payerCountry": zod.enum(['BI', 'CD', 'KE', 'RW', 'SO', 'SS', 'TZ', 'UG']).optional(),
   "currency": zod.enum(['BIF', 'CDF', 'KES', 'RWF', 'SOS', 'SSP', 'TZS', 'UGX']).optional()
 })

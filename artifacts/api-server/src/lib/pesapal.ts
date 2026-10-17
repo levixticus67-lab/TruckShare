@@ -21,7 +21,7 @@ export type CheckoutRequest = {
   callbackUrl: string;
   notificationId: string;
   email?: string;
-  phoneNumber: string;
+  phoneNumber?: string;
   countryCode: string;
   firstName?: string;
   lastName?: string;
@@ -40,6 +40,7 @@ export type PesapalTransactionStatus = PesapalEnvelope & {
   amount?: number | string;
   currency?: string;
   payment_method?: string;
+  payment_account?: string;
   confirmation_code?: string;
   payment_status_description?: string;
   status_code?: number | string;
@@ -160,7 +161,7 @@ export async function createCheckout(input: CheckoutRequest): Promise<CheckoutRe
       redirect_mode: "TOP_WINDOW",
       billing_address: {
         email_address: input.email || undefined,
-        phone_number: input.phoneNumber,
+        phone_number: input.phoneNumber || undefined,
         country_code: input.countryCode,
         first_name: input.firstName || undefined,
         last_name: input.lastName || undefined,

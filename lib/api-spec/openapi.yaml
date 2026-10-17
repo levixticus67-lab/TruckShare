@@ -947,7 +947,7 @@ components:
         currency: { $ref: "#/components/schemas/CurrencyCode" }
     PaymentCheckoutInput:
       type: object
-      required: [bookingId, network, phone]
+      required: [bookingId, network]
       properties:
         bookingId: { type: string }
         network: { type: string, enum: ["MTN MoMo", "Airtel Money", "Bank Transfer"] }
