@@ -78,6 +78,26 @@ function FitRoute({ positions, focusPoint }: { positions: MapPoint[]; focusPoint
   return null;
 }
 
+function InvalidateOnResize() {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    const invalidate = () => map.invalidateSize({ pan: false });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(invalidate);
+    observer?.observe(container);
+    window.addEventListener("resize", invalidate);
+    const frame = window.requestAnimationFrame(invalidate);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener("resize", invalidate);
+    };
+  }, [map]);
+
+  return null;
+}
+
 type MapShellProps = {
   children: ReactNode;
   height?: string;
@@ -173,6 +193,7 @@ export function RouteMap({ stops, className = "", height = "360px", routing = fa
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <InvalidateOnResize />
         {routePath.length > 1 && (
           <Polyline
             positions={routePath}
@@ -258,6 +279,7 @@ export function EacNetworkMap({ height = "clamp(320px, 52dvh, 440px)" }: { heigh
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <InvalidateOnResize />
         {networkRoutes.map((route, index) => (
           <Polyline key={`network-route-${index}`} positions={route} pathOptions={{ color: "#f26522", weight: 3, opacity: 0.78 }} />
         ))}

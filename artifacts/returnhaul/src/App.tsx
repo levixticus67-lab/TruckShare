@@ -13,7 +13,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
 import { LocationPicker } from "@/components/LocationPicker";
 import { EacNetworkMap, RouteMap, type RouteStop } from "@/components/RouteMap";
-import { EAC_LOCATIONS, findLocation, routeStopsFor, type LocationPoint } from "@/lib/locations";
+import { corridorEndpoints, EAC_LOCATIONS, findLocation, routeStopsFor, type LocationPoint } from "@/lib/locations";
 import NotFound from "@/pages/not-found";
 import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
@@ -1542,7 +1542,10 @@ function TrackingPage() {
   const [checkpoint, setCheckpoint] = useState("");
   const [border, setBorder] = useState("");
   const [requiredDocuments, setRequiredDocuments] = useState("");
-  const baseStops = active ? routeStopsFor(active.corridor.split("→")[0]?.trim() || "", active.originCountry || "", active.corridor.split("→")[1]?.trim() || "", active.destinationCountry || "") : [];
+  const endpoints = active ? corridorEndpoints(active.corridor) : undefined;
+  const baseStops = active && endpoints
+    ? routeStopsFor(endpoints[0], active.originCountry || "", endpoints[1], active.destinationCountry || "")
+    : [];
   const routeStops: RouteStop[] = baseStops.map((stop, index) => ({ ...stop, label: index === 0 ? "Origin" : "Destination", status: active?.status === "Delivered" ? "complete" : index === 0 ? "complete" : "active" }));
   const updateMilestone = async (milestone: BorderMilestone, status: string) => {
     try {
