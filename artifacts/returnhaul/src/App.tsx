@@ -1406,7 +1406,7 @@ function DeliveryProofPanel({ booking, onRefresh }: { booking: Booking; onRefres
       setBusy(false);
     }
   };
-  return <div className="mt-4 rounded-xl border border-accent/30 bg-[#fff8ec] p-4">
+  return <div className="mt-4 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div><p className={labelClass}>Receiver confirmation</p><p className="text-sm font-semibold">Verify delivery before payout release.</p></div>
       <button type="button" onClick={() => setOpen((value) => !value)} className={button}><ShieldCheck size={14} /> {open ? "Close verification" : "Verify delivery"}</button>
