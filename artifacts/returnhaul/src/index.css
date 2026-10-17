@@ -931,16 +931,18 @@ textarea {
 .home-hero {
   position: relative;
   isolation: isolate;
-  min-height: min(920px, calc(100dvh - 2rem));
-  margin: -2rem;
+  width: calc(100vw - 258px);
+  max-width: none;
+  min-height: max(34rem, calc(100dvh - 64px));
+  margin: -2rem 0 -2rem calc(50% - 50vw + 129px);
   overflow: hidden;
-  border-radius: 2rem;
+  border-radius: 0;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  --home-hero-image-filter: saturate(.9) contrast(.96) brightness(.96);
+  --home-hero-image-filter: saturate(1.08) contrast(1.02) brightness(.92);
   --home-hero-scrim:
-    linear-gradient(180deg, hsl(var(--background) / .48) 0%, hsl(var(--background) / .28) 30%, hsl(var(--background) / .2) 58%, hsl(var(--background) / .68) 100%),
-    linear-gradient(90deg, hsl(var(--background) / .16), transparent 58%, hsl(var(--background) / .14));
+    linear-gradient(180deg, hsl(var(--background) / .28) 0%, hsl(var(--background) / .14) 28%, hsl(var(--background) / .06) 58%, hsl(var(--background) / .3) 100%),
+    linear-gradient(90deg, hsl(var(--background) / .12), transparent 58%, hsl(var(--background) / .08));
   --home-hero-top-glow: hsl(var(--primary) / .16);
   --home-hero-center-glow: radial-gradient(ellipse, hsl(var(--primary) / .28), hsl(var(--primary) / .1) 48%, transparent 73%);
   --home-orbit-card: hsl(var(--card) / .88);
@@ -952,10 +954,10 @@ textarea {
 }
 
 .dark .home-hero {
-  --home-hero-image-filter: saturate(.82) contrast(.96) brightness(.68);
+  --home-hero-image-filter: saturate(1.02) contrast(1.04) brightness(.76);
   --home-hero-scrim:
-    linear-gradient(180deg, rgba(11, 17, 34, .72) 0%, rgba(11, 17, 34, .54) 28%, rgba(11, 17, 34, .28) 58%, rgba(8, 14, 28, .84) 100%),
-    linear-gradient(90deg, rgba(10, 17, 34, .2), transparent 58%, rgba(16, 18, 34, .18));
+    linear-gradient(180deg, rgba(8, 13, 27, .62) 0%, rgba(8, 13, 27, .4) 28%, rgba(8, 13, 27, .2) 58%, rgba(8, 14, 28, .62) 100%),
+    linear-gradient(90deg, rgba(10, 17, 34, .18), transparent 58%, rgba(16, 18, 34, .12));
   --home-hero-top-glow: hsl(var(--primary) / .22);
   --home-hero-center-glow: radial-gradient(ellipse, hsl(var(--primary) / .42), hsl(var(--primary) / .16) 48%, transparent 73%);
   --home-orbit-card: hsl(var(--card) / .92);
@@ -977,9 +979,9 @@ textarea {
 .home-hero-image {
   z-index: -3;
   object-fit: cover;
-  object-position: 55% 78%;
+  object-position: 50% 56%;
   filter: var(--home-hero-image-filter);
-  transform: scale(1.055);
+  transform: scale(1.015);
 }
 
 .home-hero-scrim {
@@ -1043,6 +1045,12 @@ textarea {
   left: 50%;
   width: min(34rem, calc(100% - 2.7rem));
   max-width: 34rem;
+  border: 1px solid hsl(var(--border) / .58);
+  border-radius: 1.25rem;
+  padding: .85rem 1.1rem;
+  background: hsl(var(--background) / .7);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   text-align: center;
   transform: translateX(-50%);
 }
@@ -1215,11 +1223,24 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: .55rem;
+  border: 1px solid hsl(var(--border) / .58);
+  border-radius: 999px;
+  padding: .45rem .75rem;
+  background: hsl(var(--background) / .7);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   color: hsl(var(--foreground) / .72);
   font: 700 9px var(--app-font-mono);
   letter-spacing: .09em;
   text-transform: uppercase;
   transform: translateX(-50%);
+}
+
+@media (max-width: 1023px) {
+  .home-hero {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+  }
 }
 
 .home-hero-status i {
@@ -1284,13 +1305,13 @@ textarea {
 
 @media (max-width: 767px) {
   .home-hero {
-    min-height: calc(100dvh - .5rem);
-    margin: -1rem -.875rem -6.5rem;
+    min-height: max(34rem, calc(100dvh - 8.375rem));
+    margin: -1rem calc(50% - 50vw) -6.5rem;
     border-radius: 0;
   }
 
   .home-hero-image {
-    object-position: 53% 83%;
+    object-position: 50% 60%;
   }
 
   .home-hero-content {
