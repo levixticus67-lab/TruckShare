@@ -1305,7 +1305,7 @@ textarea {
 
 @media (max-width: 767px) {
   .home-hero {
-    min-height: max(34rem, calc(100dvh - 4rem));
+    min-height: max(34rem, 100dvh);
     margin: -1rem calc(50% - 50vw) -6.5rem;
     border-radius: 0;
   }
@@ -1324,7 +1324,7 @@ textarea {
 
   .home-hero-support {
     right: auto;
-    bottom: 7.4rem;
+    bottom: 8.4rem;
     left: 50%;
     width: calc(100% - 4rem);
     transform: translateX(-50%);
@@ -1384,7 +1384,7 @@ textarea {
 
   .home-hero-status {
     right: auto;
-    bottom: 5rem;
+    bottom: 6rem;
     left: 50%;
     justify-content: center;
     gap: .4rem;
