@@ -1305,7 +1305,7 @@ textarea {
 
 @media (max-width: 767px) {
   .home-hero {
-    min-height: max(34rem, calc(100dvh - 8.375rem));
+    min-height: max(34rem, calc(100dvh - 4rem));
     margin: -1rem calc(50% - 50vw) -6.5rem;
     border-radius: 0;
   }

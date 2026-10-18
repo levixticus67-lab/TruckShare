@@ -2322,7 +2322,7 @@ function HomePage() {
     },
   };
   return <section className="home-hero" aria-labelledby="home-title">
-    <img className="home-hero-image" src="/branding/story/home-hero.jpg" alt="A cargo truck travelling through East African highlands" fetchPriority="high" decoding="async" />
+    <img className="home-hero-image" src={`${import.meta.env.BASE_URL}branding/story/home-hero.jpg?v=2`} alt="" aria-hidden="true" fetchPriority="high" decoding="async" />
     <div className="home-hero-scrim" aria-hidden="true" />
     <div className="home-hero-glow home-hero-glow-top" aria-hidden="true" />
     <div className="home-hero-glow home-hero-glow-center" aria-hidden="true" />
