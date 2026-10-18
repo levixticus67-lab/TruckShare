@@ -214,6 +214,8 @@ type BrokerRequest = {
   cancellationResolvedBy?: string;
   cancellationResolutionNote?: string;
 };
+const approvedMessageStatuses = new Set<BrokerRequestStatus>(["Approved", "Matching", "Offer sent", "Confirmed", "Assigned", "In progress", "On hold", "Closed"]);
+
 type AdminActivity = {
   id: string;
   requestId?: string;
@@ -240,6 +242,8 @@ type User = {
   termsAcceptedAt?: string;
   termsVersion?: string;
 };
+
+type StoredMessage = { id: string; clientUserId: string; senderUserId: string; senderRole: "Carrier" | "Shipper" | "Admin"; senderName: string; body: string; sentAt: string; createdAt: string; read: boolean };
 
 type CountryCode = "BI" | "CD" | "KE" | "RW" | "SO" | "SS" | "TZ" | "UG";
 type CurrencyCode = "BIF" | "CDF" | "KES" | "RWF" | "SOS" | "SSP" | "TZS" | "UGX";
@@ -420,7 +424,7 @@ const payments: Payment[] = [];
 
 const borderMilestones: BorderMilestone[] = [];
 
-const messages: Array<{ id: string; sender: string; body: string; sentAt: string; read: boolean }> = [];
+const messages: StoredMessage[] = [];
 
 const documents: Array<{ id: string; name: string; type: string; uploadedBy: string; uploadedAt: string; size: string; status: string }> = [];
 
@@ -493,7 +497,14 @@ function applyState(key: string, value: string) {
     requiredDocuments: Array.isArray(item.requiredDocuments) ? item.requiredDocuments.filter((document): document is string => typeof document === "string") : [],
     status: item.status || "Planned",
   })) as BorderMilestone[]);
-  if (key === "messages") messages.splice(0, messages.length, ...parsed);
+  if (key === "messages") {
+    const validMessages = parsed.filter((entry): entry is StoredMessage => {
+      if (typeof entry !== "object" || entry === null) return false;
+      const item = entry as Partial<StoredMessage>;
+      return typeof item.id === "string" && typeof item.clientUserId === "string" && typeof item.senderUserId === "string" && typeof item.senderName === "string" && typeof item.body === "string" && typeof item.sentAt === "string" && typeof item.createdAt === "string" && typeof item.read === "boolean" && ["Carrier", "Shipper", "Admin"].includes(item.senderRole || "");
+    });
+    messages.splice(0, messages.length, ...validMessages);
+  }
   if (key === "documents") documents.splice(0, documents.length, ...parsed);
   if (key === "users") users.splice(0, users.length, ...(parsed as Partial<User>[]).map((item) => ({
     ...item,
@@ -881,6 +892,19 @@ function adminUser(req: Request, res: Response) {
     return undefined;
   }
   return user;
+}
+
+function approvedMovementRequests(userId: string) {
+  return brokerRequests.filter((request) => request.ownerUserId === userId && approvedMessageStatuses.has(request.status));
+}
+
+function messageView(message: StoredMessage, viewer: User, client?: User) {
+  const sender = viewer.role === "Admin"
+    ? message.senderRole === "Admin"
+      ? message.senderUserId === viewer.id ? "You" : "Admin"
+      : client?.name || message.senderName || "Client"
+    : message.senderRole === "Admin" ? "TruckShare admin" : "You";
+  return { id: message.id, sender, body: message.body, sentAt: message.sentAt, read: message.read };
 }
 
 function canViewBookingFinance(user: User, booking: Booking) {
@@ -2555,13 +2579,104 @@ router.post("/payments/simulate", async (req, res) => {
   res.json({ booking, payment, message: `${network} payment simulated and escrow funded.` });
 });
 
-router.get("/messages", (_req, res) => res.json(ListMessagesResponse.parse(messages)));
-router.post("/messages", async (req, res) => {
-  const data = CreateMessageBody.parse(req.body);
-  const message = { ...data, id: id("msg"), sender: "You", sentAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), read: true };
+router.get("/admin/messages", (req, res) => {
+  const admin = adminUser(req, res);
+  if (!admin) return;
+  const eligibleRequests = brokerRequests
+    .filter((request) => approvedMessageStatuses.has(request.status) && request.ownerUserId)
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  const buildThreads = (kind: BrokerRequestKind) => {
+    const grouped = new Map<string, { client: User; movements: BrokerRequest[] }>();
+    for (const request of eligibleRequests) {
+      if (request.kind !== kind || !request.ownerUserId) continue;
+      const client = users.find((item) => item.id === request.ownerUserId);
+      if (!client || client.role === "Admin") continue;
+      const group = grouped.get(client.id) || { client, movements: [] };
+      group.movements.push(request);
+      grouped.set(client.id, group);
+    }
+    return Array.from(grouped.values()).map(({ client, movements }) => {
+      const threadMessages = messages
+        .filter((message) => message.clientUserId === client.id)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return {
+        client,
+        latestMovement: movements[0]!,
+        movementCount: movements.length,
+        threadMessages,
+        latestActivity: threadMessages[threadMessages.length - 1]?.createdAt || movements[0]!.updatedAt,
+      };
+    }).sort((a, b) => Date.parse(b.latestActivity) - Date.parse(a.latestActivity))
+      .map(({ client, latestMovement, movementCount, threadMessages }) => ({
+        clientUserId: client.id,
+        clientName: client.name,
+        movementCount,
+        movementTitle: latestMovement.title,
+        corridor: latestMovement.corridor,
+        status: latestMovement.status,
+        messages: threadMessages.map((message) => messageView(message, admin, client)),
+      }));
+  };
+  res.json({ cargoOwners: buildThreads("Load"), transporters: buildThreads("Trip") });
+});
+
+router.post("/admin/messages", async (req, res) => {
+  const admin = adminUser(req, res);
+  if (!admin) return;
+  const clientUserId = text(req.body?.clientUserId);
+  if (!clientUserId) { res.status(400).json({ error: "Choose an approved client conversation." }); return; }
+  const client = users.find((item) => item.id === clientUserId && item.role !== "Admin");
+  if (!client || !approvedMovementRequests(clientUserId).length) {
+    res.status(404).json({ error: "Approved client conversation not found." });
+    return;
+  }
+  const data = CreateMessageBody.parse({ body: req.body?.body });
+  const body = text(data.body);
+  if (!body || body.length > 2000) { res.status(400).json({ error: "Enter a message of 1 to 2000 characters." }); return; }
+  const now = new Date();
+  const message: StoredMessage = {
+    id: id("msg"), clientUserId, senderUserId: admin.id, senderRole: "Admin", senderName: admin.name, body,
+    sentAt: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), createdAt: now.toISOString(), read: true,
+  };
   messages.push(message);
   await persistDatabaseState();
-  res.status(201).json(message);
+  res.status(201).json(messageView(message, admin, client));
+});
+
+router.get("/messages", (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) { res.status(401).json({ error: "Log in to view messages." }); return; }
+  if (user.role === "Admin") { res.status(403).json({ error: "Use the admin chats workspace to view client messages." }); return; }
+  if (!approvedMovementRequests(user.id).length) {
+    res.status(403).json({ error: "Messages unlock after an admin approves one of your movements." });
+    return;
+  }
+  const visible = messages
+    .filter((message) => message.clientUserId === user.id)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((message) => messageView(message, user));
+  res.json(ListMessagesResponse.parse(visible));
+});
+
+router.post("/messages", async (req, res) => {
+  const user = authenticatedUser(req);
+  if (!user) { res.status(401).json({ error: "Log in before sending a message." }); return; }
+  if (user.role === "Admin") { res.status(403).json({ error: "Use the admin chats workspace to contact clients." }); return; }
+  if (!approvedMovementRequests(user.id).length) {
+    res.status(403).json({ error: "Messages unlock after an admin approves one of your movements." });
+    return;
+  }
+  const data = CreateMessageBody.parse(req.body);
+  const body = text(data.body);
+  if (!body || body.length > 2000) { res.status(400).json({ error: "Enter a message of 1 to 2000 characters." }); return; }
+  const now = new Date();
+  const message: StoredMessage = {
+    id: id("msg"), clientUserId: user.id, senderUserId: user.id, senderRole: user.role, senderName: user.name, body,
+    sentAt: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), createdAt: now.toISOString(), read: false,
+  };
+  messages.push(message);
+  await persistDatabaseState();
+  res.status(201).json(messageView(message, user));
 });
 
 router.get("/documents", (_req, res) => res.json(ListDocumentsResponse.parse(documents)));

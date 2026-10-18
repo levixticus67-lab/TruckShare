@@ -89,6 +89,9 @@ type AuthUser = { id: string; name: string; phone?: string; email?: string; coun
 type BrokerSuggestion = { id: string; kind: "Load" | "Trip"; title: string; counterpart: string; corridor: string; date: string; price: number; compatibility: number };
 type BrokerActivity = { id: string; requestId?: string; label: string; detail: string; actor: string; createdAt: string };
 type BrokerRequest = { id: string; kind: "Load" | "Trip"; entityId: string; title: string; counterpart: string; corridor: string; date: string; priority: "Low" | "Normal" | "High" | "Urgent"; status: "New" | "Needs information" | "Approved" | "Matching" | "Offer sent" | "Confirmed" | "Assigned" | "In progress" | "On hold" | "Closed" | "Rejected" | "Cancelled"; assignedTo?: string; proposedMatchId?: string; bookingId?: string; notes: string[]; createdAt: string; updatedAt: string; cancellationStatus?: CancellationStatus; cancellationReason?: string; cancellationRequestedAt?: string; cancellationResolvedAt?: string; cancellationResolvedBy?: string; cancellationResolutionNote?: string; suggestions: BrokerSuggestion[]; activities?: BrokerActivity[] };
+type ChatMessage = { id: string; sender: string; body: string; sentAt: string; read: boolean };
+type AdminChatThread = { clientUserId: string; clientName: string; movementCount: number; movementTitle: string; corridor: string; status: string; messages: ChatMessage[] };
+type AdminChatInbox = { cargoOwners: AdminChatThread[]; transporters: AdminChatThread[] };
 type CustomerRequest = { id: string; entityId: string; kind: "Load" | "Trip"; title: string; counterpart: string; corridor: string; date: string; priority: "Low" | "Normal" | "High" | "Urgent"; status: BrokerRequest["status"]; bookingId?: string; proposedMatchId?: string; notes: string[]; createdAt: string; updatedAt: string; cancellationStatus?: CancellationStatus; cancellationReason?: string; cancellationRequestedAt?: string; cancellationResolutionNote?: string };
 const truckAssetPaths: Record<string, string> = {
   fuso: "/transport/trucks/truck-fuso.png",
@@ -198,7 +201,7 @@ const adminPanelPages = [
   { href: "/admin/requests", key: "requests", label: "Requests", detail: "Review incoming requests, update their workflow, and make matches.", icon: Inbox },
   { href: "/admin/operations", key: "operations", label: "Active operations", detail: "Track confirmed assignments and in-progress handoffs.", icon: RouteIcon },
   { href: "/admin/bookings", key: "bookings", label: "Bookings", detail: "Manage active bookings, delivery progress, and payouts.", icon: CalendarDays },
-  { href: "/admin/messages", key: "messages", label: "Messages", detail: "Review and send coordination messages from the admin workspace.", icon: MessageSquare },
+  { href: "/admin/messages", key: "messages", label: "Chats", detail: "Chat with approved cargo owners and transporters through the admin desk.", icon: MessageSquare },
   { href: "/admin/finance", key: "finance", label: "Finance", detail: "Monitor booking value, commissions, and items requiring follow-up.", icon: Banknote },
   { href: "/admin/compliance", key: "compliance", label: "Compliance", detail: "Review submitted identity, license, and vehicle documents.", icon: ShieldCheck },
   { href: "/admin/activity", key: "activity", label: "Activity", detail: "See the latest decisions made across the broker desk.", icon: Activity },
@@ -1601,27 +1604,99 @@ function MessagesPage() {
   const role = useRole();
   const [location] = useLocation();
   const embeddedAdmin = role === "Admin" && location.startsWith("/admin");
-  const query = useApi<{ id: string; sender: string; body: string; sentAt: string; read: boolean }[]>("/messages", []);
+  const adminInbox = useApi<AdminChatInbox>("/admin/messages", { cargoOwners: [], transporters: [] }, embeddedAdmin);
+  const clientMessages = useApi<ChatMessage[]>("/messages", [], !embeddedAdmin);
+  const [group, setGroup] = useState<"cargoOwners" | "transporters">("cargoOwners");
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [search, setSearch] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const adminThreads = embeddedAdmin ? adminInbox.data[group] : [];
+  const visibleThreads = adminThreads.filter((thread) => [thread.clientName, thread.corridor, thread.movementTitle].join(" ").toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const selectedThread = visibleThreads.find((thread) => thread.clientUserId === selectedClientId);
+
+  useEffect(() => {
+    if (embeddedAdmin && !visibleThreads.some((thread) => thread.clientUserId === selectedClientId)) {
+      setSelectedClientId(visibleThreads[0]?.clientUserId || "");
+    }
+  }, [embeddedAdmin, visibleThreads, selectedClientId]);
+
   const send = async (event: FormEvent) => {
     event.preventDefault();
-    if (!body.trim() || sending) return;
+    const messageBody = body.trim();
+    if (!messageBody || sending) return;
+    if (embeddedAdmin && !selectedThread) return;
     setSending(true);
     try {
-      await api("/messages", { method: "POST", body: JSON.stringify({ body }) });
+      if (embeddedAdmin && selectedThread) {
+        await api("/admin/messages", { method: "POST", body: JSON.stringify({ clientUserId: selectedThread.clientUserId, body: messageBody }) });
+        adminInbox.reload();
+      } else {
+        await api("/messages", { method: "POST", body: JSON.stringify({ body: messageBody }) });
+        clientMessages.reload();
+      }
       setBody("");
       notifySuccess("Message sent.");
-      query.reload();
     } catch (reason: unknown) {
       notifyError(reason instanceof Error ? reason.message : "Message could not be sent.");
     } finally {
       setSending(false);
     }
   };
-  return <div className="space-y-6">{!embeddedAdmin && <Header eyebrow="Coordination" title="Messages" detail="Send and review messages recorded for your account." />}<Card className="mx-auto max-w-3xl"><div className="mb-5 flex items-center gap-3 border-b border-border pb-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-primary"><MessageSquare size={18} /></div><div><h3 className="text-sm font-bold">Messages</h3><p className="text-[11px] text-muted-foreground">Account activity</p></div></div><div className="min-h-[280px] space-y-3">{query.loading ? <Loading error={query.error} retry={query.reload} /> : query.data.length ? query.data.map((message) => <div key={message.id} className={`flex ${message.sender === "You" ? "justify-end" : "justify-start"}`}><div className={`max-w-[80%] rounded-2xl px-4 py-3 text-xs ${message.sender === "You" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted"}`}><p>{message.body}</p><p className={`mt-2 font-mono-ui text-[9px] ${message.sender === "You" ? "text-primary-foreground/55" : "text-muted-foreground"}`}>{message.sender} · {message.sentAt}</p></div></div>) : <div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">No messages have been sent.</div>}</div><form onSubmit={send} className="mt-4 flex gap-2 border-t border-border pt-4"><input className={input} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." /><button type="submit" disabled={sending || !body.trim()} className={button} aria-label="Send message">{sending ? "Sending..." : <Send size={14} />}</button></form></Card></div>;
-}
 
+  if (embeddedAdmin) {
+    const chatMessages = selectedThread?.messages || [];
+    return <div className="admin-dashboard admin-page-content space-y-5">
+      {adminInbox.error && <div role="alert" className="admin-inline-error">{adminInbox.error}</div>}
+      <div className="grid gap-4 xl:grid-cols-[minmax(15rem,.72fr)_minmax(0,1.7fr)]">
+        <Card className="overflow-hidden p-0">
+          <div role="tablist" aria-label="Client type" className="grid grid-cols-2 border-b border-border">
+            <button type="button" role="tab" aria-selected={group === "cargoOwners"} onClick={() => { setGroup("cargoOwners"); setSelectedClientId(""); }} className={"min-h-12 px-3 text-xs font-bold " + (group === "cargoOwners" ? "border-b-2 border-primary bg-primary/5 text-foreground" : "text-muted-foreground hover:bg-muted/50")}>
+              Cargo owners <span className="ml-1 text-[10px] text-muted-foreground">{adminInbox.data.cargoOwners.length}</span>
+            </button>
+            <button type="button" role="tab" aria-selected={group === "transporters"} onClick={() => { setGroup("transporters"); setSelectedClientId(""); }} className={"min-h-12 px-3 text-xs font-bold " + (group === "transporters" ? "border-b-2 border-primary bg-primary/5 text-foreground" : "text-muted-foreground hover:bg-muted/50")}>
+              Transporters <span className="ml-1 text-[10px] text-muted-foreground">{adminInbox.data.transporters.length}</span>
+            </button>
+          </div>
+          <div className="p-3">
+            <label className="block"><span className={labelClass}>Find a client</span><input className={input} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, route, or movement" /></label>
+          </div>
+          <div className="max-h-[50vh] min-h-[220px] overflow-y-auto px-2 pb-2">
+            {adminInbox.loading ? <Loading error={adminInbox.error} retry={adminInbox.reload} /> : visibleThreads.length ? <div className="space-y-1">{visibleThreads.map((thread) => {
+              const latest = thread.messages[thread.messages.length - 1];
+              const active = selectedClientId === thread.clientUserId;
+              return <button type="button" key={thread.clientUserId} onClick={() => setSelectedClientId(thread.clientUserId)} aria-pressed={active} className={"w-full rounded-xl border p-3 text-left transition " + (active ? "border-primary/40 bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/50")}>
+                <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-bold">{thread.clientName}</p><p className="mt-1 truncate text-[11px] text-muted-foreground">{thread.movementTitle} · {thread.corridor}</p></div><Status value={thread.status} /></div>
+                <p className="mt-2 truncate text-[10px] text-muted-foreground">{latest ? (latest.sender === "You" ? "You: " : latest.sender + ": ") + latest.body : "Start a conversation"}</p>
+              </button>;
+            })}</div> : <p className="px-3 py-8 text-center text-xs leading-5 text-muted-foreground">No approved {group === "cargoOwners" ? "cargo owner" : "transporter"} chats yet.</p>}
+          </div>
+        </Card>
+        <Card className="flex min-h-[440px] flex-col p-0">
+          {selectedThread ? <>
+            <div className="flex items-center gap-3 border-b border-border p-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare size={18} /></div><div className="min-w-0"><h2 className="truncate text-sm font-bold">{selectedThread.clientName}</h2><p className="mt-1 truncate text-[11px] text-muted-foreground">{group === "cargoOwners" ? "Cargo owner" : "Transporter"} · {selectedThread.corridor} · {selectedThread.movementCount} approved movement{selectedThread.movementCount === 1 ? "" : "s"}</p></div></div>
+            <div className="flex min-h-[280px] max-h-[55vh] flex-1 flex-col gap-3 overflow-y-auto p-4">
+              {chatMessages.length ? chatMessages.map((message) => <div key={message.id} className={"flex " + (message.sender === "You" ? "justify-end" : "justify-start")}><div className={"max-w-[82%] rounded-2xl px-4 py-3 text-xs " + (message.sender === "You" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted")}><p className="whitespace-pre-wrap break-words">{message.body}</p><p className={"mt-2 font-mono-ui text-[9px] " + (message.sender === "You" ? "text-primary-foreground/60" : "text-muted-foreground")}>{message.sender} · {message.sentAt}</p></div></div>) : <div className="m-auto max-w-sm text-center"><MessageSquare className="mx-auto text-muted-foreground" size={24} /><p className="mt-3 text-sm font-semibold">Start the admin chat</p><p className="mt-1 text-xs leading-5 text-muted-foreground">This private thread is visible to the selected client and TruckShare admins only.</p></div>}
+            </div>
+            <form onSubmit={send} className="flex gap-2 border-t border-border p-4"><input className={input + " min-w-0 flex-1"} maxLength={2000} value={body} onChange={(event) => setBody(event.target.value)} placeholder={"Message " + selectedThread.clientName} aria-label={"Message " + selectedThread.clientName} /><button type="submit" disabled={sending || !body.trim()} className={button} aria-label="Send message">{sending ? "Sending…" : <Send size={14} />}</button></form>
+          </> : <div className="flex flex-1 items-center justify-center p-8 text-center"><div><MessageSquare className="mx-auto text-muted-foreground" size={26} /><p className="mt-3 text-sm font-semibold">Choose an approved client</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Client conversations are grouped by cargo owner and transporter. All chat stays with the admin team.</p></div></div>}
+        </Card>
+      </div>
+    </div>;
+  }
+
+  const locked = clientMessages.error.toLocaleLowerCase().includes("unlocks");
+  return <div className="space-y-6">
+    <Header eyebrow="Admin coordination" title="Messages" detail="Chat privately with the TruckShare admin desk about an approved movement. Clients do not message other clients." />
+    {clientMessages.error ? <Card><div className="mx-auto max-w-lg py-8 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-primary"><MessageSquare size={20} /></div><h2 className="mt-4 font-display text-xl font-semibold">{locked ? "Chat unlocks after approval" : "Messages are unavailable"}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{locked ? "Once the admin approves one of your load or trip movements, you can contact the admin team here." : clientMessages.error}</p></div></Card> : <Card className="mx-auto flex max-w-3xl flex-col p-0">
+      <div className="flex items-center gap-3 border-b border-border p-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare size={18} /></div><div><h2 className="text-sm font-bold">TruckShare admin</h2><p className="mt-1 text-[11px] text-muted-foreground">Private coordination about your approved movement</p></div></div>
+      <div className="flex min-h-[280px] max-h-[55vh] flex-col gap-3 overflow-y-auto p-4">
+        {clientMessages.loading ? <Loading error={clientMessages.error} retry={clientMessages.reload} /> : clientMessages.data.length ? clientMessages.data.map((message) => <div key={message.id} className={"flex " + (message.sender === "You" ? "justify-end" : "justify-start")}><div className={"max-w-[82%] rounded-2xl px-4 py-3 text-xs " + (message.sender === "You" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted")}><p className="whitespace-pre-wrap break-words">{message.body}</p><p className={"mt-2 font-mono-ui text-[9px] " + (message.sender === "You" ? "text-primary-foreground/60" : "text-muted-foreground")}>{message.sender} · {message.sentAt}</p></div></div>) : <div className="m-auto max-w-sm text-center"><p className="text-sm font-semibold">No messages yet</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Send a note to the TruckShare admin team. Your conversation stays private to the admin desk.</p></div>}
+      </div>
+      <form onSubmit={send} className="flex gap-2 border-t border-border p-4"><input className={input + " min-w-0 flex-1"} maxLength={2000} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Message the admin team" aria-label="Message the admin team" /><button type="submit" disabled={sending || !body.trim() || clientMessages.loading} className={button} aria-label="Send message">{sending ? "Sending…" : <Send size={14} />}</button></form>
+    </Card>}
+  </div>;
+}
 function DocumentsPage() {
   const query = useApi<{ id: string; name: string; type: string; uploadedBy: string; uploadedAt: string; size: string; status: string }[]>("/documents", []);
   const [formOpen, setFormOpen] = useState(false);

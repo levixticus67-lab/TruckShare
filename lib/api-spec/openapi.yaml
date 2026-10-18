@@ -648,7 +648,7 @@ paths:
     get:
       operationId: listMessages
       tags: [messages]
-      summary: List negotiation messages
+      summary: List the authenticated client’s admin chat after movement approval
       responses:
         "200":
           description: Messages
@@ -661,7 +661,7 @@ paths:
     post:
       operationId: createMessage
       tags: [messages]
-      summary: Send a negotiation message
+      summary: Send a message to the admin team; clients cannot choose a recipient
       requestBody:
         required: true
         content:
@@ -675,6 +675,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
+  /admin/messages:
+    get:
+      operationId: getAdminMessageInbox
+      tags: [admin, messages]
+      summary: List eligible client chats grouped by cargo owner and transporter
+      responses:
+        "200":
+          description: Approved client conversations for the admin inbox
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMessageInbox"
+        "401": { description: Authentication required }
+        "403": { description: Admin access required }
+    post:
+      operationId: sendAdminMessage
+      tags: [admin, messages]
+      summary: Send a message from an admin to an approved client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminMessageInput"
+      responses:
+        "201":
+          description: Admin message created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401": { description: Authentication required }
+        "403": { description: Admin access required }
+        "404": { description: Approved client conversation not found }
   /documents:
     get:
       operationId: listDocuments
@@ -1157,7 +1191,36 @@ components:
       type: object
       required: [body]
       properties:
-        body: { type: string }
+        body: { type: string, minLength: 1, maxLength: 2000 }
+    AdminChatThread:
+      type: object
+      required: [clientUserId, clientName, movementCount, movementTitle, corridor, status, messages]
+      properties:
+        clientUserId: { type: string }
+        clientName: { type: string }
+        movementCount: { type: integer }
+        movementTitle: { type: string }
+        corridor: { type: string }
+        status: { type: string }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+    AdminMessageInbox:
+      type: object
+      required: [cargoOwners, transporters]
+      properties:
+        cargoOwners:
+          type: array
+          items: { $ref: "#/components/schemas/AdminChatThread" }
+        transporters:
+          type: array
+          items: { $ref: "#/components/schemas/AdminChatThread" }
+    AdminMessageInput:
+      type: object
+      required: [clientUserId, body]
+      properties:
+        clientUserId: { type: string }
+        body: { type: string, minLength: 1, maxLength: 2000 }
     Document:
       type: object
       required: [id, name, type, uploadedBy, uploadedAt, size, status]
