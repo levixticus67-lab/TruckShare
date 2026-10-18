@@ -508,7 +508,7 @@ function Field({ label, value, onChange, type = "text", placeholder, required = 
 function CountrySelect({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className={labelClass}>{label} *</span><select required className={input} value={value} onChange={(event) => onChange(event.target.value)}>{regionalReference.countries.map((country) => <option key={country.code} value={country.code}>{country.name} ({country.code})</option>)}</select></label>; }
 
 function RouteLocationField({ label, value, countryCode, onChange, onLabelChange, onCountryChange }: { label: string; value?: LocationPoint; countryCode: string; onChange: (location: LocationPoint) => void; onLabelChange: (label: string) => void; onCountryChange: (value: string) => void }) {
-  return <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_7rem] items-end gap-2">
+  return <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_7rem] items-start gap-2">
     <LocationPicker label={label} value={value} countryCode={countryCode} onChange={onChange} onLabelChange={onLabelChange} />
     <label className="block min-w-0"><span className={labelClass}>Country</span><select aria-label={label + " country"} required className={input + " px-2 text-[11px]"} value={countryCode} onChange={(event) => onCountryChange(event.target.value)}>{regionalReference.countries.map((country) => <option key={country.code} value={country.code}>{country.code} · {country.name}</option>)}</select></label>
   </div>;
