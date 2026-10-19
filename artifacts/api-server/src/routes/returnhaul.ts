@@ -801,6 +801,7 @@ function frontendRedirectUrl() {
 function safeFrontendRedirect(value?: string) {
   const fallback = new URL(frontendRedirectUrl());
   if (!value) return fallback.toString();
+  if (value === "truckshare://auth") return value;
   try {
     const requested = new URL(value);
     if (requested.origin !== fallback.origin) return fallback.toString();

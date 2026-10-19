@@ -1,4 +1,7 @@
 import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import {
   Activity, ArrowLeft, ArrowRight, BadgeCheck, Banknote, BarChart3, Bell, Box, CalendarDays,
   Check, ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Clock3, FileCheck2,
@@ -886,7 +889,13 @@ function LegacyEmailAuthModal({ onComplete, onClose = () => {}, required = false
     setBusy(true);
     const params = new URLSearchParams({ mode });
     if (mode === "signup") params.set("roles", roles.join(","));
-    window.location.assign(`${API_ROOT}/auth/google/start?${params.toString()}`);
+    if (Capacitor.isNativePlatform()) params.set("return_to", "truckshare://auth");
+    const url = `${API_ROOT}/auth/google/start?${params.toString()}`;
+    if (Capacitor.isNativePlatform()) {
+      void Browser.open({ url }).catch(() => setMessage("Google sign-in could not be opened. Please try again.")).finally(() => setBusy(false));
+      return;
+    }
+    window.location.assign(url);
   };
   const submitProfile = (event: FormEvent) => {
     event.preventDefault();
@@ -1053,8 +1062,14 @@ function AuthModal({ onComplete, onClose = () => {}, required = false, initialMe
     const params = new URLSearchParams({ mode });
     if (mode === "signup") params.set("roles", roles.join(","));
     if (mode === "signup" && acceptedTerms) params.set("terms", "1");
-    params.set("return_to", `${window.location.origin}${window.location.pathname}`);
-    window.location.assign(`${API_ROOT}/auth/google/start?${params.toString()}`);
+    if (Capacitor.isNativePlatform()) params.set("return_to", "truckshare://auth");
+    else params.set("return_to", `${window.location.origin}${window.location.pathname}`);
+    const url = `${API_ROOT}/auth/google/start?${params.toString()}`;
+    if (Capacitor.isNativePlatform()) {
+      void Browser.open({ url }).catch(() => setMessage("Google sign-in could not be opened. Please try again.")).finally(() => setBusy(false));
+      return;
+    }
+    window.location.assign(url);
   };
 
   const submitProfile = (event: FormEvent) => {
@@ -2615,8 +2630,56 @@ function Router() {
     </Switch>
   </ErrorBoundary>;
 }
+function NativeAppBridge() {
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let disposed = false;
+    const listeners: Array<{ remove: () => Promise<void> }> = [];
+    const keepListener = (pending: Promise<{ remove: () => Promise<void> }>) => {
+      void pending.then((listener) => {
+        if (disposed) void listener.remove();
+        else listeners.push(listener);
+      });
+    };
+    const seenUrls = new Set<string>();
+    const handleDeepLink = ({ url }: { url: string }) => {
+      if (seenUrls.has(url)) return;
+      try {
+        const link = new URL(url);
+        if (link.protocol !== "truckshare:" || link.host !== "auth") return;
+        const params = new URLSearchParams();
+        const code = link.searchParams.get("google_code");
+        const error = link.searchParams.get("google_error");
+        if (code) params.set("google_code", code);
+        if (error) params.set("google_error", error);
+        if (!params.toString()) return;
+        seenUrls.add(url);
+        void Browser.close().catch(() => undefined);
+        window.location.assign("/?" + params.toString());
+      } catch {
+        // Ignore non-URL app events; only the TruckShare auth link is handled.
+      }
+    };
+    keepListener(CapacitorApp.addListener("backButton", ({ canGoBack }) => {
+      if (canGoBack && window.history.length > 1) window.history.back();
+      else if (window.location.pathname !== "/") window.location.assign("/");
+      else void CapacitorApp.exitApp();
+    }));
+    keepListener(CapacitorApp.addListener("appUrlOpen", handleDeepLink));
+    void CapacitorApp.getLaunchUrl().then((launch) => {
+      if (launch?.url) handleDeepLink({ url: launch.url });
+    });
+    return () => {
+      disposed = true;
+      listeners.forEach((listener) => void listener.remove());
+    };
+  }, []);
+  return null;
+}
+
 export default function App() {
   return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+    <NativeAppBridge />
     <Router />
     <Toaster
       position="bottom-right"

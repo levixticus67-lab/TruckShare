@@ -25,9 +25,17 @@ app.use(
     },
   }),
 );
+const nativeFrontendOrigins = new Set(["https://localhost", "capacitor://localhost"]);
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL ?? true,
+    origin: (origin, callback) => {
+      const frontendOrigin = process.env.FRONTEND_URL?.replace(/\/$/, "");
+      if (!origin || !frontendOrigin || origin === frontendOrigin || nativeFrontendOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("This origin is not allowed by CORS."));
+    },
   }),
 );
 app.use(express.json());
